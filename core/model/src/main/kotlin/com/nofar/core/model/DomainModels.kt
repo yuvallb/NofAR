@@ -1,22 +1,52 @@
 package com.nofar.core.model
 
+import java.time.Instant
+import java.util.UUID
+
 data class Region(
-    val id: Long,
+    val id: UUID,
     val name: String,
     val centerLat: Double,
     val centerLon: Double,
-    val radiusMeters: Double
+    val radiusM: Double,
+    val minLat: Double,
+    val maxLat: Double,
+    val minLon: Double,
+    val maxLon: Double,
+    val createdAt: Instant,
+    val updatedAt: Instant,
+    val downloadStatus: DownloadStatus,
+    val downloadProgressPct: Int,
+    val osmDatasetVersion: Instant?,
+    val estimatedSizeBytes: Long,
+    val entityCount: Int
 )
 
 data class GeoEntity(
-    val id: Long,
-    val osmId: Long,
+    val id: String,
+    val osmType: OsmType,
     val name: String,
-    val latitude: Double,
-    val longitude: Double,
-    val elevationMeters: Double?,
-    val placeTag: String?,
-    val isPeak: Boolean
+    val type: GeoEntityType,
+    val lat: Double,
+    val lon: Double,
+    val elevation: Double?,
+    val elevationSource: ElevationSource?,
+    val lastSeenAt: Instant
 )
 
-data class DemTile(val tileId: String, val southWestLat: Double, val southWestLon: Double, val rows: Int, val cols: Int)
+data class DemTile(
+    val tileId: String,
+    val filePath: String,
+    val width: Int,
+    val height: Int,
+    val tileLat: Int,
+    val tileLon: Int,
+    val noDataValue: Float,
+    val sizeBytes: Long,
+    val refCount: Int,
+    val lastAccessedAt: Instant
+)
+
+data class RegionEntityCoverage(val regionId: UUID, val entityId: String)
+
+data class TileCoverage(val regionId: UUID, val tileId: String)
