@@ -70,7 +70,7 @@ What exists today:
 
 ### Android app
 
-Requirements: JDK 17+, Android SDK, a device or emulator on API 26+.
+Requirements: **JDK 26** (Gradle runtime; Android modules compile to JVM 17 bytecode), Android SDK, a device or emulator on API 26+.
 
 ```bash
 ./gradlew :app:assembleDebug
