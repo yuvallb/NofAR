@@ -31,6 +31,6 @@ object AppConfig {
     /** Default DEM tile cache size limit (bytes). */
     const val DEM_CACHE_DEFAULT_LIMIT_BYTES: Long = 500L * 1024 * 1024
 
-    /** Grace period before evicting unused DEM tiles after region delete. */
-    val demCacheGracePeriod: Duration = 2.minutes
+    /** Keep Explore running after leaving the active region (GPS excursion tolerance). */
+    val exploreRegionExitGracePeriod: Duration = 2.minutes
 }

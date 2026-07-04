@@ -10,10 +10,11 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinAndroidProjectExtension
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 
-private val kotlinCompilerArgs = listOf(
-    "-opt-in=kotlin.RequiresOptIn",
-    "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
-)
+private val kotlinCompilerArgs =
+    listOf(
+        "-opt-in=kotlin.RequiresOptIn",
+        "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api"
+    )
 
 internal fun Project.configureKotlinAndroid(extension: ApplicationExtension) {
     extension.apply {

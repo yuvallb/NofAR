@@ -38,16 +38,16 @@ fun NofARApp() {
                                 }
                             },
                             icon = destination.icon,
-                            label = { Text(destination.label) },
+                            label = { Text(destination.label) }
                         )
                     }
                 }
             }
-        },
+        }
     ) { innerPadding ->
         NofARNavHost(
             navController = navController,
-            modifier = Modifier.padding(innerPadding),
+            modifier = Modifier.padding(innerPadding)
         )
     }
 }

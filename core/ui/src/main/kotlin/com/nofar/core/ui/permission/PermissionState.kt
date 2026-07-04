@@ -12,11 +12,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import com.nofar.core.ui.R
 
 enum class NofARPermission {
     FineLocation,
     Camera,
-    Internet,
+    Internet
+}
+
+fun permissionRationaleResId(permission: NofARPermission): Int = when (permission) {
+    NofARPermission.FineLocation -> R.string.permission_rationale_location
+    NofARPermission.Camera -> R.string.permission_rationale_camera
+    NofARPermission.Internet -> R.string.permission_rationale_internet
 }
 
 @Immutable
@@ -25,7 +32,7 @@ data class PermissionState(
     val cameraGranted: Boolean,
     val internetGranted: Boolean,
     val requestFineLocation: () -> Unit,
-    val requestCamera: () -> Unit,
+    val requestCamera: () -> Unit
 )
 
 /**
@@ -39,38 +46,41 @@ fun rememberNofARPermissionState(): PermissionState {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
                 context,
-                Manifest.permission.ACCESS_FINE_LOCATION,
-            ) == PackageManager.PERMISSION_GRANTED,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED
         )
     }
     var cameraGranted by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(
                 context,
-                Manifest.permission.CAMERA,
-            ) == PackageManager.PERMISSION_GRANTED,
+                Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
         )
     }
-    val internetGranted = remember {
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.INTERNET,
-        ) == PackageManager.PERMISSION_GRANTED
-    }
+    val internetGranted =
+        remember {
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.INTERNET
+            ) == PackageManager.PERMISSION_GRANTED
+        }
 
-    val locationLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted -> fineLocationGranted = granted }
+    val locationLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted -> fineLocationGranted = granted }
 
-    val cameraLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission(),
-    ) { granted -> cameraGranted = granted }
+    val cameraLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestPermission()
+        ) { granted -> cameraGranted = granted }
 
     return PermissionState(
         fineLocationGranted = fineLocationGranted,
         cameraGranted = cameraGranted,
         internetGranted = internetGranted,
         requestFineLocation = { locationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION) },
-        requestCamera = { cameraLauncher.launch(Manifest.permission.CAMERA) },
+        requestCamera = { cameraLauncher.launch(Manifest.permission.CAMERA) }
     )
 }

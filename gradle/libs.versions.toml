@@ -14,6 +14,7 @@ camerax = "1.4.1"
 okhttp = "4.12.0"
 moshi = "1.15.2"
 detekt = "2.0.0-alpha.5"
+spotless = "7.0.4"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
@@ -29,6 +30,7 @@ truth = "1.4.4"
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
 detekt-gradlePlugin = { group = "dev.detekt", name = "dev.detekt.gradle.plugin", version.ref = "detekt" }
+spotless-gradlePlugin = { group = "com.diffplug.spotless", name = "com.diffplug.spotless.gradle.plugin", version.ref = "spotless" }
 
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycle" }
@@ -82,6 +84,7 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
 
 # Convention plugins (defined in build-logic)
 nofar-android-application = { id = "nofar.android.application" }
@@ -91,4 +94,5 @@ nofar-android-hilt = { id = "nofar.android.hilt" }
 nofar-android-compose = { id = "nofar.android.compose" }
 nofar-android-lint = { id = "nofar.android.lint" }
 nofar-detekt = { id = "nofar.detekt" }
+nofar-spotless = { id = "nofar.spotless" }
 nofar-jvm-library = { id = "nofar.jvm.library" }

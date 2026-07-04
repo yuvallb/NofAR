@@ -81,7 +81,7 @@ cp local.properties.example local.properties
 
 ```bash
 ./gradlew :app:assembleDebug
-./gradlew detekt lint test
+./gradlew spotlessCheck detekt lint test
 ```
 
 Release builds:
@@ -90,7 +90,7 @@ Release builds:
 ./gradlew :app:assembleRelease
 ```
 
-CI will run `detekt`, `lint`, `test`, and `assembleRelease` on pull requests.
+CI will run `spotlessCheck`, `detekt`, `lint`, `test`, `assembleDebug`, and `assembleRelease` on pull requests.
 
 ### Python prototypes (available now)
 

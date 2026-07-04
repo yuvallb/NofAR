@@ -17,7 +17,7 @@ import com.nofar.core.designsystem.component.NofARTopAppBar
 fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: HomeViewModel = hiltViewModel(),
+    viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -27,7 +27,7 @@ fun HomeScreen(
             Text(text = uiState.message)
             Button(
                 onClick = onNavigateToSettings,
-                modifier = Modifier.padding(top = 16.dp),
+                modifier = Modifier.padding(top = 16.dp)
             ) {
                 Text(text = "Settings")
             }

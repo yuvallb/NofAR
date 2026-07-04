@@ -10,14 +10,12 @@ import androidx.compose.ui.unit.dp
 import com.nofar.core.designsystem.component.NofARTopAppBar
 
 @Composable
-fun PrepareScreen(
-    modifier: Modifier = Modifier,
-) {
+fun PrepareScreen(modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxSize()) {
         NofARTopAppBar(title = "Prepare")
         Text(
             text = "Draw a circular region and download OSM + DEM data.",
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(16.dp)
         )
     }
 }

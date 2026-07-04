@@ -1,5 +1,7 @@
 package com.nofar.core.model
 
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -29,5 +31,7 @@ class AppConfigTest {
         assertEquals(20.0, AppConfig.REGION_RADIUS_MAX_KM, 0.001)
         assertEquals(50L * 1024 * 1024, AppConfig.CELLULAR_DOWNLOAD_WARNING_BYTES)
         assertEquals(500L * 1024 * 1024, AppConfig.DEM_CACHE_DEFAULT_LIMIT_BYTES)
+        assertEquals(2.seconds, AppConfig.visibilityRefreshMaxInterval)
+        assertEquals(2.minutes, AppConfig.exploreRegionExitGracePeriod)
     }
 }

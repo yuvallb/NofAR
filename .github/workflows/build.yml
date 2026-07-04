@@ -36,4 +36,4 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build and verify
-        run: ./gradlew detekt lint test assembleRelease --stacktrace
+        run: ./gradlew spotlessCheck detekt lint test assembleDebug assembleRelease --stacktrace

@@ -53,11 +53,11 @@ Once Phase 0 is complete, use these commands (requires **JDK 26** to run Gradle;
 ./gradlew :app:assembleRelease
 
 # Quality gates (must pass before merging)
-./gradlew detekt lint test
+./gradlew spotlessCheck detekt lint test
 ./gradlew connectedCheck   # instrumented tests, when applicable
 ```
 
-CI (GitHub Actions) runs `./gradlew detekt lint test assembleRelease` on PRs and pushes to `main` using JDK 26.
+CI (GitHub Actions) runs `./gradlew spotlessCheck detekt lint test assembleDebug assembleRelease` on PRs and pushes to `main` using JDK 26.
 
 **Python scripts** (algorithm prototyping only):
 
@@ -147,7 +147,7 @@ These are non-negotiable for MVP — do not introduce alternatives without expli
 - Match [Now in Android](https://github.com/android/nowinandroid) conventions: naming, module boundaries, convention plugins, theme pattern (`NofARTheme`).
 - Keep diffs minimal and scoped to the task — no drive-by refactors.
 - Prefer self-explanatory code; comment only non-obvious business logic.
-- Run `detekt` and `lint` before considering Android work complete.
+- Run `spotlessCheck`, `detekt`, and `lint` before considering Android work complete.
 
 ---
 

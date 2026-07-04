@@ -8,7 +8,6 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
-    testImplementation(project(":core:testing"))
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }
