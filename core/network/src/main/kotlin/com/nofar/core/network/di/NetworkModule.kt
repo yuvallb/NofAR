@@ -1,5 +1,9 @@
 package com.nofar.core.network.di
 
+import com.nofar.core.network.DefaultDemTileFetcher
+import com.nofar.core.network.DefaultOverpassApi
+import com.nofar.core.network.DemTileFetcher
+import com.nofar.core.network.OverpassApi
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

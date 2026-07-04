@@ -23,6 +23,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -92,6 +93,31 @@ constructor(
                         )
                     }
                 }
+            }
+        }
+        viewModelScope.launch {
+            while (true) {
+                delay(500)
+                pollDownloadProgressFromDb()
+            }
+        }
+    }
+
+    private suspend fun pollDownloadProgressFromDb() {
+        val regionId = _uiState.value.regionId
+        val region = regionId?.let { regionRepository.getRegion(it) }
+        if (region?.downloadStatus == DownloadStatus.DOWNLOADING) {
+            _uiState.update { state ->
+                state.copy(
+                    progress =
+                    state.progress?.copy(overallPercent = region.downloadProgressPct)
+                        ?: PrepareProgress(
+                            phase = PreparePhase.OSM,
+                            overallPercent = region.downloadProgressPct
+                        ),
+                    downloadUiState = PrepareDownloadUiState.DOWNLOADING,
+                    step = PrepareStep.DOWNLOAD
+                )
             }
         }
     }

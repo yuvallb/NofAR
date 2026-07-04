@@ -83,12 +83,20 @@ constructor(
     @Volatile
     private var cancelled = false
 
+    @Volatile
+    private var activeRegionId: UUID? = null
+
+    @Volatile
+    private var lastPersistedPercent = -1
+
     fun cancel() {
         cancelled = true
     }
 
     suspend fun download(regionId: UUID): Result<Unit> {
         cancelled = false
+        activeRegionId = regionId
+        lastPersistedPercent = -1
         val region =
             regionRepository.getRegion(regionId) ?: return Result.failure(IllegalStateException("Region missing"))
 
@@ -102,16 +110,24 @@ constructor(
         return try {
             // OSM phase (0–40%)
             updateProgress(PreparePhase.OSM, 0, message = "Downloading OSM data…")
+            persistProgress(0)
             val overpassResponse =
                 overpassApi.queryRegion(bbox) { bytes ->
-                    val pct = (
+                    val pct =
                         (
-                            bytes.toDouble() / estimate.osmEstimateBytes.coerceAtLeast(
-                                1
-                            )
-                            ) * 40
-                        ).toInt().coerceIn(0, 40)
-                    updateProgress(PreparePhase.OSM, pct, osmBytesRead = bytes)
+                            (
+                                bytes.toDouble() / estimate.osmEstimateBytes.coerceAtLeast(
+                                    1
+                                )
+                                ) * 40
+                            ).toInt().coerceIn(0, 40)
+                    _progress.value =
+                        PrepareProgress(
+                            phase = PreparePhase.OSM,
+                            overallPercent = pct,
+                            osmBytesRead = bytes,
+                            message = "Downloading OSM data…"
+                        )
                 }
             osmDatasetVersion = overpassResponse.datasetVersion
             overpassResponse.body.use { stream ->
@@ -158,6 +174,7 @@ constructor(
                         demTileIndex = index + 1,
                         demTileCount = tiles.size
                     )
+                    persistProgress(pct)
                     return@forEachIndexed
                 }
 
@@ -207,6 +224,8 @@ constructor(
                     }
                     demTileRepository.incrementRefCount(tileId)
                     linkTileCoverage(regionId, tileId)
+                    val completedPct = 40 + ((index + 1) * 50 / tiles.size.coerceAtLeast(1))
+                    persistProgress(completedPct)
                 } catch (error: Exception) {
                     demFailures++
                     tifFile.delete()
@@ -215,8 +234,10 @@ constructor(
 
             // Post-processing (90–100%)
             updateProgress(PreparePhase.POST_PROCESSING, 92, message = "Filling elevations…")
+            persistProgress(92)
             val postSuccess = postProcessor.process(regionId)
             updateProgress(PreparePhase.POST_PROCESSING, 100)
+            persistProgress(100)
 
             if (demFailures > 0 || !postSuccess) {
                 regionRepository.updateDownloadStatus(regionId, DownloadStatus.PARTIAL, progressPct = 100)
@@ -263,6 +284,15 @@ constructor(
                 remainingBytesEstimate = remainingBytesEstimate,
                 message = message
             )
+    }
+
+    private suspend fun persistProgress(overallPercent: Int) {
+        val regionId = activeRegionId ?: return
+        val pct = overallPercent.coerceIn(0, 100)
+        if (pct >= lastPersistedPercent + 5 || pct == 0 || pct == 100) {
+            lastPersistedPercent = pct
+            regionRepository.updateDownloadStatus(regionId, DownloadStatus.DOWNLOADING, pct)
+        }
     }
 
     private fun checkCancelled() {
