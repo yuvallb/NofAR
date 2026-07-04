@@ -21,9 +21,7 @@ The Android app scaffold does **not** exist yet. Implementation follows a phased
 | `internal/phases/README.md` | Phase index, dependencies, cross-cutting practices |
 | `internal/phases/phase-NN-*.md` | Per-phase tasks and acceptance criteria |
 
-> `internal/` may be gitignored locally; treat it as authoritative when present.
-
-**Python prototypes** in `scripts/` (`horizon_dem.py`, `line_dem_profile.py`, `download_dem.py`) are algorithm references — port logic to Kotlin; do not ship Python in the app.
+> `internal/` may be gitignored locally; treat it as authoritative when present. request explicit permission before modifying files here.
 
 ---
 
@@ -47,7 +45,7 @@ The Android app scaffold does **not** exist yet. Implementation follows a phased
 
 ## Build, test, and lint
 
-Once Phase 0 is complete, use these commands:
+Once Phase 0 is complete, use these commands (requires **JDK 26** to run Gradle; Android modules still target JVM 17 bytecode):
 
 ```bash
 # Build
@@ -59,7 +57,7 @@ Once Phase 0 is complete, use these commands:
 ./gradlew connectedCheck   # instrumented tests, when applicable
 ```
 
-CI (GitHub Actions) runs `./gradlew detekt lint test assembleRelease` on PRs and pushes to `main`.
+CI (GitHub Actions) runs `./gradlew detekt lint test assembleRelease` on PRs and pushes to `main` using JDK 26.
 
 **Python scripts** (algorithm prototyping only):
 

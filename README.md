@@ -72,6 +72,13 @@ What exists today:
 
 Requirements: **JDK 26** (Gradle runtime; Android modules compile to JVM 17 bytecode), Android SDK, a device or emulator on API 26+.
 
+**Android SDK (one-time):** Install [Android Studio](https://developer.android.com/studio) (or the command-line SDK tools). The default SDK path on macOS is `~/Library/Android/sdk`. Point Gradle at it:
+
+```bash
+cp local.properties.example local.properties
+# Edit sdk.dir= if your SDK lives elsewhere (Android Studio → Settings → Android SDK → Android SDK Location)
+```
+
 ```bash
 ./gradlew :app:assembleDebug
 ./gradlew detekt lint test

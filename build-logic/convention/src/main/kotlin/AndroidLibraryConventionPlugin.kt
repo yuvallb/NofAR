@@ -1,4 +1,4 @@
-import com.android.build.gradle.LibraryExtension
+import com.android.build.api.dsl.LibraryExtension
 import com.nofar.buildlogic.configureKotlinAndroid
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -12,7 +12,8 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
 
             extensions.configure<LibraryExtension> {
                 configureKotlinAndroid(this)
-                defaultConfig.targetSdk = 35
+                testOptions.targetSdk = 35
+                lint.targetSdk = 35
             }
         }
     }
