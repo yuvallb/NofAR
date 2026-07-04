@@ -1,2 +1,30 @@
+# Android / Gradle
+.gradle/
+build/
+**/build/
+local.properties
+*.iml
+.idea/
+.cxx/
+.externalNativeBuild/
+captures/
+*.apk
+*.ap_
+*.aab
+
+# Kotlin
+.kotlin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python prototypes
 /scripts/dem_cache
 /scripts/*.png
+
+# Internal planning docs (optional local gitignore)
+/internal
+
+# DEM tile cache (runtime)
+dem_cache/
