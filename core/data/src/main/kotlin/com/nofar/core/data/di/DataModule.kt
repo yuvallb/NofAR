@@ -1,5 +1,10 @@
 package com.nofar.core.data.di
 
+import com.nofar.core.data.dem.DefaultGeoTiffConverter
+import com.nofar.core.data.dem.GeoTiffConverter
+import com.nofar.core.data.osm.OverpassStreamParser
+import com.nofar.core.data.preferences.DefaultDownloadPreferences
+import com.nofar.core.data.preferences.DownloadPreferences
 import com.nofar.core.data.repository.DefaultDemTileRepository
 import com.nofar.core.data.repository.DefaultGeoEntityRepository
 import com.nofar.core.data.repository.DefaultRegionRepository
@@ -10,6 +15,7 @@ import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.repository.StorageRepository
 import dagger.Binds
 import dagger.Module
+import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
@@ -32,4 +38,18 @@ abstract class DataModule {
     @Binds
     @Singleton
     abstract fun bindStorageRepository(impl: DefaultStorageRepository): StorageRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDownloadPreferences(impl: DefaultDownloadPreferences): DownloadPreferences
+
+    companion object {
+        @Provides
+        @Singleton
+        fun provideGeoTiffConverter(): GeoTiffConverter = DefaultGeoTiffConverter()
+
+        @Provides
+        @Singleton
+        fun provideOverpassStreamParser(): OverpassStreamParser = OverpassStreamParser()
+    }
 }

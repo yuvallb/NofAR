@@ -16,6 +16,8 @@ constructor(
     private val geoEntityUpserter: GeoEntityUpserter,
     private val spatialQuery: GeoEntitySpatialQuery
 ) : GeoEntityRepository {
+    override suspend fun getById(id: String): GeoEntity? = geoEntityDao.getByOsmId(id)?.asExternalModel()
+
     override suspend fun upsert(entity: GeoEntity): String {
         geoEntityUpserter.upsert(entity.asEntity())
         return entity.id

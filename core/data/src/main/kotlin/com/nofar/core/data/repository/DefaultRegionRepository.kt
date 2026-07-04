@@ -34,4 +34,23 @@ constructor(private val regionDao: RegionDao) : RegionRepository {
         .getCandidatesContainingPoint(lat, lon)
         .map { it.asExternalModel() }
         .filter { RegionBounds.containsPoint(it, lat, lon) }
+
+    override suspend fun updateDownloadStatus(
+        id: UUID,
+        status: com.nofar.core.model.DownloadStatus,
+        progressPct: Int,
+        osmDatasetVersion: java.time.Instant?,
+        entityCount: Int?
+    ) {
+        val existing = regionDao.getById(id.toString()) ?: return
+        val updated =
+            existing.copy(
+                downloadStatus = status.name,
+                downloadProgressPct = progressPct,
+                osmDatasetVersion = osmDatasetVersion?.toEpochMilli() ?: existing.osmDatasetVersion,
+                entityCount = entityCount ?: existing.entityCount,
+                updatedAt = java.time.Instant.now().toEpochMilli()
+            )
+        regionDao.upsert(updated)
+    }
 }

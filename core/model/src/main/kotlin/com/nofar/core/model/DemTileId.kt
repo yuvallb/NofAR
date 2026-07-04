@@ -1,31 +1,51 @@
 package com.nofar.core.model
 
+import kotlin.math.floor
+
 /**
- * Copernicus GLO-30 tile naming: `Copernicus_DSM_COG_10_N{lat}_00_E{lon}_00_DEM`.
+ * Copernicus GLO-30 tile naming: `Copernicus_DSM_COG_10_{N|S}{lat}_00_{E|W}{lon}_00_DEM`.
  */
 object DemTileId {
     private val tileIdPattern =
-        Regex("""Copernicus_DSM_COG_10_N(\d{2})_00_E(\d{3})_00_DEM""")
+        Regex("""Copernicus_DSM_COG_10_([NS])(\d{2})_00_([EW])(\d{3})_00_DEM""")
 
-    fun fromCoordinates(tileLat: Int, tileLon: Int): String {
-        require(tileLat in 0..89) { "tileLat must be 0..89, got $tileLat" }
-        require(tileLon in 0..179) { "tileLon must be 0..179, got $tileLon" }
-        return "Copernicus_DSM_COG_10_N${tileLat.toString().padStart(
+    fun fromCoordinates(lat: Int, lon: Int): String {
+        val ns = if (lat >= 0) "N" else "S"
+        val ew = if (lon >= 0) "E" else "W"
+        return "Copernicus_DSM_COG_10_${ns}${kotlin.math.abs(lat).toString().padStart(
             2,
             '0'
-        )}_00_E${tileLon.toString().padStart(3, '0')}_00_DEM"
+        )}_00_${ew}${kotlin.math.abs(lon).toString().padStart(3, '0')}_00_DEM"
     }
 
     fun parse(tileId: String): Pair<Int, Int>? {
         val match = tileIdPattern.matchEntire(tileId) ?: return null
-        return match.groupValues[1].toInt() to match.groupValues[2].toInt()
+        val latSign = if (match.groupValues[1] == "N") 1 else -1
+        val lonSign = if (match.groupValues[3] == "E") 1 else -1
+        return match.groupValues[2].toInt() * latSign to match.groupValues[4].toInt() * lonSign
     }
 
     fun coordinatesForPoint(lat: Double, lon: Double): Pair<Int, Int> {
-        val tileLat = kotlin.math.floor(lat).toInt()
-        val tileLon = kotlin.math.floor(lon).toInt()
+        val tileLat = floor(lat).toInt()
+        val tileLon = floor(lon).toInt()
         return tileLat to tileLon
     }
 
+    fun intersectingTiles(bbox: BoundingBox): List<Pair<Int, Int>> {
+        val minLat = floor(bbox.minLat).toInt()
+        val maxLat = floor(bbox.maxLat).toInt()
+        val minLon = floor(bbox.minLon).toInt()
+        val maxLon = floor(bbox.maxLon).toInt()
+        val tiles = mutableListOf<Pair<Int, Int>>()
+        for (lat in minLat..maxLat) {
+            for (lon in minLon..maxLon) {
+                tiles += lat to lon
+            }
+        }
+        return tiles
+    }
+
     fun binFileName(tileId: String): String = "$tileId.bin"
+
+    fun s3ObjectKey(tileId: String): String = "$tileId/$tileId.tif"
 }

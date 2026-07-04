@@ -20,9 +20,19 @@ interface RegionRepository {
     suspend fun deleteRegion(id: UUID)
 
     suspend fun regionsContainingPoint(lat: Double, lon: Double): List<Region>
+
+    suspend fun updateDownloadStatus(
+        id: UUID,
+        status: com.nofar.core.model.DownloadStatus,
+        progressPct: Int,
+        osmDatasetVersion: java.time.Instant? = null,
+        entityCount: Int? = null
+    )
 }
 
 interface GeoEntityRepository {
+    suspend fun getById(id: String): GeoEntity?
+
     suspend fun upsert(entity: GeoEntity): String
 
     suspend fun upsertFromStream(entities: Sequence<GeoEntity>)

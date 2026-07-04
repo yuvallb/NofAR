@@ -12,7 +12,10 @@ class DemTileIdTest {
     }
 
     @Test
-    fun coordinatesForPoint_usesFloor() {
-        assertThat(DemTileId.coordinatesForPoint(32.9, 35.1)).isEqualTo(32 to 35)
+    fun intersectingTiles_coversBoundingBox() {
+        val bbox = com.nofar.core.model.BoundingBox(31.2, 34.1, 33.8, 36.4)
+        val tiles = DemTileId.intersectingTiles(bbox)
+        assertThat(tiles).contains(32 to 35)
+        assertThat(tiles).isNotEmpty()
     }
 }
