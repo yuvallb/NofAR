@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -18,7 +19,7 @@ fun SettingsScreen(
         NofARTopAppBar(
             title = "Settings",
             navigationIcon = {
-                androidx.compose.material3.TextButton(onClick = onNavigateBack) {
+                TextButton(onClick = onNavigateBack) {
                     Text(text = "Back")
                 }
             },

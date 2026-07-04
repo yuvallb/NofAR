@@ -6,7 +6,7 @@ import org.gradle.kotlin.dsl.configure
 class AndroidLintConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
-            extensions.configure<CommonExtension<*, *, *, *, *, *>> {
+            extensions.configure<CommonExtension<*, *, *, *, *, *, *>> {
                 lint {
                     abortOnError = true
                     warningsAsErrors = false
