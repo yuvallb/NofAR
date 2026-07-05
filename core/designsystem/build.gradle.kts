@@ -10,6 +10,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core:model"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.compose.material.icons.extended)
     androidTestImplementation(libs.androidx.test.ext.junit)

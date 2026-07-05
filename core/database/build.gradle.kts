@@ -14,7 +14,7 @@ android {
     }
 
     sourceSets {
-        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+        getByName("androidTest").assets.directories.add("$projectDir/schemas")
     }
 }
 
@@ -26,6 +26,7 @@ dependencies {
     implementation(project(":core:model"))
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.androidx.sqlite.bundled)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.kotlinx.coroutines.android)
     ksp(libs.room.compiler)

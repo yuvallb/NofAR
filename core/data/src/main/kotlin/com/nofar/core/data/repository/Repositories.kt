@@ -67,7 +67,12 @@ interface DemTileRepository {
     suspend fun getLruUnusedCandidates(): List<DemTile>
 }
 
-data class StorageStats(val regionCount: Int, val entityDbSizeBytes: Long, val demCacheSizeBytes: Long)
+data class StorageStats(
+    val regionCount: Int,
+    val entityDbSizeBytes: Long,
+    val demCacheSizeBytes: Long,
+    val entityRowCount: Int
+)
 
 interface StorageRepository {
     suspend fun getStorageStats(): StorageStats

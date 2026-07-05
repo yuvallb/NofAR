@@ -68,4 +68,7 @@ interface GeoEntityDao {
 
     @Query("SELECT * FROM geo_entity WHERE row_id IN (:rowIds)")
     suspend fun getByRowIds(rowIds: List<Long>): List<GeoEntityEntity>
+
+    @Query("SELECT COUNT(*) FROM geo_entity")
+    suspend fun countAll(): Int
 }

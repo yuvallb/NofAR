@@ -14,6 +14,7 @@ import com.nofar.core.database.model.GeoEntityEntity
 import com.nofar.core.database.model.RegionEntity
 import com.nofar.core.database.model.RegionEntityCoverageEntity
 import com.nofar.core.database.model.TileCoverageEntity
+import com.nofar.core.database.useBundledSqliteWithRTree
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.RegionBounds
 import java.util.UUID
@@ -27,7 +28,7 @@ import org.junit.runner.RunWith
 private fun inMemoryDatabase(context: Context): NofARDatabase =
     Room.inMemoryDatabaseBuilder(context, NofARDatabase::class.java)
         .allowMainThreadQueries()
-        .addCallback(RTreeCallback())
+        .useBundledSqliteWithRTree()
         .build()
 
 @RunWith(AndroidJUnit4::class)

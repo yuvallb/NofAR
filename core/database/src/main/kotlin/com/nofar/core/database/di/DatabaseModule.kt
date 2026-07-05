@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.room.Room
 import com.nofar.core.database.GeoEntitySpatialQuery
 import com.nofar.core.database.NofARDatabase
-import com.nofar.core.database.RTreeCallback
 import com.nofar.core.database.dao.CoverageLinker
 import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.dao.GeoEntityDao
@@ -12,6 +11,7 @@ import com.nofar.core.database.dao.GeoEntityUpserter
 import com.nofar.core.database.dao.RegionDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
 import com.nofar.core.database.dao.TileCoverageDao
+import com.nofar.core.database.useBundledSqliteWithRTree
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -29,7 +29,7 @@ object DatabaseModule {
         NofARDatabase::class.java,
         NofARDatabase.DATABASE_NAME
     )
-        .addCallback(RTreeCallback())
+        .useBundledSqliteWithRTree()
         .build()
 
     @Provides

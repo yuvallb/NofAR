@@ -79,9 +79,10 @@ constructor(
     val uiState: StateFlow<PrepareUiState> = _uiState.asStateFlow()
 
     init {
-        savedStateHandle.get<String>("regionId")?.let { id ->
+        savedStateHandle.get<String>("regionId")?.takeIf { it.isNotBlank() }?.let { id ->
             loadExistingRegion(UUID.fromString(id))
         }
+        refreshEstimate()
         viewModelScope.launch {
             orchestrator.progress.collect { progress ->
                 if (progress != null) {
@@ -123,10 +124,19 @@ constructor(
     }
 
     fun onMapTap(lat: Double, lon: Double) {
+        val suggestedName =
+            "Region near ${"%.2f".format(lat)}, ${"%.2f".format(lon)}"
         _uiState.update {
+            val name =
+                if (it.regionName.isBlank() || it.regionName.startsWith("Region near")) {
+                    suggestedName
+                } else {
+                    it.regionName
+                }
             it.copy(
                 centerLat = lat,
                 centerLon = lon,
+                regionName = name,
                 step = PrepareStep.DEFINE,
                 errorMessage = null
             )

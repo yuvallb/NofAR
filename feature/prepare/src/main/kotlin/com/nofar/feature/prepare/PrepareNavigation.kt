@@ -8,7 +8,7 @@ import androidx.navigation.navArgument
 const val PREPARE_ROUTE = "prepare"
 const val PREPARE_ROUTE_WITH_ARG = "prepare?regionId={regionId}"
 
-fun NavGraphBuilder.prepareScreen() {
+fun NavGraphBuilder.prepareScreen(onNavigateBack: () -> Unit) {
     composable(
         route = PREPARE_ROUTE_WITH_ARG,
         arguments =
@@ -20,6 +20,6 @@ fun NavGraphBuilder.prepareScreen() {
             }
         )
     ) {
-        PrepareScreen()
+        PrepareScreen(onNavigateBack = onNavigateBack)
     }
 }

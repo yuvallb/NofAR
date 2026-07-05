@@ -13,7 +13,7 @@ object TestDatabase {
     fun inMemory(context: Context = ApplicationProvider.getApplicationContext()): NofARDatabase =
         Room.inMemoryDatabaseBuilder(context, NofARDatabase::class.java)
             .allowMainThreadQueries()
-            .addCallback(RTreeCallback())
+            .useBundledSqliteWithRTree()
             .build()
 }
 
