@@ -1,6 +1,7 @@
 package com.nofar.core.designsystem.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,11 +42,12 @@ private val arTextShadow =
 data class ArLabel(
     val name: String,
     val elevationM: Int?,
-    val distanceKm: String,
+    val distanceDisplay: String,
     val isPeak: Boolean,
-    val xFraction: Float,
-    val yFraction: Float,
-    val hiddenCount: Int = 0
+    val anchorXPx: Float,
+    val anchorYPx: Float,
+    val hiddenCount: Int = 0,
+    val bucketIndex: Int = 0
 )
 
 @Composable
@@ -92,19 +94,22 @@ fun NofARCompassRibbon(headings: List<String>, centerHeading: String, modifier: 
 }
 
 @Composable
-fun NofARArLabel(label: ArLabel, modifier: Modifier = Modifier) {
-    Column(
+fun NofARArLabel(label: ArLabel, modifier: Modifier = Modifier, onHiddenCountClick: ((Int) -> Unit)? = null) {
+    Box(
         modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+        contentAlignment = Alignment.BottomCenter
     ) {
-        ArLabelTextBlock(label = label)
-        ArLabelLeaderLine()
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            ArLabelTextBlock(label = label, onHiddenCountClick = onHiddenCountClick)
+            ArLabelLeaderLine()
+            Spacer(modifier = Modifier.height(4.dp))
+        }
         ArLabelAnchorDot()
     }
 }
 
 @Composable
-private fun ArLabelTextBlock(label: ArLabel) {
+private fun ArLabelTextBlock(label: ArLabel, onHiddenCountClick: ((Int) -> Unit)? = null) {
     val marker = if (label.isPeak) "▲" else "■"
     Surface(
         shape = RoundedCornerShape(4.dp),
@@ -126,24 +131,28 @@ private fun ArLabelTextBlock(label: ArLabel) {
                 )
             }
             Text(
-                text = "${label.distanceKm} km",
+                text = label.distanceDisplay,
                 style = MaterialTheme.typography.bodySmall.copy(shadow = arTextShadow),
                 color = Color.White,
                 fontWeight = FontWeight.Medium
             )
             if (label.hiddenCount > 0) {
-                ArLabelHiddenCountCapsule(count = label.hiddenCount)
+                ArLabelHiddenCountCapsule(
+                    count = label.hiddenCount,
+                    onClick = { onHiddenCountClick?.invoke(label.bucketIndex) }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun ArLabelHiddenCountCapsule(count: Int) {
+private fun ArLabelHiddenCountCapsule(count: Int, onClick: () -> Unit) {
     Spacer(modifier = Modifier.height(4.dp))
     Surface(
         shape = RoundedCornerShape(12.dp),
-        color = NofARColors.ArOverlayBackground
+        color = NofARColors.ArOverlayBackground,
+        modifier = Modifier.clickable(onClick = onClick)
     ) {
         Text(
             text = "+ $count more",

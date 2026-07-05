@@ -83,4 +83,19 @@ object AppConfig {
 
     /** Effective Earth radius including refraction: R / (1 − k). */
     const val EFFECTIVE_EARTH_RADIUS_METERS: Double = 7_322_988.505747126
+
+    /** Horizontal bucket width for screen-space label clustering (pixels). */
+    const val EXPLORE_CLUSTER_BUCKET_WIDTH_PX: Int = 50
+
+    /** Maximum labels shown per cluster bucket before collapsing remainder. */
+    const val EXPLORE_MAX_LABELS_PER_BUCKET: Int = 2
+
+    /** Vertical offset between stacked labels within a bucket (pixels). */
+    const val EXPLORE_LABEL_STACK_OFFSET_PX: Int = 72
+
+    /** Fallback horizontal FOV when camera characteristics are unavailable (degrees). */
+    const val CAMERA_HORIZONTAL_FOV_FALLBACK_DEG: Float = 60f
+
+    /** Fallback vertical FOV when camera characteristics are unavailable (degrees). */
+    const val CAMERA_VERTICAL_FOV_FALLBACK_DEG: Float = 45f
 }

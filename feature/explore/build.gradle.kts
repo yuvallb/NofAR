@@ -8,6 +8,10 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+    defaultConfig {
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
 }
 
 dependencies {
@@ -17,4 +21,17 @@ dependencies {
     implementation(project(":core:sensors"))
     implementation(project(":core:visibility"))
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.camera.core)
+    implementation(libs.camera.camera2)
+    implementation(libs.camera.lifecycle)
+    implementation(libs.camera.view)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.truth)
+    testImplementation(libs.kotlinx.coroutines.test)
+
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.truth)
 }
