@@ -33,4 +33,33 @@ object AppConfig {
 
     /** Keep Explore running after leaving the active region (GPS excursion tolerance). */
     val exploreRegionExitGracePeriod: Duration = 2.minutes
+
+    /** GPS update interval for Explore/Home (milliseconds). Requirements §8: ≥ 1 s average. */
+    const val GPS_UPDATE_INTERVAL_MS: Long = 1_000L
+
+    /** Minimum interval between GPS callbacks (milliseconds). */
+    const val GPS_MIN_UPDATE_INTERVAL_MS: Long = 1_000L
+
+    /** Recompute magnetic declination when the user moves at least this far (meters). */
+    const val DECLINATION_UPDATE_DISTANCE_METERS: Double = 1_000.0
+
+    /**
+     * One Euro Filter defaults (Casiez et al., CHI 2012).
+     * Tune via debug overlay in Explore (Requirements §13).
+     */
+    const val ONE_EURO_MIN_CUTOFF_AZIMUTH: Double = 1.0
+    const val ONE_EURO_BETA_AZIMUTH: Double = 0.007
+    const val ONE_EURO_MIN_CUTOFF_PITCH: Double = 1.0
+    const val ONE_EURO_BETA_PITCH: Double = 0.007
+    const val ONE_EURO_MIN_CUTOFF_ROLL: Double = 1.0
+    const val ONE_EURO_BETA_ROLL: Double = 0.007
+
+    /** Default derivative smoothing factor for the One Euro Filter. */
+    const val ONE_EURO_D_CUTOFF: Double = 1.0
+
+    /**
+     * Compass accuracy at or below this [android.hardware.SensorManager] level triggers calibration UX.
+     * SENSOR_STATUS_ACCURACY_LOW = 1.
+     */
+    const val COMPASS_ACCURACY_THRESHOLD: Int = 1
 }

@@ -9,6 +9,8 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:data"))
+    implementation(project(":core:location"))
+    implementation(project(":core:sensors"))
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
 }

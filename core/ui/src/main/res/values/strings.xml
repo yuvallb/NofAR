@@ -3,4 +3,11 @@
     <string name="permission_rationale_location">NofAR needs precise location to show which region you are in and to align horizon labels while exploring offline.</string>
     <string name="permission_rationale_camera">NofAR uses the camera as a live viewfinder for Explore mode labels. Images are not uploaded.</string>
     <string name="permission_rationale_internet">Internet is required only in Prepare mode to download OpenStreetMap and elevation data.</string>
+    <string name="location_permission_denied">Location access is required to detect which region you are in and to align horizon labels.</string>
+    <string name="location_permission_denied_permanent">Location was denied. Open Settings to grant precise location access for NofAR.</string>
+    <string name="location_waiting_for_fix">Waiting for GPS fix…</string>
+    <string name="location_open_settings">Open Settings</string>
+    <string name="location_grant_permission">Grant location</string>
+    <string name="location_permission_rationale_action">Enable location for region detection and horizon alignment.</string>
+    <string name="compass_calibration_hint">Move your phone in a figure-8 pattern to calibrate the compass.</string>
 </resources>

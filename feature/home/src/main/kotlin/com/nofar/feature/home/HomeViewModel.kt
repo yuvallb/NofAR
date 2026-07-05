@@ -8,8 +8,13 @@ import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.repository.StorageRepository
 import com.nofar.core.data.usecase.RegionDeletionUseCase
 import com.nofar.core.designsystem.component.RegionCardState
+import com.nofar.core.location.LocationController
+import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.DownloadStatus
+import com.nofar.core.model.LocationAccessState
 import com.nofar.core.model.Region
+import com.nofar.core.model.UserLocation
+import com.nofar.core.sensors.DeclinationCorrector
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
@@ -28,7 +33,9 @@ data class HomeUiState(
     val freeSpaceBytes: Long = 0L,
     val deleteConfirmRegion: Region? = null,
     val overlappingRegionsDialog: List<Region>? = null,
-    val navigateToExploreRegionId: UUID? = null
+    val navigateToExploreRegionId: UUID? = null,
+    val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED,
+    val waitingForGpsFix: Boolean = false
 )
 
 @HiltViewModel
@@ -38,24 +45,63 @@ constructor(
     @ApplicationContext private val context: Context,
     private val regionRepository: RegionRepository,
     private val storageRepository: StorageRepository,
-    private val regionDeletionUseCase: RegionDeletionUseCase
+    private val regionDeletionUseCase: RegionDeletionUseCase,
+    private val locationRepository: LocationRepository,
+    private val locationController: LocationController,
+    private val declinationCorrector: DeclinationCorrector
 ) : ViewModel() {
-    private val currentLocation = MutableStateFlow<Pair<Double, Double>?>(null)
+    private val currentLocation = MutableStateFlow<UserLocation?>(null)
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
 
     init {
+        locationController.acquire(HOME_LOCATION_TOKEN)
         viewModelScope.launch {
             combine(
                 regionRepository.observeAllRegions(),
                 currentLocation
             ) { regions, location ->
-                buildRegionCards(regions, location)
+                buildHomeRegionCards(regionRepository, regions, location)
             }.collect { cards ->
                 _uiState.update { it.copy(regions = cards) }
             }
         }
+        viewModelScope.launch {
+            locationRepository.locationFlow.collect { location ->
+                currentLocation.value = location
+                _uiState.update {
+                    it.copy(
+                        waitingForGpsFix = false,
+                        locationAccessState =
+                        if (it.locationAccessState == LocationAccessState.WAITING_FOR_FIX) {
+                            LocationAccessState.GRANTED
+                        } else {
+                            it.locationAccessState
+                        }
+                    )
+                }
+            }
+        }
         refreshStorageStats()
+    }
+
+    fun onLocationPermissionChanged(accessState: LocationAccessState) {
+        if (accessState == LocationAccessState.GRANTED) {
+            locationRepository.start()
+        } else {
+            currentLocation.value = null
+            locationRepository.onPermissionRevoked()
+            declinationCorrector.clearSeedLocation()
+        }
+        _uiState.update { state ->
+            val waiting =
+                accessState == LocationAccessState.GRANTED &&
+                    currentLocation.value == null
+            state.copy(
+                locationAccessState = if (waiting) LocationAccessState.WAITING_FOR_FIX else accessState,
+                waitingForGpsFix = waiting
+            )
+        }
     }
 
     fun refreshStorageStats() {
@@ -65,7 +111,7 @@ constructor(
                 it.copy(
                     demCacheBytes = stats.demCacheSizeBytes,
                     entitiesDbBytes = stats.entityDbSizeBytes,
-                    freeSpaceBytes = readFreeSpaceBytes()
+                    freeSpaceBytes = readFreeSpaceBytes(context)
                 )
             }
         }
@@ -84,7 +130,7 @@ constructor(
             }
             val overlapping =
                 regionRepository
-                    .regionsContainingPoint(location.first, location.second)
+                    .regionsContainingPoint(location.latitude, location.longitude)
                     .filter {
                         it.downloadStatus == DownloadStatus.READY || it.downloadStatus == DownloadStatus.PARTIAL
                     }
@@ -132,35 +178,17 @@ constructor(
         _uiState.update { it.copy(deleteConfirmRegion = null) }
     }
 
-    private suspend fun buildRegionCards(
-        regions: List<Region>,
-        location: Pair<Double, Double>?
-    ): List<RegionCardState> {
-        val sorted = regions.sortedByDescending { it.updatedAt }
-        val containingIds =
-            if (location != null) {
-                regionRepository
-                    .regionsContainingPoint(location.first, location.second)
-                    .map { it.id }
-                    .toSet()
-            } else {
-                emptySet()
-            }
-        return sorted.map { region ->
-            val isHere = region.id in containingIds
-            val canExplore =
-                isHere &&
-                    (region.downloadStatus == DownloadStatus.READY || region.downloadStatus == DownloadStatus.PARTIAL)
-            RegionCardState(
-                region = region,
-                isYouAreHere = isHere,
-                canEnterExplore = canExplore
-            )
-        }
+    override fun onCleared() {
+        locationController.release(HOME_LOCATION_TOKEN)
+        super.onCleared()
     }
 
-    private fun readFreeSpaceBytes(): Long = runCatching {
-        val stat = StatFs(context.filesDir.path)
-        stat.availableBlocksLong * stat.blockSizeLong
-    }.getOrDefault(0L)
+    companion object {
+        private const val HOME_LOCATION_TOKEN = "home"
+    }
 }
+
+internal fun readFreeSpaceBytes(context: Context): Long = runCatching {
+    val stat = StatFs(context.filesDir.path)
+    stat.availableBlocksLong * stat.blockSizeLong
+}.getOrDefault(0L)

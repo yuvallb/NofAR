@@ -38,6 +38,9 @@ import com.nofar.core.designsystem.component.NofARStorageSummary
 import com.nofar.core.designsystem.component.RegionCardState
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.model.Region
+import com.nofar.core.ui.location.LocationPermissionBanner
+import com.nofar.core.ui.permission.PermissionState
+import com.nofar.core.ui.permission.rememberNofARPermissionState
 import java.util.UUID
 
 @Composable
@@ -49,6 +52,11 @@ fun HomeScreen(
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val permissionState = rememberNofARPermissionState()
+
+    LaunchedEffect(permissionState.locationAccessState) {
+        viewModel.onLocationPermissionChanged(permissionState.locationAccessState)
+    }
 
     LaunchedEffect(uiState.navigateToExploreRegionId) {
         uiState.navigateToExploreRegionId?.let { regionId ->
@@ -59,6 +67,7 @@ fun HomeScreen(
 
     HomeScreenContent(
         uiState = uiState,
+        permissionState = permissionState,
         onNavigateToSettings = onNavigateToSettings,
         onNavigateToPrepare = onNavigateToPrepare,
         onEnterExplore = viewModel::onEnterExploreClicked,
@@ -75,6 +84,7 @@ fun HomeScreen(
 @Composable
 private fun HomeScreenContent(
     uiState: HomeUiState,
+    permissionState: PermissionState,
     onNavigateToSettings: () -> Unit,
     onNavigateToPrepare: (UUID?) -> Unit,
     onEnterExplore: (UUID) -> Unit,
@@ -91,6 +101,10 @@ private fun HomeScreenContent(
                     tint = NofARColors.PrimaryYellow
                 )
             }
+        )
+        LocationPermissionBanner(
+            permissionState = permissionState,
+            waitingForGpsFix = uiState.waitingForGpsFix
         )
         NofARSecondaryOutlinedButton(
             text = "+ ADD REGION",
