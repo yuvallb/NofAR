@@ -7,6 +7,7 @@ import com.nofar.core.database.model.asEntity
 import com.nofar.core.database.model.asExternalModel
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.ResolutionLevel
+import java.util.UUID
 import javax.inject.Inject
 
 class DefaultGeoEntityRepository
@@ -36,6 +37,16 @@ constructor(
         resolutionLevel: ResolutionLevel
     ): List<GeoEntity> = spatialQuery
         .queryWithinRadius(lat, lon, radiusM, resolutionLevel)
+        .map { it.asExternalModel() }
+
+    override suspend fun queryWithinRadiusForRegion(
+        regionId: UUID,
+        lat: Double,
+        lon: Double,
+        radiusM: Double,
+        resolutionLevel: ResolutionLevel
+    ): List<GeoEntity> = spatialQuery
+        .queryWithinRadiusForRegion(regionId.toString(), lat, lon, radiusM, resolutionLevel)
         .map { it.asExternalModel() }
 
     override suspend fun garbageCollectOrphans(): Int = geoEntityDao.deleteOrphans()

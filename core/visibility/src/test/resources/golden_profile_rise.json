@@ -1,0 +1,11 @@
+{
+  "description": "Gradual rise — horizon at farthest sample",
+  "elevations": [50.0, 60.0, 80.0, 100.0, 130.0],
+  "fixedDistanceM": 100.0,
+  "observerHeightM": 1.7,
+  "expectedHorizonIndex": 4,
+  "expectedVisible": true,
+  "observerEyeM": 51.7,
+  "targetElevationM": 130.0,
+  "totalDistanceM": 400.0
+}

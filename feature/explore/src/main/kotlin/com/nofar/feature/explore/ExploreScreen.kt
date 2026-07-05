@@ -101,6 +101,12 @@ private fun ExploreOrientationDebugOverlay(uiState: ExploreUiState, modifier: Mo
                 color = Color.White
             )
         }
+        if (uiState.visibleEntityCount > 0) {
+            Text(
+                text = "Visible: ${uiState.visibleEntityCount}",
+                color = NofARColors.ArAccent
+            )
+        }
     }
 }
 

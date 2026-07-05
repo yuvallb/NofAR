@@ -44,6 +44,14 @@ interface GeoEntityRepository {
         resolutionLevel: ResolutionLevel
     ): List<GeoEntity>
 
+    suspend fun queryWithinRadiusForRegion(
+        regionId: UUID,
+        lat: Double,
+        lon: Double,
+        radiusM: Double,
+        resolutionLevel: ResolutionLevel
+    ): List<GeoEntity>
+
     suspend fun garbageCollectOrphans(): Int
 }
 

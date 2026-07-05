@@ -35,7 +35,7 @@ constructor(@ApplicationContext private val context: Context) {
                 .build()
         workManager.enqueueUniqueWork(
             "${PrepareDownloadWorker.UNIQUE_WORK_PREFIX}$regionId",
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             request
         )
     }

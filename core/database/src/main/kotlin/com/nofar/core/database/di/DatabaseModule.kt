@@ -61,6 +61,9 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideGeoEntitySpatialQuery(database: NofARDatabase, geoEntityDao: GeoEntityDao): GeoEntitySpatialQuery =
-        GeoEntitySpatialQuery(database, geoEntityDao)
+    fun provideGeoEntitySpatialQuery(
+        database: NofARDatabase,
+        geoEntityDao: GeoEntityDao,
+        regionEntityCoverageDao: RegionEntityCoverageDao
+    ): GeoEntitySpatialQuery = GeoEntitySpatialQuery(database, geoEntityDao, regionEntityCoverageDao)
 }

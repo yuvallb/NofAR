@@ -1,6 +1,7 @@
 package com.nofar.core.location
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
@@ -24,7 +25,8 @@ import kotlinx.coroutines.flow.asSharedFlow
 @Singleton
 class GpsOnlyLocationProvider
 @Inject
-constructor(@ApplicationContext private val context: Context) : LocationProvider {
+constructor(@param:ApplicationContext private val context: Context) :
+    LocationProvider {
     private val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     private val _lastLocation = MutableStateFlow<UserLocation?>(null)
     private val _locationFlow = MutableSharedFlow<UserLocation>(extraBufferCapacity = 1)
@@ -48,6 +50,7 @@ constructor(@ApplicationContext private val context: Context) : LocationProvider
         _lastLocation.value = null
     }
 
+    @SuppressLint("MissingPermission")
     private fun registerListener() {
         if (!hasLocationPermission()) return
         if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) return
@@ -59,22 +62,33 @@ constructor(@ApplicationContext private val context: Context) : LocationProvider
                 }
             }
         listener = locationListener
-        locationManager.requestLocationUpdates(
-            LocationManager.GPS_PROVIDER,
-            AppConfig.GPS_UPDATE_INTERVAL_MS,
-            0f,
-            locationListener,
-            Looper.getMainLooper()
-        )
-        locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let { last ->
-            if (last.provider == LocationManager.GPS_PROVIDER) {
-                onLocation(last)
+        try {
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                AppConfig.GPS_UPDATE_INTERVAL_MS,
+                0f,
+                locationListener,
+                Looper.getMainLooper()
+            )
+            locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)?.let { last ->
+                if (last.provider == LocationManager.GPS_PROVIDER) {
+                    onLocation(last)
+                }
             }
+        } catch (_: SecurityException) {
+            listener = null
         }
     }
 
+    @SuppressLint("MissingPermission")
     private fun unregisterListener() {
-        listener?.let { locationManager.removeUpdates(it) }
+        listener?.let {
+            try {
+                locationManager.removeUpdates(it)
+            } catch (_: SecurityException) {
+                // Permission revoked while updates were active.
+            }
+        }
         listener = null
     }
 

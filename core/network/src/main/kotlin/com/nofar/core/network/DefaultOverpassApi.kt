@@ -8,11 +8,12 @@ import java.time.Instant
 import javax.inject.Inject
 import kotlin.math.min
 import kotlin.math.pow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import okhttp3.MediaType.Companion.toMediaType
+import kotlinx.coroutines.withContext
+import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.RequestBody.Companion.toRequestBody
 import okio.buffer
 
 class DefaultOverpassApi
@@ -31,14 +32,22 @@ constructor(
                 delay(min(backoffMs, MAX_BACKOFF_MS))
             }
 
+            val requestBody =
+                FormBody.Builder()
+                    .add("data", query)
+                    .build()
+
             val request =
                 Request.Builder()
                     .url(baseUrl)
                     .header("User-Agent", OverpassConfig.USER_AGENT)
-                    .post("data=$query".toRequestBody(OVERPASS_MEDIA_TYPE))
+                    .post(requestBody)
                     .build()
 
-            val response = okHttpClient.newCall(request).execute()
+            val response =
+                withContext(Dispatchers.IO) {
+                    okHttpClient.newCall(request).execute()
+                }
             when (response.code) {
                 HTTP_TOO_MANY_REQUESTS, HTTP_GATEWAY_TIMEOUT -> {
                     lastError = IOException("Overpass mirror returned HTTP ${response.code}")
@@ -97,7 +106,6 @@ constructor(
     }
 
     companion object {
-        private val OVERPASS_MEDIA_TYPE = "application/x-www-form-urlencoded".toMediaType()
         private const val HTTP_TOO_MANY_REQUESTS = 429
         private const val HTTP_GATEWAY_TIMEOUT = 504
         private const val INITIAL_BACKOFF_MS = 1_000L

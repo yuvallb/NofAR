@@ -22,11 +22,14 @@ object SensorsModule {
 
     @Provides
     @Singleton
-    fun provideOrientationProvider(
+    @UnsmoothedOrientation
+    fun provideUnsmoothedOrientationProvider(
         rawProvider: RotationVectorOrientationProvider,
         declinationCorrector: DeclinationCorrector
-    ): OrientationProvider {
-        val trueNorth = TrueNorthOrientationProvider(rawProvider, declinationCorrector)
-        return SmoothedOrientationProvider(trueNorth)
-    }
+    ): OrientationProvider = TrueNorthOrientationProvider(rawProvider, declinationCorrector)
+
+    @Provides
+    @Singleton
+    fun provideOrientationProvider(@UnsmoothedOrientation trueNorthProvider: OrientationProvider): OrientationProvider =
+        SmoothedOrientationProvider(trueNorthProvider)
 }

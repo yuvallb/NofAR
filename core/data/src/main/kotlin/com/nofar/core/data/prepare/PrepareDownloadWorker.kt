@@ -6,6 +6,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import java.io.IOException
 import java.util.UUID
 
 @HiltWorker
@@ -23,12 +24,19 @@ constructor(
 
         return orchestrator.download(regionId).fold(
             onSuccess = { androidx.work.ListenableWorker.Result.success() },
-            onFailure = { androidx.work.ListenableWorker.Result.retry() }
+            onFailure = { error ->
+                if (error is IOException && runAttemptCount < MAX_ATTEMPTS) {
+                    androidx.work.ListenableWorker.Result.retry()
+                } else {
+                    androidx.work.ListenableWorker.Result.failure()
+                }
+            }
         )
     }
 
     companion object {
         const val KEY_REGION_ID = "region_id"
         const val UNIQUE_WORK_PREFIX = "prepare_download_"
+        private const val MAX_ATTEMPTS = 3
     }
 }

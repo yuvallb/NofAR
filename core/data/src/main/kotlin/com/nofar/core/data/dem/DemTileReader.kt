@@ -5,13 +5,18 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 import kotlin.math.floor
 
 /**
  * Explore-time random-access elevation lookup from a converted `.bin` tile.
+ *
+ * Elevation raster is memory-mapped for zero-copy lookup in the visibility hot loop.
  */
 class DemTileReader private constructor(
     private val file: RandomAccessFile,
+    private val dataBuffer: MappedByteBuffer,
     val width: Int,
     val height: Int,
     val tileLat: Int,
@@ -27,11 +32,8 @@ class DemTileReader private constructor(
 
         val x = pixelX(lon)
         val y = pixelY(lat)
-        val offset = DemBinaryFormat.HEADER_SIZE_BYTES + (y * width + x) * Float.SIZE_BYTES
-        file.seek(offset.toLong())
-        val bytes = ByteArray(Float.SIZE_BYTES)
-        file.readFully(bytes)
-        val value = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).float
+        val offset = y * width + x
+        val value = dataBuffer.getFloat(offset * Float.SIZE_BYTES)
         return if (!value.isFinite() || value == noDataValue) null else value
     }
 
@@ -68,8 +70,17 @@ class DemTileReader private constructor(
             val originLat = header.getDouble()
             val originLon = header.getDouble()
             val noDataValue = header.getFloat()
+            val dataBytes = width.toLong() * height * Float.SIZE_BYTES
+            val mapped =
+                raf.channel.map(
+                    FileChannel.MapMode.READ_ONLY,
+                    DemBinaryFormat.HEADER_SIZE_BYTES.toLong(),
+                    dataBytes
+                )
+            mapped.order(ByteOrder.LITTLE_ENDIAN)
             return DemTileReader(
                 file = raf,
+                dataBuffer = mapped,
                 width = width,
                 height = height,
                 tileLat = originLat.toInt(),

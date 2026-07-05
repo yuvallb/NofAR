@@ -62,4 +62,25 @@ object AppConfig {
      * SENSOR_STATUS_ACCURACY_LOW = 1.
      */
     const val COMPASS_ACCURACY_THRESHOLD: Int = 1
+
+    /** Ray-march sample interval along terrain profile (meters). Matches Python prototype default. */
+    const val VISIBILITY_RAY_STEP_METERS: Double = 100.0
+
+    /** Maximum candidate entities passed to the visibility engine per pass. */
+    const val VISIBILITY_MAX_CANDIDATES: Int = 100
+
+    /** GPS altitude is used when vertical accuracy is at or below this threshold (meters). */
+    const val GPS_ALTITUDE_ACCURACY_THRESHOLD_METERS: Float = 50f
+
+    /** Mean Earth radius for haversine and curvature correction (meters). */
+    const val EARTH_RADIUS_METERS: Double = 6_371_000.0
+
+    /**
+     * Standard atmospheric refraction coefficient for line-of-sight curvature correction.
+     * Effective drop = d² / (2R) × (1 − k). Matches Requirements §3.3.3.
+     */
+    const val ATMOSPHERIC_REFRACTION_COEFFICIENT: Double = 0.13
+
+    /** Effective Earth radius including refraction: R / (1 − k). */
+    const val EFFECTIVE_EARTH_RADIUS_METERS: Double = 7_322_988.505747126
 }

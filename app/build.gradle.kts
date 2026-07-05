@@ -32,6 +32,7 @@ dependencies {
     implementation(project(":core:data"))
     implementation(project(":core:location"))
     implementation(project(":core:sensors"))
+    implementation(project(":core:visibility"))
     implementation(project(":core:ui"))
     implementation(project(":core:designsystem"))
     implementation(project(":feature:home"))

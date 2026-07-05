@@ -31,6 +31,7 @@ import java.io.File
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
+import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -62,6 +63,7 @@ sealed interface PrepareDownloadError {
     data class Unknown(val message: String) : PrepareDownloadError
 }
 
+@Singleton
 class PrepareDownloadOrchestrator
 @Inject
 constructor(
@@ -109,7 +111,7 @@ constructor(
 
         return try {
             // OSM phase (0–40%)
-            updateProgress(PreparePhase.OSM, 0, message = "Downloading OSM data…")
+            updateProgress(PreparePhase.OSM, 0, message = "Contacting OpenStreetMap servers…")
             persistProgress(0)
             val overpassResponse =
                 overpassApi.queryRegion(bbox) { bytes ->
@@ -137,7 +139,12 @@ constructor(
                         checkCancelled()
                         parsedEntities.add(element)
                     }
-                for (element in parsedEntities) {
+                updateProgress(
+                    PreparePhase.OSM,
+                    _progress.value?.overallPercent?.coerceAtLeast(1) ?: 1,
+                    message = "Saving OpenStreetMap features…"
+                )
+                parsedEntities.forEachIndexed { index, element ->
                     checkCancelled()
                     val geoEntity = overpassStreamParser.toGeoEntity(element)
                     geoEntityRepository.upsert(geoEntity)
@@ -147,6 +154,19 @@ constructor(
                             entityId = geoEntity.id
                         )
                     )
+                    if ((index + 1) % 50 == 0 || index + 1 == entityCount) {
+                        val ingestPct =
+                            if (entityCount > 0) {
+                                (((index + 1).toDouble() / entityCount) * 40).toInt().coerceIn(1, 40)
+                            } else {
+                                40
+                            }
+                        updateProgress(
+                            PreparePhase.OSM,
+                            ingestPct,
+                            message = "Saving OpenStreetMap features (${index + 1}/$entityCount)…"
+                        )
+                    }
                 }
             }
             regionRepository.updateDownloadStatus(
