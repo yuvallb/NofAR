@@ -24,7 +24,7 @@ import kotlin.math.atan
 
 private const val TAG = "ExploreCamera"
 
-@OptIn(ExperimentalCamera2Interop::class)
+@ExperimentalCamera2Interop
 @Composable
 fun ExploreCameraPreview(modifier: Modifier = Modifier, onFieldOfViewChanged: (CameraFieldOfView) -> Unit = {}) {
     val context = LocalContext.current
@@ -62,7 +62,7 @@ fun ExploreCameraPreview(modifier: Modifier = Modifier, onFieldOfViewChanged: (C
                             preview
                         )
 
-                    val fov = readFieldOfView(camera.cameraInfo, cameraSelector)
+                    val fov = readFieldOfView(camera.cameraInfo)
                     onFieldOfViewChanged(fov)
                 }
             cameraProviderFuture.addListener(listener, ContextCompat.getMainExecutor(context))
@@ -76,11 +76,8 @@ fun ExploreCameraPreview(modifier: Modifier = Modifier, onFieldOfViewChanged: (C
     }
 }
 
-@OptIn(ExperimentalCamera2Interop::class)
-internal fun readFieldOfView(
-    cameraInfo: androidx.camera.core.CameraInfo,
-    cameraSelector: CameraSelector
-): CameraFieldOfView {
+@ExperimentalCamera2Interop
+internal fun readFieldOfView(cameraInfo: androidx.camera.core.CameraInfo): CameraFieldOfView {
     return runCatching {
         val camera2Info = Camera2CameraInfo.from(cameraInfo)
         val characteristics = camera2Info.getCameraCharacteristic(
@@ -92,18 +89,18 @@ internal fun readFieldOfView(
             )
 
         if (characteristics == null || sensorSize == null || characteristics.isEmpty()) {
-            Log.w(TAG, "Camera FOV characteristics unavailable; using fallback for ${cameraSelector.lensFacing}")
+            Log.w(TAG, "Camera FOV characteristics unavailable; using fallback for back camera")
             return CameraFieldOfView.fallback()
         }
 
         val focalLength = characteristics[0]
         val horizontalDeg =
             Math.toDegrees(
-                2.0 * atan((sensorSize.width / (2.0 * focalLength)).toDouble())
+                2.0 * atan((sensorSize.width / (2.0 * focalLength)))
             ).toFloat()
         val verticalDeg =
             Math.toDegrees(
-                2.0 * atan((sensorSize.height / (2.0 * focalLength)).toDouble())
+                2.0 * atan((sensorSize.height / (2.0 * focalLength)))
             ).toFloat()
 
         CameraFieldOfView(
@@ -124,11 +121,11 @@ internal fun readFieldOfViewFromSensor(
 ): CameraFieldOfView {
     val horizontalDeg =
         Math.toDegrees(
-            2.0 * atan((sensorWidthMm / (2.0 * focalLengthMm)).toDouble())
+            2.0 * atan((sensorWidthMm / (2.0 * focalLengthMm)))
         ).toFloat()
     val verticalDeg =
         Math.toDegrees(
-            2.0 * atan((sensorHeightMm / (2.0 * focalLengthMm)).toDouble())
+            2.0 * atan((sensorHeightMm / (2.0 * focalLengthMm)))
         ).toFloat()
     return CameraFieldOfView(
         horizontalDeg = horizontalDeg.coerceAtLeast(AppConfig.CAMERA_HORIZONTAL_FOV_FALLBACK_DEG / 2f),

@@ -16,6 +16,9 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nofar.core.designsystem.component.NofARHomeTopBar
+import com.nofar.core.designsystem.component.NofARPrimaryButton
 import com.nofar.core.designsystem.component.NofARRegionCard
 import com.nofar.core.designsystem.component.NofARRegionListDivider
 import com.nofar.core.designsystem.component.NofARSecondaryOutlinedButton
@@ -53,6 +57,7 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val permissionState = rememberNofARPermissionState()
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(permissionState.locationAccessState) {
         viewModel.onLocationPermissionChanged(permissionState.locationAccessState)
@@ -61,19 +66,32 @@ fun HomeScreen(
     LaunchedEffect(uiState.navigateToExploreRegionId) {
         uiState.navigateToExploreRegionId?.let { regionId ->
             onNavigateToExplore(regionId)
-            viewModel.onExploreNavigationHandled()
+            viewModel.onExploreUiAction(ExploreUiAction.NavigationHandled)
         }
     }
 
-    HomeScreenContent(
-        uiState = uiState,
-        permissionState = permissionState,
-        onNavigateToSettings = onNavigateToSettings,
-        onNavigateToPrepare = onNavigateToPrepare,
-        onEnterExplore = viewModel::onEnterExploreClicked,
-        onDelete = viewModel::onDeleteClicked,
-        modifier = modifier
-    )
+    LaunchedEffect(uiState.snackbarMessage) {
+        uiState.snackbarMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.onSnackbarShown()
+        }
+    }
+
+    Scaffold(
+        modifier = modifier,
+        snackbarHost = { SnackbarHost(snackbarHostState) }
+    ) { padding ->
+        HomeScreenContent(
+            uiState = uiState,
+            permissionState = permissionState,
+            onNavigateToSettings = onNavigateToSettings,
+            onNavigateToPrepare = onNavigateToPrepare,
+            onGlobalEnterExplore = viewModel::onGlobalEnterExploreClicked,
+            onEnterExplore = viewModel::onEnterExploreClicked,
+            onDelete = viewModel::onDeleteClicked,
+            modifier = Modifier.padding(padding)
+        )
+    }
 
     HomeScreenDialogs(
         uiState = uiState,
@@ -87,6 +105,7 @@ private fun HomeScreenContent(
     permissionState: PermissionState,
     onNavigateToSettings: () -> Unit,
     onNavigateToPrepare: (UUID?) -> Unit,
+    onGlobalEnterExplore: () -> Unit,
     onEnterExplore: (UUID) -> Unit,
     onDelete: (UUID) -> Unit,
     modifier: Modifier = Modifier
@@ -112,11 +131,16 @@ private fun HomeScreenContent(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))
+        GlobalEnterExploreSection(
+            enabled = uiState.enterExploreEnabled,
+            onClick = onGlobalEnterExplore
+        )
         NofARSectionHeader(title = "LOCAL REGIONS")
         HomeRegionList(
             regions = uiState.regions,
             onEnterExplore = onEnterExplore,
             onPrepare = { regionId -> onNavigateToPrepare(regionId) },
+            onAddRegion = { onNavigateToPrepare(null) },
             onDelete = onDelete,
             modifier = Modifier.weight(1f)
         )
@@ -130,19 +154,48 @@ private fun HomeScreenContent(
 }
 
 @Composable
+private fun GlobalEnterExploreSection(enabled: Boolean, onClick: () -> Unit) {
+    Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+        NofARPrimaryButton(
+            text = "ENTER EXPLORE",
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+            enabled = enabled
+        )
+        if (!enabled) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "Move inside a ready region to explore the horizon.",
+                style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
+                color = NofARColors.TextCaption
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+}
+
+@Composable
 private fun HomeRegionList(
     regions: List<RegionCardState>,
     onEnterExplore: (UUID) -> Unit,
     onPrepare: (UUID) -> Unit,
+    onAddRegion: () -> Unit,
     onDelete: (UUID) -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (regions.isEmpty()) {
-        Text(
-            text = "No regions yet. Tap + ADD REGION to download map data for an area.",
-            modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-            color = NofARColors.TextSecondary
-        )
+        Column(modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text(
+                text = "No regions yet. Download map data for an area to get started.",
+                color = NofARColors.TextSecondary
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            NofARPrimaryButton(
+                text = "ADD REGION",
+                onClick = onAddRegion,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
         return
     }
     LazyColumn(
@@ -180,8 +233,13 @@ private fun HomeScreenDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
     uiState.overlappingRegionsDialog?.let { regions ->
         OverlappingRegionsDialog(
             regions = regions,
+            initialSelectionId =
+            HomeRegionLogic.defaultOverlapSelection(
+                regions,
+                uiState.lastSelectedOverlapRegionId
+            ),
             onSelect = viewModel::onOverlappingRegionSelected,
-            onDismiss = viewModel::dismissOverlappingRegionsDialog
+            onDismiss = { viewModel.onExploreUiAction(ExploreUiAction.DismissOverlap) }
         )
     }
 }
@@ -191,7 +249,11 @@ private fun DeleteRegionDialog(region: Region, onConfirm: () -> Unit, onDismiss:
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Delete ${region.name}?") },
-        text = { Text("This removes the region and any data not shared with other regions.") },
+        text = {
+            Text(
+                "This removes the region and any entities or DEM tiles not shared with other regions."
+            )
+        },
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text("DELETE", color = NofARColors.ErrorDestructive)
@@ -206,8 +268,13 @@ private fun DeleteRegionDialog(region: Region, onConfirm: () -> Unit, onDismiss:
 }
 
 @Composable
-private fun OverlappingRegionsDialog(regions: List<Region>, onSelect: (UUID) -> Unit, onDismiss: () -> Unit) {
-    var selectedId by remember(regions) { mutableStateOf(regions.first().id) }
+private fun OverlappingRegionsDialog(
+    regions: List<Region>,
+    initialSelectionId: UUID,
+    onSelect: (UUID) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedId by remember(regions, initialSelectionId) { mutableStateOf(initialSelectionId) }
 
     AlertDialog(
         onDismissRequest = onDismiss,

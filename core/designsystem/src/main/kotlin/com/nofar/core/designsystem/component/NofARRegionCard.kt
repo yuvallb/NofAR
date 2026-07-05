@@ -49,7 +49,7 @@ fun NofARRegionCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 NofARYouAreHereBadge()
             }
-            RegionCardMetadata(region = region)
+            RegionCardMetadata(state = state)
             RegionCardDownloadProgress(region = region)
             RegionCardActions(
                 state = state,
@@ -82,7 +82,8 @@ private fun RegionCardHeader(region: Region) {
 }
 
 @Composable
-private fun RegionCardMetadata(region: Region) {
+private fun RegionCardMetadata(state: RegionCardState) {
+    val region = state.region
     Spacer(modifier = Modifier.height(8.dp))
     val center =
         "Center: ${NofARFormatters.formatCoordinate(region.centerLat)}, " +
@@ -92,10 +93,23 @@ private fun RegionCardMetadata(region: Region) {
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
+    val sizeText =
+        if (state.demSizeBytes > 0L) {
+            "Size: OSM ${NofARFormatters.formatMegabytes(state.osmSizeBytes)} + " +
+                "DEM ${NofARFormatters.formatMegabytes(state.demSizeBytes)}"
+        } else {
+            "Size: ${NofARFormatters.formatMegabytes(region.estimatedSizeBytes)}"
+        }
     Text(
         text =
-        "Entities: ${NofARFormatters.formatCount(region.entityCount)} | " +
-            "Size: ${NofARFormatters.formatMegabytes(region.estimatedSizeBytes)}",
+        "Entities: ${NofARFormatters.formatCount(region.entityCount)} | $sizeText",
+        style = MaterialTheme.typography.bodySmall,
+        color = NofARColors.TextSecondary
+    )
+    Text(
+        text =
+        "OSM: ${NofARFormatters.formatTimestamp(region.osmDatasetVersion)} | " +
+            "DEM: ${NofARFormatters.formatTimestamp(state.latestDemTimestamp)}",
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
@@ -128,13 +142,23 @@ private fun RegionCardActions(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        RegionCardPrimaryAction(
-            region = region,
-            canEnterExplore = state.canEnterExplore,
-            onEnterExplore = onEnterExplore,
-            onPrepare = onPrepare,
-            modifier = Modifier.weight(1f)
-        )
+        Column(modifier = Modifier.weight(1f)) {
+            RegionCardPrimaryAction(
+                region = region,
+                canEnterExplore = state.canEnterExplore,
+                onEnterExplore = onEnterExplore,
+                onPrepare = onPrepare,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (region.downloadStatus == DownloadStatus.READY || region.downloadStatus == DownloadStatus.PARTIAL) {
+                Spacer(modifier = Modifier.height(8.dp))
+                NofARSecondaryOutlinedButton(
+                    text = "UPDATE DATA",
+                    onClick = { onPrepare(region.id) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
         Spacer(modifier = Modifier.width(8.dp))
         IconButton(
             onClick = { onDelete(region.id) },

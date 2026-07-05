@@ -2,15 +2,16 @@ package com.nofar.feature.home
 
 import android.content.Context
 import android.os.StatFs
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nofar.core.data.repository.HomeRegionMetadataRepository
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.repository.StorageRepository
+import com.nofar.core.data.usecase.InsideRegionUseCase
 import com.nofar.core.data.usecase.RegionDeletionUseCase
-import com.nofar.core.designsystem.component.RegionCardState
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
-import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.LocationAccessState
 import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
@@ -23,19 +24,26 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
-    val regions: List<RegionCardState> = emptyList(),
+    val regions: List<com.nofar.core.designsystem.component.RegionCardState> = emptyList(),
+    val insideRegionIds: Set<UUID> = emptySet(),
+    val enterExploreEnabled: Boolean = false,
     val demCacheBytes: Long = 0L,
     val entitiesDbBytes: Long = 0L,
     val freeSpaceBytes: Long = 0L,
     val deleteConfirmRegion: Region? = null,
     val overlappingRegionsDialog: List<Region>? = null,
+    val lastSelectedOverlapRegionId: UUID? = null,
     val navigateToExploreRegionId: UUID? = null,
+    val snackbarMessage: String? = null,
     val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED,
-    val waitingForGpsFix: Boolean = false
+    val waitingForGpsFix: Boolean = false,
+    val loading: Boolean = true
 )
 
 @HiltViewModel
@@ -43,44 +51,70 @@ class HomeViewModel
 @Inject
 constructor(
     @ApplicationContext private val context: Context,
+    private val savedStateHandle: SavedStateHandle,
     private val regionRepository: RegionRepository,
     private val storageRepository: StorageRepository,
     private val regionDeletionUseCase: RegionDeletionUseCase,
+    private val insideRegionUseCase: InsideRegionUseCase,
+    private val metadataRepository: HomeRegionMetadataRepository,
     private val locationRepository: LocationRepository,
     private val locationController: LocationController,
     private val declinationCorrector: DeclinationCorrector
 ) : ViewModel() {
     private val currentLocation = MutableStateFlow<UserLocation?>(null)
+    private val insideExploreRegions = MutableStateFlow<List<Region>>(emptyList())
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private val exploreNavigation = HomeExploreNavigation(_uiState)
 
     init {
+        savedStateHandle.get<String>(LAST_SELECTED_REGION_KEY)?.let(UUID::fromString)?.let { restored ->
+            _uiState.update { it.copy(lastSelectedOverlapRegionId = restored) }
+        }
+
         locationController.acquire(HOME_LOCATION_TOKEN)
         viewModelScope.launch {
             combine(
                 regionRepository.observeAllRegions(),
                 currentLocation
-            ) { regions, location ->
-                buildHomeRegionCards(regionRepository, regions, location)
-            }.collect { cards ->
-                _uiState.update { it.copy(regions = cards) }
-            }
-        }
-        viewModelScope.launch {
-            locationRepository.locationFlow.collect { location ->
-                currentLocation.value = location
-                _uiState.update {
-                    it.copy(
-                        waitingForGpsFix = false,
-                        locationAccessState =
-                        if (it.locationAccessState == LocationAccessState.WAITING_FOR_FIX) {
-                            LocationAccessState.GRANTED
-                        } else {
-                            it.locationAccessState
-                        }
+            ) { regions, location -> regions to location }
+                .mapLatest { (regions, location) ->
+                    buildHomeRegionCards(
+                        insideRegionUseCase = insideRegionUseCase,
+                        metadataRepository = metadataRepository,
+                        regions = regions,
+                        location = location
                     )
                 }
-            }
+                .collect { cards ->
+                    _uiState.update { it.copy(regions = cards, loading = false) }
+                }
+        }
+        viewModelScope.launch {
+            locationRepository.locationFlow
+                .sample(INSIDE_REGION_THROTTLE_MS)
+                .collect { location ->
+                    currentLocation.value = location
+                    val insideExplore =
+                        insideRegionUseCase.exploreEligibleRegionsContainingPoint(
+                            location.latitude,
+                            location.longitude
+                        )
+                    insideExploreRegions.value = insideExplore
+                    _uiState.update { state ->
+                        state.copy(
+                            insideRegionIds = insideExplore.map { region -> region.id }.toSet(),
+                            enterExploreEnabled = HomeRegionLogic.isEnterExploreEnabled(insideExplore),
+                            waitingForGpsFix = false,
+                            locationAccessState =
+                            if (state.locationAccessState == LocationAccessState.WAITING_FOR_FIX) {
+                                LocationAccessState.GRANTED
+                            } else {
+                                state.locationAccessState
+                            }
+                        )
+                    }
+                }
         }
         refreshStorageStats()
     }
@@ -90,6 +124,7 @@ constructor(
             locationRepository.start()
         } else {
             currentLocation.value = null
+            insideExploreRegions.value = emptyList()
             locationRepository.onPermissionRevoked()
             declinationCorrector.clearSeedLocation()
         }
@@ -99,12 +134,14 @@ constructor(
                     currentLocation.value == null
             state.copy(
                 locationAccessState = if (waiting) LocationAccessState.WAITING_FOR_FIX else accessState,
-                waitingForGpsFix = waiting
+                waitingForGpsFix = waiting,
+                insideRegionIds = emptySet(),
+                enterExploreEnabled = false
             )
         }
     }
 
-    fun refreshStorageStats() {
+    private fun refreshStorageStats() {
         viewModelScope.launch {
             val stats = storageRepository.getStorageStats()
             _uiState.update {
@@ -117,51 +154,38 @@ constructor(
         }
     }
 
+    fun onGlobalEnterExploreClicked() {
+        exploreNavigation.onGlobalEnterExplore(insideExploreRegions.value)
+    }
+
     fun onEnterExploreClicked(regionId: UUID) {
+        val location = currentLocation.value ?: return
         viewModelScope.launch {
-            val location = currentLocation.value
-            val region = regionRepository.getRegion(regionId) ?: return@launch
-            if (region.downloadStatus != DownloadStatus.READY && region.downloadStatus != DownloadStatus.PARTIAL) {
-                return@launch
-            }
-            if (location == null) {
-                _uiState.update { it.copy(navigateToExploreRegionId = regionId) }
-                return@launch
-            }
-            val overlapping =
-                regionRepository
-                    .regionsContainingPoint(location.latitude, location.longitude)
-                    .filter {
-                        it.downloadStatus == DownloadStatus.READY || it.downloadStatus == DownloadStatus.PARTIAL
-                    }
-            if (overlapping.size > 1) {
-                _uiState.update {
-                    it.copy(overlappingRegionsDialog = overlapping)
-                }
-            } else {
-                _uiState.update { it.copy(navigateToExploreRegionId = regionId) }
-            }
+            val insideExplore =
+                insideRegionUseCase.exploreEligibleRegionsContainingPoint(
+                    location.latitude,
+                    location.longitude
+                )
+            exploreNavigation.onRegionEnterExplore(insideExplore, regionId)
         }
     }
 
     fun onOverlappingRegionSelected(regionId: UUID) {
-        _uiState.update {
-            it.copy(overlappingRegionsDialog = null, navigateToExploreRegionId = regionId)
+        exploreNavigation.onOverlappingRegionSelected(regionId, savedStateHandle)
+    }
+
+    fun onExploreUiAction(action: ExploreUiAction) {
+        when (action) {
+            ExploreUiAction.DismissOverlap -> exploreNavigation.dismissOverlappingRegionsDialog()
+            ExploreUiAction.NavigationHandled -> exploreNavigation.onExploreNavigationHandled()
         }
-    }
-
-    fun dismissOverlappingRegionsDialog() {
-        _uiState.update { it.copy(overlappingRegionsDialog = null) }
-    }
-
-    fun onExploreNavigationHandled() {
-        _uiState.update { it.copy(navigateToExploreRegionId = null) }
     }
 
     fun onDeleteClicked(regionId: UUID) {
         viewModelScope.launch {
-            val region = regionRepository.getRegion(regionId) ?: return@launch
-            _uiState.update { it.copy(deleteConfirmRegion = region) }
+            regionRepository.getRegion(regionId)?.let { region ->
+                _uiState.update { it.copy(deleteConfirmRegion = region) }
+            }
         }
     }
 
@@ -169,7 +193,9 @@ constructor(
         val region = _uiState.value.deleteConfirmRegion ?: return
         viewModelScope.launch {
             regionDeletionUseCase.execute(region.id)
-            _uiState.update { it.copy(deleteConfirmRegion = null) }
+            _uiState.update {
+                it.copy(deleteConfirmRegion = null, snackbarMessage = "${region.name} deleted")
+            }
             refreshStorageStats()
         }
     }
@@ -178,13 +204,19 @@ constructor(
         _uiState.update { it.copy(deleteConfirmRegion = null) }
     }
 
+    fun onSnackbarShown() {
+        _uiState.update { it.copy(snackbarMessage = null) }
+    }
+
     override fun onCleared() {
         locationController.release(HOME_LOCATION_TOKEN)
         super.onCleared()
     }
 
     companion object {
+        internal const val LAST_SELECTED_REGION_KEY = "lastSelectedExploreRegionId"
         private const val HOME_LOCATION_TOKEN = "home"
+        private const val INSIDE_REGION_THROTTLE_MS = 1_000L
     }
 }
 

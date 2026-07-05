@@ -1,6 +1,9 @@
 package com.nofar.core.designsystem.util
 
 import java.text.NumberFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -23,4 +26,10 @@ object NofARFormatters {
     fun formatCoordinate(value: Double): String = "%.2f".format(Locale.US, value)
 
     fun formatRadiusKm(radiusM: Double): String = "${(radiusM / 1000.0).roundToInt()} km"
+
+    fun formatTimestamp(instant: Instant?): String {
+        if (instant == null) return "—"
+        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
+        return formatter.format(instant)
+    }
 }

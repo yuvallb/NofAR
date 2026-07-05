@@ -47,14 +47,17 @@ class HomeViewModelTest {
         val insideNotReady =
             insideReady.copy(
                 region = region.copy(downloadStatus = DownloadStatus.NOT_DOWNLOADED),
+                isYouAreHere = false,
                 canEnterExplore = false
             )
         assertFalse(insideNotReady.canEnterExplore)
     }
 
     @Test
-    fun initialUiStateIsEmpty() {
+    fun initialUiStateIsEmptyAndExploreDisabled() {
         val state = HomeUiState()
         assertEquals(emptyList<com.nofar.core.designsystem.component.RegionCardState>(), state.regions)
+        assertFalse(state.enterExploreEnabled)
+        assertTrue(state.insideRegionIds.isEmpty())
     }
 }

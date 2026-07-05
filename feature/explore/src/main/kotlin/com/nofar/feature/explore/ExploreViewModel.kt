@@ -67,7 +67,7 @@ class ExploreViewModel
 constructor(
     savedStateHandle: SavedStateHandle,
     private val orientationProvider: OrientationProvider,
-    @UnsmoothedOrientation private val unsmoothedOrientationProvider: OrientationProvider,
+    @param:UnsmoothedOrientation private val unsmoothedOrientationProvider: OrientationProvider,
     private val orientationController: OrientationController,
     private val locationRepository: LocationRepository,
     private val locationController: LocationController,
@@ -335,7 +335,7 @@ constructor(
             return
         }
 
-        val projectedOrientation = orientation ?: return
+        val projectedOrientation = orientation
 
         val (clusters, labels) =
             ExploreLabelProjector.project(

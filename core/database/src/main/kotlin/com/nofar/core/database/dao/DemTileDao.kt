@@ -11,6 +11,9 @@ interface DemTileDao {
     @Query("SELECT * FROM dem_tile WHERE tile_id = :tileId LIMIT 1")
     suspend fun getById(tileId: String): DemTileEntity?
 
+    @Query("SELECT * FROM dem_tile WHERE tile_id IN (:tileIds)")
+    suspend fun getByIds(tileIds: List<String>): List<DemTileEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(tile: DemTileEntity): Long
 

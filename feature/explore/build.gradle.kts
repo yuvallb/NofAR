@@ -2,6 +2,12 @@ plugins {
     alias(libs.plugins.nofar.android.feature)
 }
 
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-opt-in=androidx.camera.camera2.interop.ExperimentalCamera2Interop")
+    }
+}
+
 android {
     namespace = "com.nofar.feature.explore"
 

@@ -1,35 +1,42 @@
 package com.nofar.feature.home
 
-import com.nofar.core.data.repository.RegionRepository
+import com.nofar.core.data.repository.HomeRegionMetadataRepository
+import com.nofar.core.data.usecase.InsideRegionUseCase
 import com.nofar.core.designsystem.component.RegionCardState
-import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
+import kotlin.math.max
 
 internal suspend fun buildHomeRegionCards(
-    regionRepository: RegionRepository,
+    insideRegionUseCase: InsideRegionUseCase,
+    metadataRepository: HomeRegionMetadataRepository,
     regions: List<Region>,
     location: UserLocation?
 ): List<RegionCardState> {
-    val sorted = regions.sortedByDescending { it.updatedAt }
-    val containingIds =
+    val sorted = HomeRegionLogic.sortRegionsByUpdatedAt(regions)
+    val insideIds =
         if (location != null) {
-            regionRepository
-                .regionsContainingPoint(location.latitude, location.longitude)
-                .map { it.id }
-                .toSet()
+            insideRegionUseCase.insideRegionIds(location.latitude, location.longitude, regions)
         } else {
             emptySet()
         }
     return sorted.map { region ->
-        val isHere = region.id in containingIds
-        val canExplore =
-            isHere &&
-                (region.downloadStatus == DownloadStatus.READY || region.downloadStatus == DownloadStatus.PARTIAL)
+        val isInside = region.id in insideIds
+        val metadata = metadataRepository.getMetadata(region.id)
+        val demSizeBytes = metadata.demSizeBytes
+        val osmSizeBytes =
+            if (demSizeBytes > 0L) {
+                max(0L, region.estimatedSizeBytes - demSizeBytes)
+            } else {
+                region.estimatedSizeBytes
+            }
         RegionCardState(
             region = region,
-            isYouAreHere = isHere,
-            canEnterExplore = canExplore
+            isYouAreHere = HomeRegionLogic.shouldShowYouAreHere(region, isInside),
+            canEnterExplore = HomeRegionLogic.canEnterExplore(region, isInside),
+            osmSizeBytes = osmSizeBytes,
+            demSizeBytes = demSizeBytes,
+            latestDemTimestamp = metadata.latestDemTimestamp
         )
     }
 }
