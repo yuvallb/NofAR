@@ -1,0 +1,11 @@
+{
+  "description": "Hill blocks mid-profile — target occluded",
+  "elevations": [100.0, 100.0, 250.0, 100.0, 120.0],
+  "fixedDistanceM": 100.0,
+  "observerHeightM": 1.7,
+  "expectedHorizonIndex": 2,
+  "expectedVisible": false,
+  "observerEyeM": 101.7,
+  "targetElevationM": 120.0,
+  "totalDistanceM": 400.0
+}

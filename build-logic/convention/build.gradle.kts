@@ -21,6 +21,8 @@ dependencies {
     compileOnly(libs.android.gradlePlugin)
     compileOnly(libs.kotlin.gradlePlugin)
     compileOnly(libs.detekt.gradlePlugin)
+    // Spotless types are referenced in SpotlessConventionPlugin and must be runtime-visible.
+    implementation(libs.spotless.gradlePlugin)
 }
 
 tasks {
@@ -59,6 +61,10 @@ gradlePlugin {
         register("detekt") {
             id = "nofar.detekt"
             implementationClass = "DetektConventionPlugin"
+        }
+        register("spotless") {
+            id = "nofar.spotless"
+            implementationClass = "SpotlessConventionPlugin"
         }
         register("jvmLibrary") {
             id = "nofar.jvm.library"

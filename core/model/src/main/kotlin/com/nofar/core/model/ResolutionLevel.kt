@@ -4,31 +4,28 @@ package com.nofar.core.model
  * Hardcoded resolution levels per Requirements §3.3.1.
  * Not user-facing in MVP — persisted configuration only.
  */
-enum class ResolutionLevel(
-    val displayName: String,
-    val placeTags: Set<String>,
-    val includesPeaks: Boolean,
-) {
+enum class ResolutionLevel(val displayName: String, val placeTags: Set<String>, val includesPeaks: Boolean) {
     Basic(
         displayName = "Basic",
         placeTags = setOf("city"),
-        includesPeaks = false,
+        includesPeaks = false
     ),
     Medium(
         displayName = "Medium",
         placeTags = setOf("city", "town", "village"),
-        includesPeaks = true,
+        includesPeaks = true
     ),
     Full(
         displayName = "Full",
-        placeTags = setOf(
+        placeTags =
+        setOf(
             "city",
             "town",
             "village",
             "hamlet",
             "isolated_dwelling",
-            "locality",
+            "locality"
         ),
-        includesPeaks = true,
-    ),
+        includesPeaks = true
+    )
 }

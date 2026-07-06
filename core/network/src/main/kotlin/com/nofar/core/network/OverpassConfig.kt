@@ -5,11 +5,12 @@ package com.nofar.core.network
  * On 429 or 504, clients retry against the next mirror before surfacing failure.
  */
 object OverpassConfig {
-    val mirrorBaseUrls: List<String> = listOf(
-        "https://overpass-api.de/api/interpreter",
-        "https://overpass.kumi.systems/api/interpreter",
-        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
-    )
+    val mirrorBaseUrls: List<String> =
+        listOf(
+            "https://overpass-api.de/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter",
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+        )
 
     const val USER_AGENT: String = "NofAR/0.1 (offline-first hiking AR; Apache-2.0)"
 }

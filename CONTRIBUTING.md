@@ -15,7 +15,7 @@ Branch from `main` and keep pull requests focused on one feature or phase slice.
 Before opening a PR:
 
 - [ ] Changes are scoped to the stated goal (no unrelated refactors)
-- [ ] `./gradlew detekt lint test` passes locally
+- [ ] `./gradlew spotlessCheck detekt lint test` passes locally
 - [ ] `./gradlew :app:assembleDebug` succeeds (or `assembleRelease` when touching release config)
 - [ ] New behavior has unit or instrumented tests where appropriate
 - [ ] No proprietary analytics, crash reporting, or network calls outside Prepare mode
@@ -28,7 +28,7 @@ Follow [Now in Android](https://github.com/android/nowinandroid) conventions:
 
 - Kotlin 2.x, Jetpack Compose (Material 3), unidirectional data flow
 - Match existing naming and module boundaries in the repo
-- Run `./gradlew detekt lint` before pushing — Detekt and Android Lint are enforced in CI
+- Run `./gradlew spotlessCheck detekt lint` before pushing — Spotless (ktlint), Detekt, and Android Lint are enforced in CI
 - Prefer self-explanatory code; comment only non-obvious business logic
 
 ## Commits
