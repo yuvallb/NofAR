@@ -10,7 +10,7 @@ No accounts. No backend. No tracking.
 |---|---|
 | **Platform** | Android 8.0+ (API 26) |
 | **License** | [Apache 2.0](LICENSE) |
-| **Status** | Phase 0 — navigable app shell (Home / Prepare / Explore / Settings) |
+| **Status** | Under active development - not ready to use |
 
 ---
 
