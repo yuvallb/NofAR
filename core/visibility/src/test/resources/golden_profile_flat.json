@@ -1,0 +1,11 @@
+{
+  "description": "Flat profile — line of sight clear to 200 m target",
+  "elevations": [100.0, 100.0, 100.0, 100.0, 100.0],
+  "fixedDistanceM": 100.0,
+  "observerHeightM": 1.7,
+  "expectedHorizonIndex": 4,
+  "expectedVisible": true,
+  "observerEyeM": 101.7,
+  "targetElevationM": 150.0,
+  "totalDistanceM": 400.0
+}
