@@ -14,8 +14,11 @@ import com.nofar.core.data.prepare.PreparePhase
 import com.nofar.core.data.prepare.PrepareProgress
 import com.nofar.core.data.prepare.PrepareWorkState
 import com.nofar.core.data.repository.RegionRepository
+import com.nofar.core.location.LocationController
+import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
+import com.nofar.core.model.LocationAccessState
 import com.nofar.core.model.Region
 import com.nofar.core.model.RegionBounds
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -54,7 +57,10 @@ data class PrepareUiState(
     val errorMessage: String? = null,
     val showCellularWarning: Boolean = false,
     val showWifiOnlyBlocked: Boolean = false,
-    val nameError: String? = null
+    val nameError: String? = null,
+    val mapRecenterNonce: Long = 0L,
+    val waitingForGpsFix: Boolean = false,
+    val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED
 )
 
 enum class PrepareStep {
@@ -73,14 +79,47 @@ constructor(
     private val orchestrator: PrepareDownloadOrchestrator,
     private val downloadPreferences: UserPreferencesRepository,
     private val networkConnectivityMonitor: NetworkConnectivityMonitor,
+    private val locationRepository: LocationRepository,
+    private val locationController: LocationController,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PrepareUiState())
     val uiState: StateFlow<PrepareUiState> = _uiState.asStateFlow()
+    private val editingExistingRegion =
+        savedStateHandle.get<String>("regionId")?.takeIf { it.isNotBlank() } != null
+    private var hasSetInitialLocation = false
+    private var pendingRecenterOnLocation = false
 
     init {
+        locationController.acquire(PREPARE_LOCATION_TOKEN)
         savedStateHandle.get<String>("regionId")?.takeIf { it.isNotBlank() }?.let { id ->
             loadExistingRegion(UUID.fromString(id))
+            hasSetInitialLocation = true
+        }
+        if (!editingExistingRegion) {
+            viewModelScope.launch {
+                locationRepository.lastLocation?.let { location ->
+                    setRegionCenter(
+                        lat = location.latitude,
+                        lon = location.longitude,
+                        recenterMap = true,
+                        suggestName = true
+                    )
+                    hasSetInitialLocation = true
+                }
+                locationRepository.locationFlow.collect { location ->
+                    if (pendingRecenterOnLocation || !hasSetInitialLocation) {
+                        setRegionCenter(
+                            lat = location.latitude,
+                            lon = location.longitude,
+                            recenterMap = true,
+                            suggestName = !hasSetInitialLocation
+                        )
+                        pendingRecenterOnLocation = false
+                        hasSetInitialLocation = true
+                    }
+                }
+            }
         }
         refreshEstimate()
         viewModelScope.launch {
@@ -127,37 +166,83 @@ constructor(
                     )
                 }
             }
-            DownloadStatus.READY -> {
+            DownloadStatus.READY, DownloadStatus.PARTIAL -> {
                 if (_uiState.value.downloadUiState == PrepareDownloadUiState.DOWNLOADING ||
                     _uiState.value.downloadUiState == PrepareDownloadUiState.ESTIMATING
                 ) {
                     markDownloadComplete(region)
                 }
             }
-            DownloadStatus.PARTIAL -> {
-                if (_uiState.value.downloadUiState == PrepareDownloadUiState.DOWNLOADING) {
-                    _uiState.update {
-                        it.copy(
-                            downloadUiState = PrepareDownloadUiState.ERROR,
-                            step = PrepareStep.ESTIMATE,
-                            errorMessage = "Download complete with partial DEM coverage.",
-                            existingRegion = region,
-                            progress = null
-                        )
-                    }
-                }
-            }
             else -> Unit
         }
     }
 
+    fun onLocationPermissionChanged(accessState: LocationAccessState) {
+        if (accessState == LocationAccessState.GRANTED) {
+            locationRepository.start()
+            locationRepository.lastLocation?.let { location ->
+                if (!hasSetInitialLocation && !editingExistingRegion) {
+                    setRegionCenter(
+                        lat = location.latitude,
+                        lon = location.longitude,
+                        recenterMap = true,
+                        suggestName = true
+                    )
+                    hasSetInitialLocation = true
+                } else if (pendingRecenterOnLocation) {
+                    setRegionCenter(
+                        lat = location.latitude,
+                        lon = location.longitude,
+                        recenterMap = true,
+                        suggestName = false
+                    )
+                    pendingRecenterOnLocation = false
+                }
+            }
+        } else {
+            pendingRecenterOnLocation = false
+        }
+        _uiState.update {
+            val waiting =
+                accessState == LocationAccessState.GRANTED &&
+                    locationRepository.lastLocation == null &&
+                    pendingRecenterOnLocation
+            it.copy(
+                locationAccessState = if (waiting) LocationAccessState.WAITING_FOR_FIX else accessState,
+                waitingForGpsFix = waiting
+            )
+        }
+    }
+
+    fun moveToCurrentLocation() {
+        val location = locationRepository.lastLocation
+        if (location != null) {
+            setRegionCenter(
+                lat = location.latitude,
+                lon = location.longitude,
+                recenterMap = true,
+                suggestName = false
+            )
+        } else {
+            pendingRecenterOnLocation = true
+            _uiState.update {
+                it.copy(
+                    waitingForGpsFix = true,
+                    locationAccessState = LocationAccessState.WAITING_FOR_FIX
+                )
+            }
+        }
+    }
+
     fun onMapTap(lat: Double, lon: Double) {
-        val suggestedName =
-            "Region near ${"%.2f".format(lat)}, ${"%.2f".format(lon)}"
+        setRegionCenter(lat = lat, lon = lon, recenterMap = false, suggestName = true)
+    }
+
+    private fun setRegionCenter(lat: Double, lon: Double, recenterMap: Boolean, suggestName: Boolean) {
         _uiState.update {
             val name =
-                if (it.regionName.isBlank() || it.regionName.startsWith("Region near")) {
-                    suggestedName
+                if (suggestName && (it.regionName.isBlank() || it.regionName.startsWith("Region near"))) {
+                    "Region near ${"%.2f".format(lat)}, ${"%.2f".format(lon)}"
                 } else {
                     it.regionName
                 }
@@ -165,6 +250,14 @@ constructor(
                 centerLat = lat,
                 centerLon = lon,
                 regionName = name,
+                mapRecenterNonce = if (recenterMap) it.mapRecenterNonce + 1 else it.mapRecenterNonce,
+                waitingForGpsFix = false,
+                locationAccessState =
+                if (it.locationAccessState == LocationAccessState.WAITING_FOR_FIX) {
+                    LocationAccessState.GRANTED
+                } else {
+                    it.locationAccessState
+                },
                 step = PrepareStep.DEFINE,
                 errorMessage = null
             )
@@ -399,14 +492,18 @@ constructor(
             }
             PrepareWorkState.FAILED -> {
                 val region = regionRepository.getRegion(regionId)
-                _uiState.update {
-                    it.copy(
-                        downloadUiState = PrepareDownloadUiState.ERROR,
-                        step = PrepareStep.ESTIMATE,
-                        errorMessage = "Download failed. You can retry to continue.",
-                        existingRegion = region,
-                        progress = null
-                    )
+                when (region?.downloadStatus) {
+                    DownloadStatus.READY, DownloadStatus.PARTIAL -> markDownloadComplete(region)
+                    else ->
+                        _uiState.update {
+                            it.copy(
+                                downloadUiState = PrepareDownloadUiState.ERROR,
+                                step = PrepareStep.ESTIMATE,
+                                errorMessage = "Download failed. You can retry to continue.",
+                                existingRegion = region,
+                                progress = null
+                            )
+                        }
                 }
             }
             PrepareWorkState.CANCELLED -> {
@@ -438,5 +535,14 @@ constructor(
         name.isBlank() -> "Name is required"
         name.length > 40 -> "Name must be 40 characters or fewer"
         else -> null
+    }
+
+    override fun onCleared() {
+        locationController.release(PREPARE_LOCATION_TOKEN)
+        super.onCleared()
+    }
+
+    companion object {
+        private const val PREPARE_LOCATION_TOKEN = "prepare"
     }
 }

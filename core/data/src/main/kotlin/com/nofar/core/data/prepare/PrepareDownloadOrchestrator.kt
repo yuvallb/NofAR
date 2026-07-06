@@ -286,11 +286,10 @@ constructor(
 
             if (demFailures > 0 || !postSuccess) {
                 regionRepository.updateDownloadStatus(regionId, DownloadStatus.PARTIAL, progressPct = 100)
-                Result.failure(IllegalStateException("Partial download: $demFailures DEM failures"))
             } else {
                 regionRepository.updateDownloadStatus(regionId, DownloadStatus.READY, progressPct = 100)
-                Result.success(Unit)
             }
+            Result.success(Unit)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {

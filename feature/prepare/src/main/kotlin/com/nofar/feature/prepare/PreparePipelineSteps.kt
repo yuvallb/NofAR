@@ -53,7 +53,7 @@ private fun postProcessPipelineStep(uiState: PrepareUiState): PipelineStep {
         detailLines =
         if (phase == PreparePhase.POST_PROCESSING) {
             listOf(
-                progress?.message?.takeIf { it.isNotBlank() }
+                progress.message.takeIf { it.isNotBlank() }
                     ?: "Sampling elevations from downloaded DEM tiles…"
             )
         } else {

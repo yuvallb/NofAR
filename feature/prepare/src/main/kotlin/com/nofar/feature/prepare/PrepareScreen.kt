@@ -2,6 +2,8 @@
 
 package com.nofar.feature.prepare
 
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.view.MotionEvent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,12 +12,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Help
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -26,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,13 +53,17 @@ import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
+import com.nofar.core.ui.permission.rememberNofARPermissionState
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapListener
+import org.osmdroid.events.ScrollEvent
+import org.osmdroid.events.ZoomEvent
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Overlay
-import org.osmdroid.views.overlay.Polygon
 
 @Composable
 fun PrepareScreen(
@@ -62,6 +73,7 @@ fun PrepareScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val permissionState = rememberNofARPermissionState()
     val isDownloading =
         uiState.downloadUiState == PrepareDownloadUiState.DOWNLOADING ||
             uiState.downloadUiState == PrepareDownloadUiState.ESTIMATING
@@ -69,6 +81,10 @@ fun PrepareScreen(
     DisposableEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
         onDispose { }
+    }
+
+    LaunchedEffect(permissionState.locationAccessState) {
+        viewModel.onLocationPermissionChanged(permissionState.locationAccessState)
     }
 
     Column(modifier = modifier.fillMaxSize()) {
@@ -98,7 +114,7 @@ fun PrepareScreen(
                     )
                 } else {
                     Icon(
-                        imageVector = Icons.Default.Help,
+                        imageVector = Icons.AutoMirrored.Filled.Help,
                         contentDescription = "Help",
                         tint = NofARColors.TextSecondary,
                         modifier = Modifier.padding(end = 8.dp)
@@ -117,6 +133,13 @@ fun PrepareScreen(
             DefineRegionContent(
                 uiState = uiState,
                 onMapTap = viewModel::onMapTap,
+                onMoveToCurrentLocation = {
+                    if (permissionState.fineLocationGranted) {
+                        viewModel.moveToCurrentLocation()
+                    } else {
+                        permissionState.requestFineLocation()
+                    }
+                },
                 onRegionNameChanged = viewModel::onRegionNameChanged,
                 onRadiusChanged = viewModel::onRadiusChanged,
                 onDownloadClicked = viewModel::onDownloadClicked,
@@ -143,6 +166,7 @@ fun PrepareScreen(
 private fun DefineRegionContent(
     uiState: PrepareUiState,
     onMapTap: (Double, Double) -> Unit,
+    onMoveToCurrentLocation: () -> Unit,
     onRegionNameChanged: (String) -> Unit,
     onRadiusChanged: (Double) -> Unit,
     onDownloadClicked: () -> Unit,
@@ -154,9 +178,26 @@ private fun DefineRegionContent(
             centerLat = uiState.centerLat,
             centerLon = uiState.centerLon,
             radiusKm = uiState.radiusKm,
+            mapRecenterNonce = uiState.mapRecenterNonce,
             onMapTap = onMapTap,
             modifier = Modifier.fillMaxSize()
         )
+        FloatingActionButton(
+            onClick = onMoveToCurrentLocation,
+            modifier =
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp),
+            containerColor = NofARColors.SurfaceVariant,
+            contentColor = NofARColors.PrimaryYellow,
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.MyLocation,
+                contentDescription = "Move marker to current location",
+                modifier = Modifier.size(24.dp)
+            )
+        }
         Column(
             modifier =
             Modifier
@@ -331,55 +372,120 @@ private fun PrepareMap(
     centerLat: Double,
     centerLon: Double,
     radiusKm: Double,
+    mapRecenterNonce: Long,
     onMapTap: (Double, Double) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val center = remember(centerLat, centerLon) { GeoPoint(centerLat, centerLon) }
+    var lastRecenterNonce by remember { mutableStateOf(0L) }
+    val mapHolder = remember { PrepareMapHolder() }
     AndroidView(
         modifier = modifier,
         factory = { context ->
             MapView(context).apply {
                 setMultiTouchControls(true)
                 controller.setZoom(10.0)
-                controller.setCenter(center)
-                overlays.add(
+                controller.setCenter(GeoPoint(centerLat, centerLon))
+                val circleOverlay = RadiusCircleOverlay(centerLat, centerLon, radiusKm * 1000)
+                val marker =
+                    Marker(this).apply {
+                        position = GeoPoint(centerLat, centerLon)
+                        isDraggable = false
+                    }
+                val tapOverlay =
                     TapOverlay { lat, lon ->
                         onMapTap(lat, lon)
                         true
                     }
+                overlays.add(circleOverlay)
+                overlays.add(marker)
+                overlays.add(tapOverlay)
+                addMapListener(
+                    object : MapListener {
+                        override fun onScroll(event: ScrollEvent?): Boolean {
+                            invalidate()
+                            return false
+                        }
+
+                        override fun onZoom(event: ZoomEvent?): Boolean {
+                            invalidate()
+                            return false
+                        }
+                    }
                 )
+                mapHolder.circleOverlay = circleOverlay
+                mapHolder.marker = marker
+                mapHolder.mapView = this
             }
         },
         update = { mapView ->
-            mapView.controller.setCenter(GeoPoint(centerLat, centerLon))
-            mapView.overlays.removeAll { it is Marker || it is Polygon }
-            mapView.overlays.add(
-                Marker(mapView).apply {
-                    position = GeoPoint(centerLat, centerLon)
-                    isDraggable = false
-                }
-            )
-            mapView.overlays.add(
-                Polygon(mapView).apply {
-                    points = circlePoints(centerLat, centerLon, radiusKm * 1000)
-                    fillPaint.color = 0x33FFE838
-                    outlinePaint.color = 0xFFFFE838.toInt()
-                    outlinePaint.strokeWidth = 4f
-                }
-            )
+            mapHolder.marker?.position = GeoPoint(centerLat, centerLon)
+            mapHolder.circleOverlay?.apply {
+                this.centerLat = centerLat
+                this.centerLon = centerLon
+                this.radiusM = radiusKm * 1000
+            }
+            if (mapRecenterNonce != lastRecenterNonce) {
+                mapView.controller.animateTo(GeoPoint(centerLat, centerLon))
+                lastRecenterNonce = mapRecenterNonce
+            }
             mapView.invalidate()
         }
     )
 }
 
-private fun circlePoints(centerLat: Double, centerLon: Double, radiusM: Double): List<GeoPoint> {
-    val points = mutableListOf<GeoPoint>()
-    repeat(64) { index ->
-        val bearing = index * 360.0 / 64.0
-        val destination = destinationPoint(centerLat, centerLon, radiusM, bearing)
-        points += GeoPoint(destination.first, destination.second)
+private class PrepareMapHolder {
+    var mapView: MapView? = null
+    var marker: Marker? = null
+    var circleOverlay: RadiusCircleOverlay? = null
+}
+
+private class RadiusCircleOverlay(var centerLat: Double, var centerLon: Double, var radiusM: Double) : Overlay() {
+    private val fillPaint =
+        Paint().apply {
+            color = 0x33FFE838
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+    private val outlinePaint =
+        Paint().apply {
+            color = 0xFFFFE838.toInt()
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+            isAntiAlias = true
+        }
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+        val projection = mapView.projection
+        val centerPoint = projection.toPixels(GeoPoint(centerLat, centerLon), null)
+        val northPoint = destinationPoint(centerLat, centerLon, radiusM, 0.0)
+        val northPixels = projection.toPixels(GeoPoint(northPoint.first, northPoint.second), null)
+        val eastPoint = destinationPoint(centerLat, centerLon, radiusM, 90.0)
+        val eastPixels = projection.toPixels(GeoPoint(eastPoint.first, eastPoint.second), null)
+        val radiusPx =
+            (
+                hypot(
+                    (northPixels.x - centerPoint.x).toDouble(),
+                    (northPixels.y - centerPoint.y).toDouble()
+                ) +
+                    hypot(
+                        (eastPixels.x - centerPoint.x).toDouble(),
+                        (eastPixels.y - centerPoint.y).toDouble()
+                    )
+                ) / 2.0
+        canvas.drawCircle(
+            centerPoint.x.toFloat(),
+            centerPoint.y.toFloat(),
+            radiusPx.toFloat(),
+            fillPaint
+        )
+        canvas.drawCircle(
+            centerPoint.x.toFloat(),
+            centerPoint.y.toFloat(),
+            radiusPx.toFloat(),
+            outlinePaint
+        )
     }
-    return points
 }
 
 private fun destinationPoint(lat: Double, lon: Double, distanceM: Double, bearingDeg: Double): Pair<Double, Double> {
