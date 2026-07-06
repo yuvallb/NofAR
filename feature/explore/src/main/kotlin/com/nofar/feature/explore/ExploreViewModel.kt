@@ -5,6 +5,7 @@ package com.nofar.feature.explore
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
@@ -58,6 +59,7 @@ data class ExploreUiState(
     val screenHeightPx: Float = 0f,
     val debugRawAzimuthDeg: Float? = null,
     val debugSmoothedAzimuthDeg: Float? = null,
+    val useRawSensorOverlay: Boolean = false,
     val visibleEntityCount: Int = 0
 )
 
@@ -74,7 +76,8 @@ constructor(
     private val calibrationMonitor: CompassCalibrationMonitor,
     private val declinationCorrector: DeclinationCorrector,
     private val visibilityPassScheduler: VisibilityPassScheduler,
-    private val regionRepository: RegionRepository
+    private val regionRepository: RegionRepository,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ExploreUiState())
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
@@ -85,6 +88,7 @@ constructor(
     private val regionBoundaryController = ExploreRegionBoundaryController()
     private var cachedVisibleEntities: List<VisibleEntity> = emptyList()
     private var currentOrientation: DeviceOrientation? = null
+    private var currentRawOrientation: DeviceOrientation? = null
     private var hasReceivedOrientation: Boolean = false
 
     init {
@@ -95,6 +99,7 @@ constructor(
         collectOrientation()
         collectLocation()
         collectVisibility()
+        collectDebugPreferences()
     }
 
     fun onLocationPermissionChanged(accessState: LocationAccessState) {
@@ -163,7 +168,22 @@ constructor(
         }
         viewModelScope.launch {
             unsmoothedOrientationProvider.orientationFlow.collect { orientation ->
-                _uiState.update { it.copy(debugRawAzimuthDeg = orientation.trueAzimuthDeg) }
+                currentRawOrientation = orientation
+                _uiState.update { state ->
+                    state.copy(debugRawAzimuthDeg = orientation.trueAzimuthDeg)
+                }
+                if (_uiState.value.useRawSensorOverlay) {
+                    reprojectLabels()
+                }
+            }
+        }
+    }
+
+    private fun collectDebugPreferences() {
+        viewModelScope.launch {
+            userPreferencesRepository.showRawSensorOverlay.collect { useRaw ->
+                _uiState.update { it.copy(useRawSensorOverlay = useRaw) }
+                reprojectLabels()
             }
         }
     }
@@ -335,7 +355,12 @@ constructor(
             return
         }
 
-        val projectedOrientation = orientation
+        val projectedOrientation =
+            if (state.useRawSensorOverlay) {
+                currentRawOrientation ?: orientation
+            } else {
+                orientation
+            }
 
         val (clusters, labels) =
             ExploreLabelProjector.project(

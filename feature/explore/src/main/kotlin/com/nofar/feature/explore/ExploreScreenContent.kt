@@ -62,6 +62,10 @@ internal fun ExploreScreenRoot(
             ExploreExpandedBucketDialog(cluster = cluster, onDismiss = onDismissExpandedBucket)
         }
 
+        if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
+            ExploreOsmWatermark(modifier = Modifier.align(Alignment.BottomEnd))
+        }
+
         debugOverlay()
     }
 }
@@ -132,7 +136,6 @@ private fun BoxScope.ExploreReadyChrome(uiState: ExploreUiState, onNavigateBack:
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
         )
     }
-    ExploreOsmWatermark(modifier = Modifier.align(Alignment.BottomEnd))
     NofARExploreBottomHud(
         altitudeM = uiState.altitudeM ?: "—",
         maxRangeKm = AppConfig.REGION_RADIUS_MAX_KM.toInt(),

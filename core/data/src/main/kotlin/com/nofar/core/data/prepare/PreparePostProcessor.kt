@@ -9,6 +9,7 @@ import com.nofar.core.database.dao.RegionDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
 import com.nofar.core.database.model.asEntity
 import com.nofar.core.database.model.asExternalModel
+import com.nofar.core.model.DemTileId
 import com.nofar.core.model.ElevationSource
 import com.nofar.core.model.GeoEntity
 import java.time.Instant
@@ -23,27 +24,35 @@ constructor(
     private val geoEntityRepository: GeoEntityRepository,
     private val demTileRepository: DefaultDemTileRepository
 ) {
-    suspend fun process(regionId: UUID): Boolean {
+    suspend fun process(regionId: UUID, onProgress: (processed: Int, total: Int) -> Unit = { _, _ -> }): Boolean {
         val entityIds = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString())
+        val total = entityIds.size
+        val readers = mutableMapOf<String, DemTileReader>()
         var allSucceeded = true
 
-        for (entityId in entityIds) {
-            val entity = geoEntityRepository.getById(entityId) ?: continue
-            if (entity.elevation != null) continue
+        try {
+            for ((index, entityId) in entityIds.withIndex()) {
+                onProgress(index + 1, total)
 
-            val sampled = sampleElevation(entity)
-            if (sampled == null) {
-                allSucceeded = false
-                continue
-            }
+                val entity = geoEntityRepository.getById(entityId) ?: continue
+                if (entity.elevation != null) continue
 
-            geoEntityRepository.upsert(
-                entity.copy(
-                    elevation = sampled.toDouble(),
-                    elevationSource = ElevationSource.DEM_SAMPLE,
-                    lastSeenAt = Instant.now()
+                val sampled = sampleElevation(entity, readers)
+                if (sampled == null) {
+                    allSucceeded = false
+                    continue
+                }
+
+                geoEntityRepository.upsert(
+                    entity.copy(
+                        elevation = sampled.toDouble(),
+                        elevationSource = ElevationSource.DEM_SAMPLE,
+                        lastSeenAt = Instant.now()
+                    )
                 )
-            )
+            }
+        } finally {
+            readers.values.forEach(DemTileReader::close)
         }
 
         val region = regionDao.getById(regionId.toString())?.asExternalModel() ?: return false
@@ -57,10 +66,13 @@ constructor(
         return allSucceeded
     }
 
-    private fun sampleElevation(entity: GeoEntity): Float? {
-        val tileCoords = com.nofar.core.model.DemTileId.coordinatesForPoint(entity.lat, entity.lon)
-        val tileId = com.nofar.core.model.DemTileId.fromCoordinates(tileCoords.first, tileCoords.second)
-        val reader: DemTileReader = demTileRepository.openReader(tileId) ?: return null
-        return reader.use { it.elevationAt(entity.lat, entity.lon) }
+    private fun sampleElevation(entity: GeoEntity, readers: MutableMap<String, DemTileReader>): Float? {
+        val tileCoords = DemTileId.coordinatesForPoint(entity.lat, entity.lon)
+        val tileId = DemTileId.fromCoordinates(tileCoords.first, tileCoords.second)
+        val reader =
+            readers[tileId] ?: demTileRepository.openReader(tileId)?.also { opened ->
+                readers[tileId] = opened
+            } ?: return null
+        return reader.elevationAt(entity.lat, entity.lon)
     }
 }

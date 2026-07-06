@@ -12,6 +12,7 @@ import java.io.File
 import java.time.Instant
 import javax.inject.Inject
 
+@Suppress("TooManyFunctions")
 class DefaultDemTileRepository
 @Inject
 constructor(
@@ -56,6 +57,9 @@ constructor(
 
     override suspend fun getLruUnusedCandidates(): List<DemTile> =
         demTileDao.getLruUnusedCandidates().map { it.asExternalModel() }
+
+    override suspend fun getAllLruCandidates(): List<DemTile> =
+        demTileDao.getAllLruCandidates().map { it.asExternalModel() }
 
     fun demFile(tileId: String): File = File(demDirectory, DemTileId.binFileName(tileId))
 

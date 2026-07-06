@@ -12,9 +12,11 @@ import android.content.Context
 import com.nofar.core.data.dem.DefaultGeoTiffConverter
 import com.nofar.core.data.dem.GeoTiffConverter
 import com.nofar.core.data.osm.OverpassStreamParser
+import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.repository.DefaultDemTileRepository
 import com.nofar.core.data.repository.GeoEntityRepository
 import com.nofar.core.data.repository.RegionRepository
+import com.nofar.core.data.usecase.LruEvictionUseCase
 import com.nofar.core.database.dao.RegionEntityCoverageDao
 import com.nofar.core.database.dao.TileCoverageDao
 import com.nofar.core.database.model.RegionEntityCoverageEntity
@@ -36,6 +38,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 
 data class PrepareProgress(
     val phase: PreparePhase,
@@ -76,6 +79,8 @@ constructor(
     private val regionEntityCoverageDao: RegionEntityCoverageDao,
     private val tileCoverageDao: TileCoverageDao,
     private val postProcessor: PreparePostProcessor,
+    private val userPreferencesRepository: UserPreferencesRepository,
+    private val lruEvictionUseCase: LruEvictionUseCase,
     private val geoTiffConverter: GeoTiffConverter = DefaultGeoTiffConverter(),
     private val overpassStreamParser: OverpassStreamParser = OverpassStreamParser()
 ) {
@@ -207,7 +212,7 @@ constructor(
                             0.5
                         }
                         val pct =
-                            40 + (((index + tileFraction) * 50) / tiles.size.coerceAtLeast(1)).toInt()
+                            40 + (((index + tileFraction * 0.7) * 50) / tiles.size.coerceAtLeast(1)).toInt()
                         val remaining =
                             estimate.totalEstimateBytes - (estimate.osmEstimateBytes + bytesRead)
                         updateProgress(
@@ -220,8 +225,18 @@ constructor(
                         )
                     }
 
+                    val convertPct =
+                        40 + (((index + 0.85) * 50) / tiles.size.coerceAtLeast(1)).toInt()
+                    updateProgress(
+                        PreparePhase.DEM,
+                        convertPct.coerceIn(40, 90),
+                        demTileIndex = index + 1,
+                        demTileCount = tiles.size,
+                        message = "Converting tile ${index + 1}/${tiles.size} to local binary…"
+                    )
                     val conversion = geoTiffConverter.convert(tifFile, tileLat, tileLon, binFile)
-                    if (!KEEP_RAW_TIF) {
+                    val keepRawTif = userPreferencesRepository.keepRawGeoTiff.first()
+                    if (!keepRawTif) {
                         tifFile.delete()
                     }
 
@@ -253,11 +268,21 @@ constructor(
             }
 
             // Post-processing (90–100%)
-            updateProgress(PreparePhase.POST_PROCESSING, 92, message = "Filling elevations…")
-            persistProgress(92)
-            val postSuccess = postProcessor.process(regionId)
-            updateProgress(PreparePhase.POST_PROCESSING, 100)
+            updateProgress(PreparePhase.POST_PROCESSING, 90, message = "Filling elevations…")
+            persistProgress(90)
+            val postSuccess =
+                postProcessor.process(regionId) { processed, total ->
+                    val pct = 90 + ((processed * 9) / total.coerceAtLeast(1))
+                    updateProgress(
+                        PreparePhase.POST_PROCESSING,
+                        pct.coerceIn(90, 99),
+                        message = "Filling elevations ($processed/$total)…"
+                    )
+                }
+            persistProgress(99)
+            updateProgress(PreparePhase.POST_PROCESSING, 100, message = "Finalizing…")
             persistProgress(100)
+            enforceDemCacheLimit()
 
             if (demFailures > 0 || !postSuccess) {
                 regionRepository.updateDownloadStatus(regionId, DownloadStatus.PARTIAL, progressPct = 100)
@@ -273,6 +298,11 @@ constructor(
                 if (entityCount > 0 || demFailures > 0) DownloadStatus.PARTIAL else DownloadStatus.NOT_DOWNLOADED
             regionRepository.updateDownloadStatus(regionId, status, progressPct = _progress.value?.overallPercent ?: 0)
             Result.failure(error)
+        } finally {
+            if (activeRegionId == regionId) {
+                _progress.value = null
+                activeRegionId = null
+            }
         }
     }
 
@@ -319,10 +349,11 @@ constructor(
         if (cancelled) throw CancellationException("Prepare download cancelled")
     }
 
+    private suspend fun enforceDemCacheLimit() {
+        val limitBytes = userPreferencesRepository.demCacheLimitBytes.first()
+        lruEvictionUseCase.execute(limitBytes)
+    }
+
     private val demDirectory: File
         get() = File(context.filesDir, "dem/raw").also { it.mkdirs() }
-
-    companion object {
-        private const val KEEP_RAW_TIF = false
-    }
 }

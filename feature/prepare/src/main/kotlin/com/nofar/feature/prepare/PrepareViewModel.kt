@@ -2,11 +2,11 @@
 
 package com.nofar.feature.prepare
 
-import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nofar.core.data.preferences.DownloadPreferences
+import com.nofar.core.data.network.NetworkConnectivityMonitor
+import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.prepare.PrepareDownloadOrchestrator
 import com.nofar.core.data.prepare.PrepareDownloadScheduler
 import com.nofar.core.data.prepare.PrepareEstimator
@@ -19,7 +19,6 @@ import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.Region
 import com.nofar.core.model.RegionBounds
 import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -54,6 +53,7 @@ data class PrepareUiState(
     val progress: PrepareProgress? = null,
     val errorMessage: String? = null,
     val showCellularWarning: Boolean = false,
+    val showWifiOnlyBlocked: Boolean = false,
     val nameError: String? = null
 )
 
@@ -68,11 +68,11 @@ enum class PrepareStep {
 class PrepareViewModel
 @Inject
 constructor(
-    @ApplicationContext private val context: Context,
     private val regionRepository: RegionRepository,
     private val downloadScheduler: PrepareDownloadScheduler,
     private val orchestrator: PrepareDownloadOrchestrator,
-    private val downloadPreferences: DownloadPreferences,
+    private val downloadPreferences: UserPreferencesRepository,
+    private val networkConnectivityMonitor: NetworkConnectivityMonitor,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PrepareUiState())
@@ -85,8 +85,13 @@ constructor(
         refreshEstimate()
         viewModelScope.launch {
             orchestrator.progress.collect { progress ->
-                if (progress != null) {
-                    _uiState.update { state ->
+                if (progress == null) return@collect
+                _uiState.update { state ->
+                    if (state.downloadUiState == PrepareDownloadUiState.COMPLETE ||
+                        state.downloadUiState == PrepareDownloadUiState.ERROR
+                    ) {
+                        state.copy(progress = progress)
+                    } else {
                         state.copy(
                             progress = progress,
                             downloadUiState = PrepareDownloadUiState.DOWNLOADING,
@@ -105,21 +110,44 @@ constructor(
     }
 
     private suspend fun pollDownloadProgressFromDb() {
-        val regionId = _uiState.value.regionId
-        val region = regionId?.let { regionRepository.getRegion(it) }
-        if (region?.downloadStatus == DownloadStatus.DOWNLOADING) {
-            _uiState.update { state ->
-                state.copy(
-                    progress =
-                    state.progress?.copy(overallPercent = region.downloadProgressPct)
-                        ?: PrepareProgress(
-                            phase = PreparePhase.OSM,
-                            overallPercent = region.downloadProgressPct
-                        ),
-                    downloadUiState = PrepareDownloadUiState.DOWNLOADING,
-                    step = PrepareStep.DOWNLOAD
-                )
+        val regionId = _uiState.value.regionId ?: return
+        val region = regionRepository.getRegion(regionId) ?: return
+        when (region.downloadStatus) {
+            DownloadStatus.DOWNLOADING -> {
+                _uiState.update { state ->
+                    state.copy(
+                        progress =
+                        state.progress?.copy(overallPercent = region.downloadProgressPct)
+                            ?: PrepareProgress(
+                                phase = PreparePhase.OSM,
+                                overallPercent = region.downloadProgressPct
+                            ),
+                        downloadUiState = PrepareDownloadUiState.DOWNLOADING,
+                        step = PrepareStep.DOWNLOAD
+                    )
+                }
             }
+            DownloadStatus.READY -> {
+                if (_uiState.value.downloadUiState == PrepareDownloadUiState.DOWNLOADING ||
+                    _uiState.value.downloadUiState == PrepareDownloadUiState.ESTIMATING
+                ) {
+                    markDownloadComplete(region)
+                }
+            }
+            DownloadStatus.PARTIAL -> {
+                if (_uiState.value.downloadUiState == PrepareDownloadUiState.DOWNLOADING) {
+                    _uiState.update {
+                        it.copy(
+                            downloadUiState = PrepareDownloadUiState.ERROR,
+                            step = PrepareStep.ESTIMATE,
+                            errorMessage = "Download complete with partial DEM coverage.",
+                            existingRegion = region,
+                            progress = null
+                        )
+                    }
+                }
+            }
+            else -> Unit
         }
     }
 
@@ -179,7 +207,7 @@ constructor(
             _uiState.update { it.copy(nameError = nameError) }
             return
         }
-        if (!PrepareNetworkMonitor.isNetworkAvailable(context)) {
+        if (!networkConnectivityMonitor.isNetworkAvailable()) {
             _uiState.update {
                 it.copy(
                     downloadUiState = PrepareDownloadUiState.ERROR,
@@ -190,21 +218,33 @@ constructor(
         }
         viewModelScope.launch {
             val wifiOnly = downloadPreferences.wifiOnlyDownloads.first()
-            val onCellular = PrepareNetworkMonitor.isCellularNetwork(context)
-            if (wifiOnly && onCellular) {
-                _uiState.update {
-                    it.copy(
-                        downloadUiState = PrepareDownloadUiState.ERROR,
-                        errorMessage = "Wi-Fi only downloads are enabled. Connect to Wi-Fi to continue."
+            val onCellular = networkConnectivityMonitor.isCellularNetwork()
+            when (
+                val gate =
+                    PrepareDownloadPolicy.evaluateStart(
+                        networkAvailable = true,
+                        wifiOnlyDownloads = wifiOnly,
+                        onCellularNetwork = onCellular,
+                        estimateBytes = state.estimateBytes
                     )
+            ) {
+                is PrepareDownloadPolicy.GateResult.Blocked -> {
+                    if (wifiOnly && onCellular) {
+                        _uiState.update { it.copy(showWifiOnlyBlocked = true) }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                downloadUiState = PrepareDownloadUiState.ERROR,
+                                errorMessage = gate.message
+                            )
+                        }
+                    }
                 }
-                return@launch
+                PrepareDownloadPolicy.GateResult.CellularWarning -> {
+                    _uiState.update { it.copy(showCellularWarning = true) }
+                }
+                PrepareDownloadPolicy.GateResult.Proceed -> startDownload()
             }
-            if (onCellular && state.estimateBytes > AppConfig.CELLULAR_DOWNLOAD_WARNING_BYTES) {
-                _uiState.update { it.copy(showCellularWarning = true) }
-                return@launch
-            }
-            startDownload()
         }
     }
 
@@ -215,6 +255,10 @@ constructor(
 
     fun dismissCellularWarning() {
         _uiState.update { it.copy(showCellularWarning = false) }
+    }
+
+    fun dismissWifiOnlyBlocked() {
+        _uiState.update { it.copy(showWifiOnlyBlocked = false) }
     }
 
     fun cancelDownload() {
@@ -267,32 +311,7 @@ constructor(
             }
 
             downloadScheduler.observeWorkState(regionId).collect { workState ->
-                when (workState) {
-                    PrepareWorkState.SUCCEEDED -> {
-                        val region = regionRepository.getRegion(regionId)
-                        _uiState.update {
-                            it.copy(
-                                downloadUiState = PrepareDownloadUiState.COMPLETE,
-                                step = PrepareStep.COMPLETE,
-                                existingRegion = region
-                            )
-                        }
-                    }
-                    PrepareWorkState.FAILED -> {
-                        val region = regionRepository.getRegion(regionId)
-                        _uiState.update {
-                            it.copy(
-                                downloadUiState = PrepareDownloadUiState.ERROR,
-                                errorMessage = "Download failed. You can retry to continue.",
-                                existingRegion = region
-                            )
-                        }
-                    }
-                    PrepareWorkState.CANCELLED -> {
-                        _uiState.update { it.copy(downloadUiState = PrepareDownloadUiState.PAUSED) }
-                    }
-                    else -> Unit
-                }
+                applyWorkState(regionId, workState)
             }
         }
     }
@@ -363,8 +382,55 @@ constructor(
                 )
             }
             if (region.downloadStatus == DownloadStatus.DOWNLOADING) {
-                downloadScheduler.observeWorkState(regionId).collect { /* handled in startDownload */ }
+                downloadScheduler.observeWorkState(regionId).collect { workState ->
+                    applyWorkState(regionId, workState)
+                }
             }
+        }
+    }
+
+    private suspend fun applyWorkState(regionId: UUID, workState: PrepareWorkState?) {
+        when (workState) {
+            PrepareWorkState.SUCCEEDED -> {
+                val region = regionRepository.getRegion(regionId)
+                if (region != null) {
+                    markDownloadComplete(region)
+                }
+            }
+            PrepareWorkState.FAILED -> {
+                val region = regionRepository.getRegion(regionId)
+                _uiState.update {
+                    it.copy(
+                        downloadUiState = PrepareDownloadUiState.ERROR,
+                        step = PrepareStep.ESTIMATE,
+                        errorMessage = "Download failed. You can retry to continue.",
+                        existingRegion = region,
+                        progress = null
+                    )
+                }
+            }
+            PrepareWorkState.CANCELLED -> {
+                _uiState.update {
+                    it.copy(
+                        downloadUiState = PrepareDownloadUiState.PAUSED,
+                        step = PrepareStep.ESTIMATE,
+                        progress = null
+                    )
+                }
+            }
+            else -> Unit
+        }
+    }
+
+    private fun markDownloadComplete(region: Region) {
+        _uiState.update {
+            it.copy(
+                downloadUiState = PrepareDownloadUiState.COMPLETE,
+                step = PrepareStep.COMPLETE,
+                existingRegion = region,
+                progress = null,
+                errorMessage = null
+            )
         }
     }
 

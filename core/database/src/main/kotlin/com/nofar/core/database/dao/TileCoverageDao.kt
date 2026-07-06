@@ -19,4 +19,10 @@ interface TileCoverageDao {
 
     @Query("SELECT tile_id FROM tile_coverage WHERE region_id = :regionId")
     suspend fun getTileIdsForRegion(regionId: String): List<String>
+
+    @Query("SELECT region_id FROM tile_coverage WHERE tile_id = :tileId")
+    suspend fun getRegionIdsForTile(tileId: String): List<String>
+
+    @Query("DELETE FROM tile_coverage WHERE tile_id = :tileId")
+    suspend fun deleteForTile(tileId: String): Int
 }

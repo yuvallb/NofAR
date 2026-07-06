@@ -26,7 +26,8 @@ class DemTileWriter(
         buffer.putDouble(tileLat.toDouble())
         buffer.putDouble(tileLon.toDouble())
         buffer.putFloat(noDataValue)
-        elevations.forEach(buffer::putFloat)
+        buffer.position(DemBinaryFormat.HEADER_SIZE_BYTES)
+        buffer.asFloatBuffer().put(elevations)
 
         RandomAccessFile(outputFile, "rw").use { file ->
             file.setLength(0)

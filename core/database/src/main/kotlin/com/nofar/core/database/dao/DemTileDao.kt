@@ -42,6 +42,14 @@ interface DemTileDao {
     )
     suspend fun getLruUnusedCandidates(): List<DemTileEntity>
 
+    @Query(
+        """
+        SELECT * FROM dem_tile
+        ORDER BY last_accessed_at ASC
+        """
+    )
+    suspend fun getAllLruCandidates(): List<DemTileEntity>
+
     @Query("SELECT COALESCE(SUM(size_bytes), 0) FROM dem_tile")
     suspend fun totalCacheSizeBytes(): Long
 

@@ -11,4 +11,8 @@ dependencies {
     implementation(project(":core:data"))
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.osmdroid.android)
+
+    testImplementation(libs.junit)
+    testImplementation(libs.truth)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

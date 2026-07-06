@@ -28,6 +28,8 @@ interface RegionRepository {
         osmDatasetVersion: java.time.Instant? = null,
         entityCount: Int? = null
     )
+
+    suspend fun hasActiveDownload(): Boolean
 }
 
 interface GeoEntityRepository {
@@ -73,6 +75,8 @@ interface DemTileRepository {
     suspend fun getUnusedTiles(): List<DemTile>
 
     suspend fun getLruUnusedCandidates(): List<DemTile>
+
+    suspend fun getAllLruCandidates(): List<DemTile>
 }
 
 data class StorageStats(

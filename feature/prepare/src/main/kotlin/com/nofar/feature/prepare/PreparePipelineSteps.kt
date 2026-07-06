@@ -39,7 +39,7 @@ private fun demPipelineStep(uiState: PrepareUiState): PipelineStep {
     return PipelineStep(
         title = "Step 2: Downloading Elevation Tiles ($tileIndex/$tileCount)",
         state = demPipelineState(phase),
-        detailLines = demDetailLines(phase, progress?.remainingBytesEstimate),
+        detailLines = demDetailLines(phase, progress?.remainingBytesEstimate, progress?.message),
         progress = phaseProgress(phase, PreparePhase.DEM, progress?.overallPercent)
     )
 }
@@ -48,23 +48,36 @@ private fun postProcessPipelineStep(uiState: PrepareUiState): PipelineStep {
     val progress = uiState.progress
     val phase = progress?.phase
     return PipelineStep(
-        title = "Step 3: Converting Grids to Local Binary",
-        state = postProcessPipelineState(phase, progress != null),
+        title = "Step 3: Enriching Feature Elevations",
+        state = postProcessPipelineState(phase, progress != null, progress?.overallPercent ?: 0),
         detailLines =
         if (phase == PreparePhase.POST_PROCESSING) {
-            listOf("Processing Copernicus GLO-30 matrix…")
+            listOf(
+                progress?.message?.takeIf { it.isNotBlank() }
+                    ?: "Sampling elevations from downloaded DEM tiles…"
+            )
         } else {
             emptyList()
         }
     )
 }
 
-private fun finalizePipelineStep(uiState: PrepareUiState): PipelineStep = PipelineStep(
-    title = "Finalizing Region",
-    state =
-    if (uiState.downloadUiState == PrepareDownloadUiState.COMPLETE) {
-        PipelineStepState.COMPLETE
-    } else {
-        PipelineStepState.PENDING
-    }
-)
+private fun finalizePipelineStep(uiState: PrepareUiState): PipelineStep {
+    val progress = uiState.progress
+    return PipelineStep(
+        title = "Finalizing Region",
+        state =
+        when {
+            uiState.downloadUiState == PrepareDownloadUiState.COMPLETE -> PipelineStepState.COMPLETE
+            progress?.phase == PreparePhase.POST_PROCESSING && progress.overallPercent >= 100 ->
+                PipelineStepState.ACTIVE
+            else -> PipelineStepState.PENDING
+        },
+        detailLines =
+        if (progress?.phase == PreparePhase.POST_PROCESSING && progress.overallPercent >= 100) {
+            listOf(progress.message.ifBlank { "Finalizing…" })
+        } else {
+            emptyList()
+        }
+    )
+}

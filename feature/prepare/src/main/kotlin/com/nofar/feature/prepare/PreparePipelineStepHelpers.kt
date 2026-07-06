@@ -16,7 +16,12 @@ internal fun demPipelineState(phase: PreparePhase?): PipelineStepState = when {
     else -> PipelineStepState.COMPLETE
 }
 
-internal fun postProcessPipelineState(phase: PreparePhase?, hasProgress: Boolean): PipelineStepState = when {
+internal fun postProcessPipelineState(
+    phase: PreparePhase?,
+    hasProgress: Boolean,
+    overallPercent: Int = 0
+): PipelineStepState = when {
+    phase == PreparePhase.POST_PROCESSING && overallPercent >= 100 -> PipelineStepState.COMPLETE
     phase == PreparePhase.POST_PROCESSING -> PipelineStepState.ACTIVE
     hasProgress && phase != PreparePhase.OSM && phase != PreparePhase.DEM -> PipelineStepState.COMPLETE
     else -> PipelineStepState.PENDING
@@ -27,10 +32,15 @@ internal fun osmDetailLines(phase: PreparePhase?, message: String?): List<String
     return listOf(message?.takeIf { it.isNotBlank() } ?: "Streaming ingestion in progress…")
 }
 
-internal fun demDetailLines(phase: PreparePhase?, remainingBytes: Long?): List<String> {
+internal fun demDetailLines(phase: PreparePhase?, remainingBytes: Long?, message: String? = null): List<String> {
     if (phase != PreparePhase.DEM) return emptyList()
+    val detail = message?.takeIf { it.isNotBlank() }
     val formatted = NofARFormatters.formatMegabytes(remainingBytes ?: 0L)
-    return listOf("~$formatted remaining")
+    return if (detail != null) {
+        listOf(detail, "~$formatted remaining")
+    } else {
+        listOf("~$formatted remaining")
+    }
 }
 
 internal fun phaseProgress(phase: PreparePhase?, activePhase: PreparePhase, overallPercent: Int?): Float? =

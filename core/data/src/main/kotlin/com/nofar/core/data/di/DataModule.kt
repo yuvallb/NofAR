@@ -2,9 +2,11 @@ package com.nofar.core.data.di
 
 import com.nofar.core.data.dem.DefaultGeoTiffConverter
 import com.nofar.core.data.dem.GeoTiffConverter
+import com.nofar.core.data.network.DefaultNetworkConnectivityMonitor
+import com.nofar.core.data.network.NetworkConnectivityMonitor
 import com.nofar.core.data.osm.OverpassStreamParser
-import com.nofar.core.data.preferences.DefaultDownloadPreferences
-import com.nofar.core.data.preferences.DownloadPreferences
+import com.nofar.core.data.preferences.DefaultUserPreferencesRepository
+import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.repository.DefaultDemTileRepository
 import com.nofar.core.data.repository.DefaultGeoEntityRepository
 import com.nofar.core.data.repository.DefaultRegionRepository
@@ -41,7 +43,11 @@ abstract class DataModule {
 
     @Binds
     @Singleton
-    abstract fun bindDownloadPreferences(impl: DefaultDownloadPreferences): DownloadPreferences
+    abstract fun bindUserPreferencesRepository(impl: DefaultUserPreferencesRepository): UserPreferencesRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindNetworkConnectivityMonitor(impl: DefaultNetworkConnectivityMonitor): NetworkConnectivityMonitor
 
     companion object {
         @Provides

@@ -64,8 +64,7 @@ fun PrepareScreen(
     val context = LocalContext.current
     val isDownloading =
         uiState.downloadUiState == PrepareDownloadUiState.DOWNLOADING ||
-            uiState.downloadUiState == PrepareDownloadUiState.ESTIMATING ||
-            uiState.step == PrepareStep.DOWNLOAD
+            uiState.downloadUiState == PrepareDownloadUiState.ESTIMATING
 
     DisposableEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
@@ -134,6 +133,9 @@ fun PrepareScreen(
             onDownloadAnyway = viewModel::confirmCellularDownload,
             onDismiss = viewModel::dismissCellularWarning
         )
+    }
+    if (uiState.showWifiOnlyBlocked) {
+        WifiOnlyBlockedDialog(onDismiss = viewModel::dismissWifiOnlyBlocked)
     }
 }
 
@@ -256,6 +258,24 @@ private fun DownloadingContent(uiState: PrepareUiState, onCancelDownload: () -> 
                 .padding(16.dp)
         )
     }
+}
+
+@Composable
+private fun WifiOnlyBlockedDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Wi-Fi only downloads") },
+        text = {
+            Text(
+                "Wi-Fi only downloads are enabled in Settings. Connect to Wi-Fi before downloading map data."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("OK")
+            }
+        }
+    )
 }
 
 @Composable
