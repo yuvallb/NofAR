@@ -8,7 +8,7 @@
     <string name="settings_language_hebrew">עברית</string>
     <string name="settings_general_section">כללי</string>
     <string name="settings_wifi_only_title">הורדות Wi-Fi בלבד</string>
-    <string name="settings_wifi_only_subtitle">חסום הורדות Prepare בנתונים סלולריים</string>
+    <string name="settings_wifi_only_subtitle">חסום הורדות הכנה בנתונים סלולריים</string>
     <string name="settings_cellular_threshold">סף אזהרת סלולר: %1$d MB (לקריאה בלבד)</string>
     <string name="settings_storage_section">אחסון</string>
     <string name="settings_dem_cache">מטמון DEM: %1$s</string>
@@ -24,7 +24,7 @@
     <string name="settings_legal_section">משפטי</string>
     <string name="settings_osm_attribution">© OpenStreetMap contributors</string>
     <string name="settings_copernicus_attribution">Copernicus DEM, ESA / Airbus</string>
-    <string name="settings_overpass_note">נתוני מפה נשלפו דרך Overpass API הציבורי במצב Prepare.</string>
+    <string name="settings_overpass_note">נתוני מפה נשלפו דרך Overpass API הציבורי במצב הכנה.</string>
     <string name="settings_mirror_bullet">• %1$s</string>
     <string name="settings_odbl_notice">נתוני OpenStreetMap זמינים תחת רישיון Open Database License (ODbL). ניתן להעתיק, להפיץ, לשדר ולהתאים נתוני OSM כל עוד מציינים את OpenStreetMap ותורמיו.</string>
     <string name="settings_about_section">אודות</string>

@@ -9,6 +9,7 @@
 package com.nofar.core.data.prepare
 
 import android.content.Context
+import com.nofar.core.common.text.UiText
 import com.nofar.core.data.R
 import com.nofar.core.data.dem.DefaultGeoTiffConverter
 import com.nofar.core.data.dem.GeoTiffConverter
@@ -48,7 +49,7 @@ data class PrepareProgress(
     val demTileIndex: Int = 0,
     val demTileCount: Int = 0,
     val remainingBytesEstimate: Long = 0L,
-    val message: String = ""
+    val message: UiText? = null
 )
 
 enum class PreparePhase {
@@ -117,7 +118,7 @@ constructor(
 
         return try {
             // OSM phase (0–40%)
-            updateProgress(PreparePhase.OSM, 0, message = context.getString(R.string.download_contacting_osm))
+            updateProgress(PreparePhase.OSM, 0, message = UiText.Resource(R.string.download_contacting_osm))
             persistProgress(0)
             val overpassResponse =
                 overpassApi.queryRegion(bbox) { bytes ->
@@ -134,7 +135,7 @@ constructor(
                             phase = PreparePhase.OSM,
                             overallPercent = pct,
                             osmBytesRead = bytes,
-                            message = context.getString(R.string.download_osm_data)
+                            message = UiText.Resource(R.string.download_osm_data)
                         )
                 }
             osmDatasetVersion = overpassResponse.datasetVersion
@@ -148,7 +149,7 @@ constructor(
                 updateProgress(
                     PreparePhase.OSM,
                     _progress.value?.overallPercent?.coerceAtLeast(1) ?: 1,
-                    message = context.getString(R.string.download_saving_osm)
+                    message = UiText.Resource(R.string.download_saving_osm)
                 )
                 parsedEntities.forEachIndexed { index, element ->
                     checkCancelled()
@@ -171,10 +172,9 @@ constructor(
                             PreparePhase.OSM,
                             ingestPct,
                             message =
-                            context.getString(
+                            UiText.Resource(
                                 R.string.download_saving_osm_progress,
-                                index + 1,
-                                entityCount
+                                listOf(index + 1, entityCount)
                             )
                         )
                     }
@@ -234,10 +234,9 @@ constructor(
                             demTileCount = tiles.size,
                             remainingBytesEstimate = remaining.coerceAtLeast(0),
                             message =
-                            context.getString(
+                            UiText.Resource(
                                 R.string.download_dem_tile,
-                                index + 1,
-                                tiles.size
+                                listOf(index + 1, tiles.size)
                             )
                         )
                     }
@@ -250,10 +249,9 @@ constructor(
                         demTileIndex = index + 1,
                         demTileCount = tiles.size,
                         message =
-                        context.getString(
+                        UiText.Resource(
                             R.string.download_converting_tile,
-                            index + 1,
-                            tiles.size
+                            listOf(index + 1, tiles.size)
                         )
                     )
                     val conversion = geoTiffConverter.convert(tifFile, tileLat, tileLon, binFile)
@@ -293,7 +291,7 @@ constructor(
             updateProgress(
                 PreparePhase.POST_PROCESSING,
                 90,
-                message = context.getString(R.string.download_filling_elevations)
+                message = UiText.Resource(R.string.download_filling_elevations)
             )
             persistProgress(90)
             postProcessor.process(regionId) { processed, total ->
@@ -301,10 +299,10 @@ constructor(
                 updateProgress(
                     PreparePhase.POST_PROCESSING,
                     pct.coerceIn(90, 99),
-                    message = context.getString(R.string.download_filling_elevations_progress, processed, total)
+                    message = UiText.Resource(R.string.download_filling_elevations_progress, listOf(processed, total))
                 )
             }
-            updateProgress(PreparePhase.POST_PROCESSING, 100, message = context.getString(R.string.download_finalizing))
+            updateProgress(PreparePhase.POST_PROCESSING, 100, message = UiText.Resource(R.string.download_finalizing))
 
             val terminalStatus =
                 when {
@@ -363,7 +361,7 @@ constructor(
         demTileIndex: Int = _progress.value?.demTileIndex ?: 0,
         demTileCount: Int = _progress.value?.demTileCount ?: 0,
         remainingBytesEstimate: Long = _progress.value?.remainingBytesEstimate ?: 0L,
-        message: String = _progress.value?.message ?: ""
+        message: UiText? = _progress.value?.message
     ) {
         _progress.value =
             PrepareProgress(

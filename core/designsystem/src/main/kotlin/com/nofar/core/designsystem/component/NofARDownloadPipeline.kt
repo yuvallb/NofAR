@@ -16,6 +16,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -147,6 +148,7 @@ fun NofAREstimatePanel(
     demTileCount: Int,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
@@ -159,8 +161,9 @@ fun NofAREstimatePanel(
                 color = NofARColors.TextCaption
             )
             Spacer(modifier = Modifier.height(4.dp))
+            val osmSizeLabel = NofARFormatters.formatMegabytes(context, osmEstimateBytes)
             Text(
-                text = stringResource(R.string.pipeline_osm_data, NofARFormatters.formatMegabytes(osmEstimateBytes)),
+                text = stringResource(R.string.pipeline_osm_data, osmSizeLabel),
                 style = MaterialTheme.typography.bodySmall,
                 color = NofARColors.TextSecondary
             )
@@ -169,13 +172,14 @@ fun NofAREstimatePanel(
                 stringResource(
                     R.string.pipeline_dem_tiles,
                     demTileCount,
-                    NofARFormatters.formatMegabytes(demEstimateBytes)
+                    NofARFormatters.formatMegabytes(context, demEstimateBytes)
                 ),
                 style = MaterialTheme.typography.bodySmall,
                 color = NofARColors.TextSecondary
             )
+            val totalSizeLabel = NofARFormatters.formatMegabytes(context, totalEstimateBytes)
             Text(
-                text = stringResource(R.string.pipeline_total, NofARFormatters.formatMegabytes(totalEstimateBytes)),
+                text = stringResource(R.string.pipeline_total, totalSizeLabel),
                 style = MaterialTheme.typography.bodyMedium,
                 color = NofARColors.PrimaryYellow,
                 fontWeight = FontWeight.Bold

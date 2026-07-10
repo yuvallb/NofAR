@@ -17,7 +17,13 @@ enum class AppLanguage {
     companion object {
         fun fromStorageValue(value: String?): AppLanguage = when (value) {
             "en" -> ENGLISH
-            "iw" -> HEBREW
+            "iw", "he" -> HEBREW
+            else -> SYSTEM
+        }
+
+        fun fromLocaleTag(tag: String): AppLanguage = when {
+            tag.startsWith("en") -> ENGLISH
+            tag == "iw" || tag == "he" -> HEBREW
             else -> SYSTEM
         }
     }

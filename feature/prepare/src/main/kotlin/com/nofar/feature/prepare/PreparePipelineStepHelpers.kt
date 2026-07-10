@@ -1,7 +1,9 @@
 package com.nofar.feature.prepare
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import com.nofar.core.common.text.UiText
 import com.nofar.core.data.prepare.PreparePhase
 import com.nofar.core.designsystem.component.PipelineStepState
 import com.nofar.core.designsystem.util.NofARFormatters
@@ -30,16 +32,21 @@ internal fun postProcessPipelineState(
 }
 
 @Composable
-internal fun osmDetailLines(phase: PreparePhase?, message: String?): List<String> {
+internal fun osmDetailLines(phase: PreparePhase?, message: UiText?): List<String> {
     if (phase != PreparePhase.OSM) return emptyList()
-    return listOf(message?.takeIf { it.isNotBlank() } ?: stringResource(R.string.prepare_step_streaming))
+    val context = LocalContext.current
+    val detail =
+        message?.asString(context)?.takeIf { it.isNotBlank() }
+            ?: stringResource(R.string.prepare_step_streaming)
+    return listOf(detail)
 }
 
 @Composable
-internal fun demDetailLines(phase: PreparePhase?, remainingBytes: Long?, message: String? = null): List<String> {
+internal fun demDetailLines(phase: PreparePhase?, remainingBytes: Long?, message: UiText? = null): List<String> {
     if (phase != PreparePhase.DEM) return emptyList()
-    val detail = message?.takeIf { it.isNotBlank() }
-    val formatted = NofARFormatters.formatMegabytes(remainingBytes ?: 0L)
+    val context = LocalContext.current
+    val detail = message?.asString(context)?.takeIf { it.isNotBlank() }
+    val formatted = NofARFormatters.formatMegabytes(context, remainingBytes ?: 0L)
     val eta = stringResource(R.string.prepare_step_eta, formatted)
     return if (detail != null) {
         listOf(detail, eta)

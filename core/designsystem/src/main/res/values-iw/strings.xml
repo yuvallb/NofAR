@@ -27,6 +27,16 @@
     <string name="pipeline_total">סה״כ: %1$s</string>
     <string name="explore_hud_alt">גובה %1$s מ׳</string>
     <string name="explore_hud_max_range">טווח מקסימלי %1$d ק״מ</string>
-    <string name="explore_hud_more_count">+ %1$d נוספים</string>
     <string name="explore_hud_elevation_m">%1$d מ׳</string>
+    <string name="format_size_gb">%1$s GB</string>
+    <string name="format_size_mb_whole">%1$s MB</string>
+    <string name="format_size_mb_fraction">%1$s MB</string>
+    <string name="format_radius_km">%1$d ק״מ</string>
+    <string name="format_timestamp_unknown">—</string>
+    <plurals name="explore_hud_more_count">
+        <item quantity="one">+ %d נוסף</item>
+        <item quantity="two">+ %d נוספים</item>
+        <item quantity="many">+ %d נוספים</item>
+        <item quantity="other">+ %d נוספים</item>
+    </plurals>
 </resources>

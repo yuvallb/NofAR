@@ -349,6 +349,7 @@ private fun CellularWarningDialog(
     onDismiss: () -> Unit
 ) {
     var dontShowAgain by remember { mutableStateOf(false) }
+    val context = LocalContext.current
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -359,7 +360,7 @@ private fun CellularWarningDialog(
                     stringResource(
                         R.string.prepare_large_download_message,
                         demTileCount,
-                        NofARFormatters.formatMegabytes(estimateBytes)
+                        NofARFormatters.formatMegabytes(context, estimateBytes)
                     )
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {

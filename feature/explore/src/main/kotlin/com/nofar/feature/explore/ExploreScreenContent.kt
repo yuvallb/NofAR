@@ -39,28 +39,26 @@ internal fun ExploreScreenRoot(
                 onScreenSizeChanged(size.width.toFloat(), size.height.toFloat())
             }
     ) {
-        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-            ExploreGateContent(
-                gate = uiState.exploreGate,
-                uiState = uiState,
-                permissionState = permissionState,
-                onNavigateBack = onNavigateBack,
-                onFieldOfViewChanged = onFieldOfViewChanged,
-                onHiddenCountClick = onHiddenCountClick
-            )
+        ExploreGateContent(
+            gate = uiState.exploreGate,
+            uiState = uiState,
+            permissionState = permissionState,
+            onNavigateBack = onNavigateBack,
+            onFieldOfViewChanged = onFieldOfViewChanged,
+            onHiddenCountClick = onHiddenCountClick
+        )
 
-            if (uiState.exploreGate == ExploreGate.READY) {
-                ExploreReadyChrome(uiState = uiState, onNavigateBack = onNavigateBack)
-            } else if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
-                ExploreExitButton(onNavigateBack = onNavigateBack)
-            }
-
-            if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
-                ExploreOsmWatermark(modifier = Modifier.align(Alignment.BottomEnd))
-            }
-
-            debugOverlay()
+        if (uiState.exploreGate == ExploreGate.READY) {
+            ExploreReadyChrome(uiState = uiState, onNavigateBack = onNavigateBack)
+        } else if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
+            ExploreExitButton(onNavigateBack = onNavigateBack)
         }
+
+        if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
+            ExploreOsmWatermark(modifier = Modifier.align(Alignment.BottomEnd))
+        }
+
+        debugOverlay()
 
         if (uiState.exploreGate == ExploreGate.GRACE_EXPIRED) {
             ExploreGraceExpiredDialog(
@@ -92,7 +90,9 @@ private fun BoxScope.ExploreGateContent(
                     onFieldOfViewChanged = onFieldOfViewChanged
                 )
             }
-            ExploreArOverlay(uiState = uiState, onHiddenCountClick = onHiddenCountClick)
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                ExploreArOverlay(uiState = uiState, onHiddenCountClick = onHiddenCountClick)
+            }
         }
         ExploreGate.WAITING_GPS -> {
             ExploreWaitingForGpsOverlay()

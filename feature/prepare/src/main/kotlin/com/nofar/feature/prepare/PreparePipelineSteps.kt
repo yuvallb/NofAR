@@ -1,6 +1,7 @@
 package com.nofar.feature.prepare
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import com.nofar.core.data.prepare.PreparePhase
 import com.nofar.core.designsystem.component.PipelineStep
@@ -54,13 +55,15 @@ private fun demPipelineStep(uiState: PrepareUiState): PipelineStep {
 private fun postProcessPipelineStep(uiState: PrepareUiState): PipelineStep {
     val progress = uiState.progress
     val phase = progress?.phase
+    val context = LocalContext.current
     val defaultDetail = stringResource(R.string.prepare_step_enrich_detail)
+    val resolvedMessage = progress?.message?.asString(context)?.takeIf { it.isNotBlank() }
     return PipelineStep(
         title = stringResource(R.string.prepare_step_enrich),
         state = postProcessPipelineState(phase, progress != null, progress?.overallPercent ?: 0),
         detailLines =
         if (phase == PreparePhase.POST_PROCESSING) {
-            listOf(progress.message.takeIf { it.isNotBlank() } ?: defaultDetail)
+            listOf(resolvedMessage ?: defaultDetail)
         } else {
             emptyList()
         }
@@ -70,7 +73,9 @@ private fun postProcessPipelineStep(uiState: PrepareUiState): PipelineStep {
 @Composable
 private fun finalizePipelineStep(uiState: PrepareUiState): PipelineStep {
     val progress = uiState.progress
+    val context = LocalContext.current
     val defaultDetail = stringResource(R.string.prepare_step_finalize_detail)
+    val resolvedMessage = progress?.message?.asString(context).orEmpty()
     return PipelineStep(
         title = stringResource(R.string.prepare_step_finalize),
         state =
@@ -82,7 +87,7 @@ private fun finalizePipelineStep(uiState: PrepareUiState): PipelineStep {
         },
         detailLines =
         if (progress?.phase == PreparePhase.POST_PROCESSING && progress.overallPercent >= 100) {
-            listOf(progress.message.ifBlank { defaultDetail })
+            listOf(resolvedMessage.ifBlank { defaultDetail })
         } else {
             emptyList()
         }

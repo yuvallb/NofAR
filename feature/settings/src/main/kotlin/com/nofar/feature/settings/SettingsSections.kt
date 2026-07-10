@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -110,24 +111,26 @@ internal fun SettingsSectionTitle(title: String) {
 @Composable
 private fun SettingsLanguageSection(selectedLanguage: AppLanguage, onLanguageChanged: (AppLanguage) -> Unit) {
     SettingsSectionTitle(stringResource(R.string.settings_language_section))
-    LanguageOptionRow(
-        label = stringResource(R.string.settings_language_system),
-        selected = selectedLanguage == AppLanguage.SYSTEM,
-        onSelect = { onLanguageChanged(AppLanguage.SYSTEM) },
-        testTag = "language_system"
-    )
-    LanguageOptionRow(
-        label = stringResource(R.string.settings_language_english),
-        selected = selectedLanguage == AppLanguage.ENGLISH,
-        onSelect = { onLanguageChanged(AppLanguage.ENGLISH) },
-        testTag = "language_english"
-    )
-    LanguageOptionRow(
-        label = stringResource(R.string.settings_language_hebrew),
-        selected = selectedLanguage == AppLanguage.HEBREW,
-        onSelect = { onLanguageChanged(AppLanguage.HEBREW) },
-        testTag = "language_hebrew"
-    )
+    Column(modifier = Modifier.selectableGroup()) {
+        LanguageOptionRow(
+            label = stringResource(R.string.settings_language_system),
+            selected = selectedLanguage == AppLanguage.SYSTEM,
+            onSelect = { onLanguageChanged(AppLanguage.SYSTEM) },
+            testTag = "language_system"
+        )
+        LanguageOptionRow(
+            label = stringResource(R.string.settings_language_english),
+            selected = selectedLanguage == AppLanguage.ENGLISH,
+            onSelect = { onLanguageChanged(AppLanguage.ENGLISH) },
+            testTag = "language_english"
+        )
+        LanguageOptionRow(
+            label = stringResource(R.string.settings_language_hebrew),
+            selected = selectedLanguage == AppLanguage.HEBREW,
+            onSelect = { onLanguageChanged(AppLanguage.HEBREW) },
+            testTag = "language_hebrew"
+        )
+    }
 }
 
 @Composable
@@ -174,9 +177,11 @@ private fun SettingsStorageSection(
     onEvictionThresholdChanged: (Float) -> Unit,
     onShowPurgeConfirm: () -> Unit
 ) {
+    val context = LocalContext.current
     SettingsSectionTitle(stringResource(R.string.settings_storage_section))
+    val demCacheLabel = NofARFormatters.formatMegabytes(context, uiState.demCacheBytes)
     Text(
-        text = stringResource(R.string.settings_dem_cache, NofARFormatters.formatMegabytes(uiState.demCacheBytes)),
+        text = stringResource(R.string.settings_dem_cache, demCacheLabel),
         style = MaterialTheme.typography.bodyMedium,
         color = NofARColors.TextPrimary
     )
@@ -184,7 +189,7 @@ private fun SettingsStorageSection(
         text =
         stringResource(
             R.string.settings_entity_database,
-            NofARFormatters.formatMegabytes(uiState.entityDbSizeBytes)
+            NofARFormatters.formatMegabytes(context, uiState.entityDbSizeBytes)
         ),
         style = MaterialTheme.typography.bodyMedium,
         color = NofARColors.TextPrimary
@@ -194,7 +199,7 @@ private fun SettingsStorageSection(
         style = MaterialTheme.typography.bodyMedium,
         color = NofARColors.TextPrimary
     )
-    val entityLabel = NofARFormatters.formatCount(uiState.entityRowCount)
+    val entityLabel = NofARFormatters.formatCount(context, uiState.entityRowCount)
     Text(
         text = stringResource(R.string.settings_entity_rows, entityLabel),
         style = MaterialTheme.typography.bodySmall,

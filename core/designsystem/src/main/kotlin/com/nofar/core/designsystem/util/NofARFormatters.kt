@@ -1,35 +1,58 @@
 package com.nofar.core.designsystem.util
 
+import android.content.Context
+import com.nofar.core.designsystem.R
 import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.Locale
+import java.time.format.FormatStyle
 import kotlin.math.roundToInt
 
 object NofARFormatters {
-    private val numberFormat = NumberFormat.getIntegerInstance(Locale.getDefault())
+    fun formatCount(context: Context, value: Int): String {
+        val locale = context.resources.configuration.locales[0]
+        return NumberFormat.getIntegerInstance(locale).format(value)
+    }
 
-    fun formatCount(value: Int): String = numberFormat.format(value)
-
-    fun formatMegabytes(bytes: Long): String {
+    fun formatMegabytes(context: Context, bytes: Long): String {
+        val locale = context.resources.configuration.locales[0]
+        val numberFormat =
+            NumberFormat.getNumberInstance(locale).apply {
+                minimumFractionDigits = 0
+                maximumFractionDigits = 1
+            }
         val mb = bytes / (1024.0 * 1024.0)
-        return if (mb >= 1024.0) {
-            "%.1f GB".format(Locale.US, mb / 1024.0)
-        } else if (mb >= 10.0) {
-            "%.0f MB".format(Locale.US, mb)
-        } else {
-            "%.1f MB".format(Locale.US, mb)
+        return when {
+            mb >= 1024.0 -> {
+                val gb = mb / 1024.0
+                context.getString(R.string.format_size_gb, numberFormat.format(gb))
+            }
+            mb >= 10.0 -> {
+                context.getString(R.string.format_size_mb_whole, numberFormat.format(mb.roundToInt()))
+            }
+            else -> {
+                context.getString(R.string.format_size_mb_fraction, "%.1f".format(locale, mb))
+            }
         }
     }
 
-    fun formatCoordinate(value: Double): String = "%.2f".format(Locale.US, value)
+    fun formatCoordinate(context: Context, value: Double): String {
+        val locale = context.resources.configuration.locales[0]
+        return "%.2f".format(locale, value)
+    }
 
-    fun formatRadiusKm(radiusM: Double): String = "${(radiusM / 1000.0).roundToInt()} km"
+    fun formatRadiusKm(context: Context, radiusM: Double): String =
+        context.getString(R.string.format_radius_km, (radiusM / 1000.0).roundToInt())
 
-    fun formatTimestamp(instant: Instant?): String {
-        if (instant == null) return "—"
-        val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault())
+    fun formatTimestamp(context: Context, instant: Instant?): String {
+        if (instant == null) return context.getString(R.string.format_timestamp_unknown)
+        val locale = context.resources.configuration.locales[0]
+        val formatter =
+            DateTimeFormatter
+                .ofLocalizedDateTime(FormatStyle.SHORT, FormatStyle.SHORT)
+                .withLocale(locale)
+                .withZone(ZoneId.systemDefault())
         return formatter.format(instant)
     }
 }

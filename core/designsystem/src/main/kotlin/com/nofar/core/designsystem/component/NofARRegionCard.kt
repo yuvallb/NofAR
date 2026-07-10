@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -84,16 +85,17 @@ private fun RegionCardHeader(region: Region) {
 @Composable
 private fun RegionCardMetadata(state: RegionCardState) {
     val region = state.region
+    val context = LocalContext.current
     Spacer(modifier = Modifier.height(8.dp))
     val center =
-        "${NofARFormatters.formatCoordinate(region.centerLat)}, " +
-            NofARFormatters.formatCoordinate(region.centerLon)
+        "${NofARFormatters.formatCoordinate(context, region.centerLat)}, " +
+            NofARFormatters.formatCoordinate(context, region.centerLon)
     Text(
         text =
         stringResource(
             R.string.region_card_center,
             center,
-            NofARFormatters.formatRadiusKm(region.radiusM)
+            NofARFormatters.formatRadiusKm(context, region.radiusM)
         ),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
@@ -102,20 +104,20 @@ private fun RegionCardMetadata(state: RegionCardState) {
         if (state.demSizeBytes > 0L) {
             stringResource(
                 R.string.region_card_size_breakdown,
-                NofARFormatters.formatMegabytes(state.osmSizeBytes),
-                NofARFormatters.formatMegabytes(state.demSizeBytes)
+                NofARFormatters.formatMegabytes(context, state.osmSizeBytes),
+                NofARFormatters.formatMegabytes(context, state.demSizeBytes)
             )
         } else {
             stringResource(
                 R.string.region_card_size_estimate,
-                NofARFormatters.formatMegabytes(region.estimatedSizeBytes)
+                NofARFormatters.formatMegabytes(context, region.estimatedSizeBytes)
             )
         }
     Text(
         text =
         stringResource(
             R.string.region_card_entities,
-            NofARFormatters.formatCount(region.entityCount),
+            NofARFormatters.formatCount(context, region.entityCount),
             sizeText
         ),
         style = MaterialTheme.typography.bodySmall,
@@ -125,8 +127,8 @@ private fun RegionCardMetadata(state: RegionCardState) {
         text =
         stringResource(
             R.string.region_card_timestamps,
-            NofARFormatters.formatTimestamp(region.osmDatasetVersion),
-            NofARFormatters.formatTimestamp(state.latestDemTimestamp)
+            NofARFormatters.formatTimestamp(context, region.osmDatasetVersion),
+            NofARFormatters.formatTimestamp(context, state.latestDemTimestamp)
         ),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
@@ -208,6 +210,7 @@ fun NofARStorageSummary(
     onAdvancedStorageClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Column(
         modifier =
         modifier
@@ -221,18 +224,21 @@ fun NofARStorageSummary(
             color = NofARColors.TextCaption
         )
         Spacer(modifier = Modifier.height(8.dp))
+        val demCacheLabel = NofARFormatters.formatMegabytes(context, demCacheBytes)
         Text(
-            text = stringResource(R.string.storage_dem_cache, NofARFormatters.formatMegabytes(demCacheBytes)),
+            text = stringResource(R.string.storage_dem_cache, demCacheLabel),
             style = MaterialTheme.typography.bodySmall,
             color = NofARColors.TextSecondary
         )
+        val entitiesDbLabel = NofARFormatters.formatMegabytes(context, entitiesDbBytes)
         Text(
-            text = stringResource(R.string.storage_entities_db, NofARFormatters.formatMegabytes(entitiesDbBytes)),
+            text = stringResource(R.string.storage_entities_db, entitiesDbLabel),
             style = MaterialTheme.typography.bodySmall,
             color = NofARColors.TextSecondary
         )
+        val freeSpaceLabel = NofARFormatters.formatMegabytes(context, freeSpaceBytes)
         Text(
-            text = stringResource(R.string.storage_free_space, NofARFormatters.formatMegabytes(freeSpaceBytes)),
+            text = stringResource(R.string.storage_free_space, freeSpaceLabel),
             style = MaterialTheme.typography.bodySmall,
             color = NofARColors.TextSecondary
         )

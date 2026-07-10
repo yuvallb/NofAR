@@ -29,8 +29,6 @@ interface UserPreferencesRepository {
 
     val keepRawGeoTiff: Flow<Boolean>
 
-    val appLanguage: Flow<AppLanguage>
-
     suspend fun setWifiOnlyDownloads(enabled: Boolean)
 
     suspend fun setDemCacheLimitBytes(bytes: Long)
@@ -39,7 +37,11 @@ interface UserPreferencesRepository {
 
     suspend fun setKeepRawGeoTiff(enabled: Boolean)
 
-    suspend fun setAppLanguage(language: AppLanguage)
+    /**
+     * One-time migration from the legacy DataStore language key to AppCompat locale storage.
+     * Returns the stored language and removes the key so AppCompat remains the source of truth.
+     */
+    suspend fun consumeLegacyAppLanguage(): AppLanguage?
 }
 
 @Singleton
@@ -69,11 +71,6 @@ constructor(@ApplicationContext context: Context) :
             prefs[KEEP_RAW_GEOTIFF_KEY] ?: false
         }
 
-    override val appLanguage: Flow<AppLanguage> =
-        dataStore.data.map { prefs ->
-            AppLanguage.fromStorageValue(prefs[APP_LANGUAGE_KEY])
-        }
-
     override suspend fun setWifiOnlyDownloads(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[WIFI_ONLY_KEY] = enabled
@@ -98,10 +95,13 @@ constructor(@ApplicationContext context: Context) :
         }
     }
 
-    override suspend fun setAppLanguage(language: AppLanguage) {
+    override suspend fun consumeLegacyAppLanguage(): AppLanguage? {
+        var legacy: AppLanguage? = null
         dataStore.edit { prefs ->
-            prefs[APP_LANGUAGE_KEY] = language.storageValue
+            val stored = prefs.remove(APP_LANGUAGE_KEY)
+            legacy = stored?.let { AppLanguage.fromStorageValue(it) }
         }
+        return legacy
     }
 
     companion object {

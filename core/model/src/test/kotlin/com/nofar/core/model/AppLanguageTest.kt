@@ -10,6 +10,16 @@ class AppLanguageTest {
         assertEquals(AppLanguage.SYSTEM, AppLanguage.fromStorageValue("system"))
         assertEquals(AppLanguage.ENGLISH, AppLanguage.fromStorageValue("en"))
         assertEquals(AppLanguage.HEBREW, AppLanguage.fromStorageValue("iw"))
+        assertEquals(AppLanguage.HEBREW, AppLanguage.fromStorageValue("he"))
+    }
+
+    @Test
+    fun fromLocaleTag_mapsKnownTags() {
+        assertEquals(AppLanguage.ENGLISH, AppLanguage.fromLocaleTag("en"))
+        assertEquals(AppLanguage.ENGLISH, AppLanguage.fromLocaleTag("en-US"))
+        assertEquals(AppLanguage.HEBREW, AppLanguage.fromLocaleTag("iw"))
+        assertEquals(AppLanguage.HEBREW, AppLanguage.fromLocaleTag("he"))
+        assertEquals(AppLanguage.SYSTEM, AppLanguage.fromLocaleTag("fr"))
     }
 
     @Test

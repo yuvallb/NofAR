@@ -13,7 +13,17 @@ sealed interface UiText {
 
     fun asString(context: Context): String = when (this) {
         is Dynamic -> value
-        is Resource -> context.getString(resId, *args.toTypedArray())
-        is Plural -> context.resources.getQuantityString(resId, quantity, *args.toTypedArray())
+        is Resource -> context.getString(resId, *sanitizeArgs(args))
+        is Plural -> context.resources.getQuantityString(resId, quantity, *sanitizeArgs(args))
+    }
+
+    companion object {
+        private fun sanitizeArgs(args: List<Any>): Array<Any> = args.map { arg ->
+            if (arg is String) {
+                arg.replace("%", "%%")
+            } else {
+                arg
+            }
+        }.toTypedArray()
     }
 }

@@ -20,6 +20,7 @@ class RegionNameResolverTest {
         assertFalse(RegionNamePolicy.isUserProvidedName(""))
         assertFalse(RegionNamePolicy.isUserProvidedName("Region near 32.00, 35.00"))
         assertFalse(RegionNamePolicy.isUserProvidedName("  Region near -32.10, 35.20  "))
+        assertFalse(RegionNamePolicy.isUserProvidedName("אזור ליד 32.00, 35.00"))
     }
 
     @Test

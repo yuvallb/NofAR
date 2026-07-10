@@ -4,6 +4,7 @@ package com.nofar.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nofar.core.common.locale.LocaleApplier
 import com.nofar.core.common.text.UiText
 import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.repository.RegionRepository
@@ -54,6 +55,7 @@ constructor(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     init {
+        _uiState.update { it.copy(appLanguage = LocaleApplier.getCurrentLanguage()) }
         observePreferences()
         observeActiveDownloads()
         refreshStats()
@@ -65,15 +67,13 @@ constructor(
                 userPreferencesRepository.wifiOnlyDownloads,
                 userPreferencesRepository.demCacheLimitBytes,
                 userPreferencesRepository.showRawSensorOverlay,
-                userPreferencesRepository.keepRawGeoTiff,
-                userPreferencesRepository.appLanguage
-            ) { wifiOnly, cacheLimitBytes, showRaw, keepTif, appLanguage ->
+                userPreferencesRepository.keepRawGeoTiff
+            ) { wifiOnly, cacheLimitBytes, showRaw, keepTif ->
                 PreferenceSnapshot(
                     wifiOnly = wifiOnly,
                     cacheLimitMb = cacheLimitBytes / (1024f * 1024f),
                     showRaw = showRaw,
-                    keepTif = keepTif,
-                    appLanguage = appLanguage
+                    keepTif = keepTif
                 )
             }.collect { snapshot ->
                 _uiState.update {
@@ -81,8 +81,7 @@ constructor(
                         wifiOnlyDownloads = snapshot.wifiOnly,
                         evictionThresholdMb = snapshot.cacheLimitMb,
                         showRawSensorOverlay = snapshot.showRaw,
-                        keepRawGeoTiff = snapshot.keepTif,
-                        appLanguage = snapshot.appLanguage
+                        keepRawGeoTiff = snapshot.keepTif
                     )
                 }
             }
@@ -113,9 +112,11 @@ constructor(
     }
 
     fun onAppLanguageChanged(language: AppLanguage) {
-        viewModelScope.launch {
-            userPreferencesRepository.setAppLanguage(language)
-        }
+        _uiState.update { it.copy(appLanguage = language) }
+    }
+
+    fun refreshAppLanguage() {
+        _uiState.update { it.copy(appLanguage = LocaleApplier.getCurrentLanguage()) }
     }
 
     fun onWifiOnlyDownloadsChanged(enabled: Boolean) {
@@ -221,7 +222,6 @@ constructor(
         val wifiOnly: Boolean,
         val cacheLimitMb: Float,
         val showRaw: Boolean,
-        val keepTif: Boolean,
-        val appLanguage: AppLanguage
+        val keepTif: Boolean
     )
 }

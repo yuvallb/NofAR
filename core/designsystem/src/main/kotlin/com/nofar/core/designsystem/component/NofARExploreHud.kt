@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -162,7 +163,7 @@ private fun ArLabelHiddenCountCapsule(count: Int, onClick: () -> Unit) {
         modifier = Modifier.clickable(onClick = onClick)
     ) {
         Text(
-            text = stringResource(R.string.explore_hud_more_count, count),
+            text = pluralStringResource(R.plurals.explore_hud_more_count, count, count),
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelMedium,
             color = NofARColors.ArAccent

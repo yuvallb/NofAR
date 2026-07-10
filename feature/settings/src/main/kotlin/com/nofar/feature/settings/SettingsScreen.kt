@@ -43,6 +43,7 @@ fun SettingsScreen(
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
                     viewModel.refreshStats()
+                    viewModel.refreshAppLanguage()
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -77,8 +78,8 @@ fun SettingsScreen(
             SettingsContent(
                 uiState = uiState,
                 onAppLanguageChanged = { language ->
-                    viewModel.onAppLanguageChanged(language)
                     LocaleApplier.apply(language)
+                    viewModel.onAppLanguageChanged(language)
                     activity?.recreate()
                 },
                 onWifiOnlyChanged = viewModel::onWifiOnlyDownloadsChanged,

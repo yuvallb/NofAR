@@ -2,7 +2,7 @@
 <resources>
     <string name="permission_rationale_location">NofAR זקוק למיקום מדויק כדי להציג באיזה אזור אתה נמצא וליישר תוויות אופק בזמן חקירה לא מקוונת.</string>
     <string name="permission_rationale_camera">NofAR משתמש במצלמה כמצלמה חיה לתוויות במצב חקירה. תמונות אינן מועלות.</string>
-    <string name="permission_rationale_internet">אינטרנט נדרש רק במצב Prepare להורדת OpenStreetMap ונתוני גובה.</string>
+    <string name="permission_rationale_internet">אינטרנט נדרש רק במצב הכנה להורדת OpenStreetMap ונתוני גובה.</string>
     <string name="location_permission_denied">נדרש גישה למיקום כדי לזהות באיזה אזור אתה נמצא וליישר תוויות אופק.</string>
     <string name="location_permission_denied_permanent">הגישה למיקום נדחתה. פתח הגדרות כדי לאשר גישה מדויקת למיקום עבור NofAR.</string>
     <string name="location_waiting_for_fix">ממתין לקבלת GPS…</string>

@@ -30,10 +30,18 @@
     <string name="explore_hud_alt">Alt %1$s m</string>
     <string name="explore_hud_max_range">Max range %1$d km</string>
     <string name="explore_hud_range_icon" translatable="false">◎</string>
-    <string name="explore_hud_more_count">+ %1$d more</string>
     <string name="explore_hud_peak_marker" translatable="false">▲</string>
     <string name="explore_hud_settlement_marker" translatable="false">■</string>
     <string name="explore_hud_elevation_m">%1$dm</string>
     <string name="explore_hud_expand" translatable="false">▼</string>
     <string name="app_brand" translatable="false">NofAR</string>
+    <string name="format_size_gb">%1$s GB</string>
+    <string name="format_size_mb_whole">%1$s MB</string>
+    <string name="format_size_mb_fraction">%1$s MB</string>
+    <string name="format_radius_km">%1$d km</string>
+    <string name="format_timestamp_unknown">—</string>
+    <plurals name="explore_hud_more_count">
+        <item quantity="one">+ %d more</item>
+        <item quantity="other">+ %d more</item>
+    </plurals>
 </resources>
