@@ -31,7 +31,6 @@ import java.util.UUID
 @Composable
 fun NofARRegionCard(
     state: RegionCardState,
-    onEnterExplore: (UUID) -> Unit,
     onPrepare: (UUID) -> Unit,
     onDelete: (UUID) -> Unit,
     modifier: Modifier = Modifier,
@@ -53,7 +52,6 @@ fun NofARRegionCard(
             RegionCardDownloadProgress(region = region)
             RegionCardActions(
                 state = state,
-                onEnterExplore = onEnterExplore,
                 onPrepare = onPrepare,
                 onDelete = onDelete,
                 deleteIcon = deleteIcon
@@ -130,7 +128,6 @@ private fun RegionCardDownloadProgress(region: Region) {
 @Composable
 private fun RegionCardActions(
     state: RegionCardState,
-    onEnterExplore: (UUID) -> Unit,
     onPrepare: (UUID) -> Unit,
     onDelete: (UUID) -> Unit,
     deleteIcon: @Composable () -> Unit
@@ -145,19 +142,9 @@ private fun RegionCardActions(
         Column(modifier = Modifier.weight(1f)) {
             RegionCardPrimaryAction(
                 region = region,
-                canEnterExplore = state.canEnterExplore,
-                onEnterExplore = onEnterExplore,
                 onPrepare = onPrepare,
                 modifier = Modifier.fillMaxWidth()
             )
-            if (region.downloadStatus == DownloadStatus.READY || region.downloadStatus == DownloadStatus.PARTIAL) {
-                Spacer(modifier = Modifier.height(8.dp))
-                NofARSecondaryOutlinedButton(
-                    text = "UPDATE DATA",
-                    onClick = { onPrepare(region.id) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
         }
         Spacer(modifier = Modifier.width(8.dp))
         IconButton(
@@ -172,8 +159,6 @@ private fun RegionCardActions(
 @Composable
 private fun RegionCardPrimaryAction(
     region: Region,
-    canEnterExplore: Boolean,
-    onEnterExplore: (UUID) -> Unit,
     onPrepare: (UUID) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -188,10 +173,9 @@ private fun RegionCardPrimaryAction(
             )
         else ->
             NofARPrimaryButton(
-                text = "ENTER EXPLORE",
-                onClick = { onEnterExplore(region.id) },
-                modifier = modifier,
-                enabled = canEnterExplore
+                text = "UPDATE DATA",
+                onClick = { onPrepare(region.id) },
+                modifier = modifier
             )
     }
 }

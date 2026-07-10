@@ -13,6 +13,7 @@ import com.nofar.core.data.prepare.PrepareEstimator
 import com.nofar.core.data.prepare.PreparePhase
 import com.nofar.core.data.prepare.PrepareProgress
 import com.nofar.core.data.prepare.PrepareWorkState
+import com.nofar.core.data.prepare.RegionNamePolicy
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
@@ -159,7 +160,14 @@ constructor(
                     ) {
                         state
                     } else {
+                        val syncedName =
+                            if (RegionNamePolicy.isUserProvidedName(state.regionName)) {
+                                state.regionName
+                            } else {
+                                region.name
+                            }
                         state.copy(
+                            regionName = syncedName,
                             progress =
                             state.progress?.copy(overallPercent = region.downloadProgressPct)
                                 ?: PrepareProgress(
@@ -247,7 +255,7 @@ constructor(
     private fun setRegionCenter(lat: Double, lon: Double, recenterMap: Boolean, suggestName: Boolean) {
         _uiState.update {
             val name =
-                if (suggestName && (it.regionName.isBlank() || it.regionName.startsWith("Region near"))) {
+                if (suggestName && it.regionName.isBlank()) {
                     "Region near ${"%.2f".format(lat)}, ${"%.2f".format(lon)}"
                 } else {
                     it.regionName
@@ -397,9 +405,11 @@ constructor(
             }
 
             val state = _uiState.value
-            val regionId = state.regionId ?: createRegionRecord().also { id ->
-                _uiState.update { it.copy(regionId = id) }
-            }
+            val regionId =
+                state.regionId ?: UUID.randomUUID().also { id ->
+                    _uiState.update { it.copy(regionId = id) }
+                }
+            syncRegionRecord(regionId)
 
             downloadScheduler.enqueue(regionId)
             _uiState.update {
@@ -415,33 +425,37 @@ constructor(
         }
     }
 
-    private suspend fun createRegionRecord(): UUID {
+    private suspend fun syncRegionRecord(regionId: UUID) {
         val state = _uiState.value
-        val id = UUID.randomUUID()
         val now = Instant.now()
-        val bbox = RegionBounds.boundingBox(state.centerLat, state.centerLon, state.radiusKm * 1000)
-        val estimate = PrepareEstimator.estimate(state.centerLat, state.centerLon, state.radiusKm * 1000)
-        regionRepository.createRegion(
+        val radiusM = state.radiusKm * 1000
+        val bbox = RegionBounds.boundingBox(state.centerLat, state.centerLon, radiusM)
+        val estimate = PrepareEstimator.estimate(state.centerLat, state.centerLon, radiusM)
+        val existing = regionRepository.getRegion(regionId)
+        val region =
             Region(
-                id = id,
+                id = regionId,
                 name = state.regionName.trim(),
                 centerLat = state.centerLat,
                 centerLon = state.centerLon,
-                radiusM = state.radiusKm * 1000,
+                radiusM = radiusM,
                 minLat = bbox.minLat,
                 maxLat = bbox.maxLat,
                 minLon = bbox.minLon,
                 maxLon = bbox.maxLon,
-                createdAt = now,
+                createdAt = existing?.createdAt ?: now,
                 updatedAt = now,
-                downloadStatus = DownloadStatus.NOT_DOWNLOADED,
-                downloadProgressPct = 0,
-                osmDatasetVersion = null,
+                downloadStatus = existing?.downloadStatus ?: DownloadStatus.NOT_DOWNLOADED,
+                downloadProgressPct = existing?.downloadProgressPct ?: 0,
+                osmDatasetVersion = existing?.osmDatasetVersion,
                 estimatedSizeBytes = estimate.totalEstimateBytes,
-                entityCount = 0
+                entityCount = existing?.entityCount ?: 0
             )
-        )
-        return id
+        if (existing == null) {
+            regionRepository.createRegion(region)
+        } else {
+            regionRepository.updateRegion(region)
+        }
     }
 
     private fun loadExistingRegion(regionId: UUID) {
@@ -527,7 +541,14 @@ constructor(
 
     private fun markDownloadComplete(region: Region) {
         _uiState.update {
+            val syncedName =
+                if (RegionNamePolicy.isUserProvidedName(it.regionName)) {
+                    it.regionName
+                } else {
+                    region.name
+                }
             it.copy(
+                regionName = syncedName,
                 downloadUiState = PrepareDownloadUiState.COMPLETE,
                 step = PrepareStep.COMPLETE,
                 existingRegion = region,

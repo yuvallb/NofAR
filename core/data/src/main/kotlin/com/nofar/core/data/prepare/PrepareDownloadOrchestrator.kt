@@ -181,6 +181,7 @@ constructor(
                 osmDatasetVersion = osmDatasetVersion,
                 entityCount = entityCount
             )
+            applyOsmAutoName(regionId)
 
             // DEM phase (40–90%)
             val tiles = DemTileId.intersectingTiles(
@@ -191,6 +192,7 @@ constructor(
                 val tileId = DemTileId.fromCoordinates(tileLat, tileLon)
                 val binFile = demTileRepository.demFile(tileId)
                 if (binFile.exists() && demTileRepository.getTile(tileId) != null) {
+                    demTileRepository.incrementRefCount(tileId)
                     linkTileCoverage(regionId, tileId)
                     val pct = 40 + ((index + 1) * 50 / tiles.size.coerceAtLeast(1))
                     updateProgress(
@@ -270,8 +272,7 @@ constructor(
             // Post-processing (90–100%)
             updateProgress(PreparePhase.POST_PROCESSING, 90, message = "Filling elevations…")
             persistProgress(90)
-            val postSuccess =
-                postProcessor.process(regionId) { processed, total ->
+            postProcessor.process(regionId) { processed, total ->
                     val pct = 90 + ((processed * 9) / total.coerceAtLeast(1))
                     updateProgress(
                         PreparePhase.POST_PROCESSING,
@@ -279,11 +280,14 @@ constructor(
                         message = "Filling elevations ($processed/$total)…"
                     )
                 }
-            persistProgress(99)
             updateProgress(PreparePhase.POST_PROCESSING, 100, message = "Finalizing…")
 
             val terminalStatus =
-                if (demFailures > 0 || !postSuccess) DownloadStatus.PARTIAL else DownloadStatus.READY
+                when {
+                    demFailures > 0 -> DownloadStatus.PARTIAL
+                    entityCount == 0 -> DownloadStatus.PARTIAL
+                    else -> DownloadStatus.READY
+                }
             regionRepository.updateDownloadStatus(regionId, terminalStatus, progressPct = 100)
 
             try {
@@ -303,6 +307,17 @@ constructor(
             if (activeRegionId == regionId) {
                 _progress.value = null
                 activeRegionId = null
+            }
+        }
+    }
+
+    private suspend fun applyOsmAutoName(regionId: UUID) {
+        val region = regionRepository.getRegion(regionId)
+        if (region != null && !RegionNamePolicy.isUserProvidedName(region.name)) {
+            val entityIds = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString())
+            val entities = entityIds.mapNotNull { entityId -> geoEntityRepository.getById(entityId) }
+            RegionNameResolver.closestEntityName(region, entities)?.let { chosenName ->
+                regionRepository.updateRegion(region.copy(name = chosenName))
             }
         }
     }

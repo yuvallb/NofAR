@@ -11,7 +11,7 @@ import org.junit.Test
 
 class HomeViewModelTest {
     @Test
-    fun regionCardExploreRequiresReadyStatusAndLocationInside() {
+    fun youAreHereBadgeRequiresReadyStatusAndLocationInside() {
         val region =
             Region(
                 id = UUID.randomUUID(),
@@ -35,22 +35,20 @@ class HomeViewModelTest {
         val insideReady =
             com.nofar.core.designsystem.component.RegionCardState(
                 region = region,
-                isYouAreHere = true,
-                canEnterExplore = true
+                isYouAreHere = true
             )
-        assertTrue(insideReady.canEnterExplore)
+        assertTrue(insideReady.isYouAreHere)
 
         val outsideReady =
-            insideReady.copy(isYouAreHere = false, canEnterExplore = false)
-        assertFalse(outsideReady.canEnterExplore)
+            insideReady.copy(isYouAreHere = false)
+        assertFalse(outsideReady.isYouAreHere)
 
         val insideNotReady =
             insideReady.copy(
                 region = region.copy(downloadStatus = DownloadStatus.NOT_DOWNLOADED),
-                isYouAreHere = false,
-                canEnterExplore = false
+                isYouAreHere = false
             )
-        assertFalse(insideNotReady.canEnterExplore)
+        assertFalse(insideNotReady.isYouAreHere)
     }
 
     @Test

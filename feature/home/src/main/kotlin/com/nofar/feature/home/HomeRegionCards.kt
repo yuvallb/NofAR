@@ -13,7 +13,7 @@ internal suspend fun buildHomeRegionCards(
     regions: List<Region>,
     location: UserLocation?
 ): List<RegionCardState> {
-    val sorted = HomeRegionLogic.sortRegionsByUpdatedAt(regions)
+    val sorted = HomeRegionLogic.sortRegionsForDisplay(regions, location)
     val insideIds =
         if (location != null) {
             insideRegionUseCase.insideRegionIds(location.latitude, location.longitude, regions)
@@ -33,7 +33,6 @@ internal suspend fun buildHomeRegionCards(
         RegionCardState(
             region = region,
             isYouAreHere = HomeRegionLogic.shouldShowYouAreHere(region, isInside),
-            canEnterExplore = HomeRegionLogic.canEnterExplore(region, isInside),
             osmSizeBytes = osmSizeBytes,
             demSizeBytes = demSizeBytes,
             latestDemTimestamp = metadata.latestDemTimestamp

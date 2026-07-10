@@ -158,18 +158,6 @@ constructor(
         exploreNavigation.onGlobalEnterExplore(insideExploreRegions.value)
     }
 
-    fun onEnterExploreClicked(regionId: UUID) {
-        val location = currentLocation.value ?: return
-        viewModelScope.launch {
-            val insideExplore =
-                insideRegionUseCase.exploreEligibleRegionsContainingPoint(
-                    location.latitude,
-                    location.longitude
-                )
-            exploreNavigation.onRegionEnterExplore(insideExplore, regionId)
-        }
-    }
-
     fun onOverlappingRegionSelected(regionId: UUID) {
         exploreNavigation.onOverlappingRegionSelected(regionId, savedStateHandle)
     }

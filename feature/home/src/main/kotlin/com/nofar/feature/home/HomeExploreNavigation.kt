@@ -11,10 +11,6 @@ internal class HomeExploreNavigation(private val uiState: MutableStateFlow<HomeU
         applyDecision(HomeRegionLogic.resolveExploreNavigation(insideExploreRegions))
     }
 
-    fun onRegionEnterExplore(insideExploreRegions: List<Region>, regionId: UUID) {
-        applyDecision(HomeRegionLogic.resolveExploreNavigationForRegion(insideExploreRegions, regionId))
-    }
-
     fun onOverlappingRegionSelected(regionId: UUID, savedStateHandle: SavedStateHandle) {
         savedStateHandle[HomeViewModel.LAST_SELECTED_REGION_KEY] = regionId.toString()
         uiState.update {
