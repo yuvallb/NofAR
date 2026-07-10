@@ -58,4 +58,37 @@ class HomeViewModelTest {
         assertFalse(state.enterExploreEnabled)
         assertTrue(state.insideRegionIds.isEmpty())
     }
+
+    @Test
+    fun exploreEligibility_trueWhenReadyRegionInsideCachedLocation() {
+        val location =
+            com.nofar.core.model.UserLocation(
+                latitude = 32.0,
+                longitude = 35.0,
+                altitudeMeters = null,
+                accuracyMeters = 10f,
+                timestampMillis = 0L
+            )
+        val ready =
+            Region(
+                id = UUID.randomUUID(),
+                name = "Test",
+                centerLat = 32.0,
+                centerLon = 35.0,
+                radiusM = 12_000.0,
+                minLat = 31.9,
+                maxLat = 32.1,
+                minLon = 34.9,
+                maxLon = 35.1,
+                createdAt = Instant.now(),
+                updatedAt = Instant.now(),
+                downloadStatus = DownloadStatus.READY,
+                downloadProgressPct = 100,
+                osmDatasetVersion = Instant.now(),
+                estimatedSizeBytes = 42_000_000,
+                entityCount = 10
+            )
+        val insideExplore = HomeRegionLogic.exploreEligibleInside(listOf(ready), location)
+        assertTrue(HomeRegionLogic.isEnterExploreEnabled(insideExplore))
+    }
 }

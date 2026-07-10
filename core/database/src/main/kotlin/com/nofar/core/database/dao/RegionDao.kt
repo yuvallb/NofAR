@@ -35,6 +35,16 @@ interface RegionDao {
     @Query(
         """
         UPDATE region SET
+            name = :name,
+            updated_at = :updatedAt
+        WHERE id = :regionId
+        """
+    )
+    suspend fun updateName(regionId: String, name: String, updatedAt: Long): Int
+
+    @Query(
+        """
+        UPDATE region SET
             download_status = :status,
             download_progress_pct = :progressPct,
             updated_at = :updatedAt

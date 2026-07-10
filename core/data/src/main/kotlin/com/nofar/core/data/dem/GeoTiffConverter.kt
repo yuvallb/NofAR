@@ -1,10 +1,10 @@
 package com.nofar.core.data.dem
 
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.io.ByteArrayOutputStream
 import java.util.zip.Inflater
 
 interface GeoTiffConverter {
@@ -204,6 +204,21 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
 
             private fun parseIfd(bytes: ByteArray, byteOrder: ByteOrder, ifdOffset: Int): TiffDirectory {
                 val entryCount = readShort(bytes, ifdOffset, byteOrder).toInt()
+                val state = IfdParseState()
+
+                repeat(entryCount) { index ->
+                    val entryOffset = ifdOffset + 2 + index * 12
+                    state.applyEntry(bytes, byteOrder, entryOffset)
+                }
+
+                require(state.width > 0 && state.height > 0) { "Missing image dimensions" }
+                if (state.rowsPerStrip == Int.MAX_VALUE) {
+                    state.rowsPerStrip = state.height
+                }
+                return state.toDirectory(byteOrder)
+            }
+
+            private class IfdParseState {
                 var width = 0
                 var height = 0
                 var bitsPerSample = 32
@@ -217,32 +232,42 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                 var tileOffsets: IntArray? = null
                 var tileByteCounts: IntArray? = null
 
-                repeat(entryCount) { index ->
-                    val entryOffset = ifdOffset + 2 + index * 12
+                fun applyEntry(bytes: ByteArray, byteOrder: ByteOrder, entryOffset: Int) {
                     val tag = readShort(bytes, entryOffset, byteOrder).toInt()
                     val type = readShort(bytes, entryOffset + 2, byteOrder).toInt()
                     val count = readInt(bytes, byteOrder, entryOffset + 4)
+                    applyTag(bytes, byteOrder, entryOffset, tag, type, count)
+                }
+
+                fun applyTag(
+                    bytes: ByteArray,
+                    byteOrder: ByteOrder,
+                    entryOffset: Int,
+                    tag: Int,
+                    type: Int,
+                    count: Int
+                ) {
                     when (tag) {
-                        TAG_IMAGE_WIDTH -> width = readTagScalar(bytes, byteOrder, entryOffset, type).toInt()
-                        TAG_IMAGE_LENGTH -> height = readTagScalar(bytes, byteOrder, entryOffset, type).toInt()
-                        TAG_BITS_PER_SAMPLE -> bitsPerSample = readTagScalar(bytes, byteOrder, entryOffset, type).toInt()
-                        TAG_SAMPLE_FORMAT -> sampleFormat = readTagScalar(bytes, byteOrder, entryOffset, type).toInt()
-                        TAG_COMPRESSION -> compression = readTagScalar(bytes, byteOrder, entryOffset, type).toInt()
-                        TAG_ROWS_PER_STRIP -> rowsPerStrip = readTagScalar(bytes, byteOrder, entryOffset, type).toInt()
-                        TAG_TILE_WIDTH -> tileWidth = readTagScalar(bytes, byteOrder, entryOffset, type).toInt()
-                        TAG_TILE_LENGTH -> tileLength = readTagScalar(bytes, byteOrder, entryOffset, type).toInt()
-                        TAG_STRIP_OFFSETS -> stripOffsets = readTagIntArray(bytes, byteOrder, entryOffset, type, count)
-                        TAG_STRIP_BYTE_COUNTS -> stripByteCounts = readTagIntArray(bytes, byteOrder, entryOffset, type, count)
-                        TAG_TILE_OFFSETS -> tileOffsets = readTagIntArray(bytes, byteOrder, entryOffset, type, count)
-                        TAG_TILE_BYTE_COUNTS -> tileByteCounts = readTagIntArray(bytes, byteOrder, entryOffset, type, count)
+                        TAG_IMAGE_WIDTH -> width = readTagScalarInt(bytes, byteOrder, entryOffset, type)
+                        TAG_IMAGE_LENGTH -> height = readTagScalarInt(bytes, byteOrder, entryOffset, type)
+                        TAG_BITS_PER_SAMPLE -> bitsPerSample = readTagScalarInt(bytes, byteOrder, entryOffset, type)
+                        TAG_SAMPLE_FORMAT -> sampleFormat = readTagScalarInt(bytes, byteOrder, entryOffset, type)
+                        TAG_COMPRESSION -> compression = readTagScalarInt(bytes, byteOrder, entryOffset, type)
+                        TAG_ROWS_PER_STRIP -> rowsPerStrip = readTagScalarInt(bytes, byteOrder, entryOffset, type)
+                        TAG_TILE_WIDTH -> tileWidth = readTagScalarInt(bytes, byteOrder, entryOffset, type)
+                        TAG_TILE_LENGTH -> tileLength = readTagScalarInt(bytes, byteOrder, entryOffset, type)
+                        TAG_STRIP_OFFSETS ->
+                            stripOffsets = readTagIntArray(bytes, byteOrder, entryOffset, type, count)
+                        TAG_STRIP_BYTE_COUNTS ->
+                            stripByteCounts = readTagIntArray(bytes, byteOrder, entryOffset, type, count)
+                        TAG_TILE_OFFSETS ->
+                            tileOffsets = readTagIntArray(bytes, byteOrder, entryOffset, type, count)
+                        TAG_TILE_BYTE_COUNTS ->
+                            tileByteCounts = readTagIntArray(bytes, byteOrder, entryOffset, type, count)
                     }
                 }
 
-                require(width > 0 && height > 0) { "Missing image dimensions" }
-                if (rowsPerStrip == Int.MAX_VALUE) {
-                    rowsPerStrip = height
-                }
-                return TiffDirectory(
+                fun toDirectory(byteOrder: ByteOrder): TiffDirectory = TiffDirectory(
                     byteOrder = byteOrder,
                     width = width,
                     height = height,
@@ -258,6 +283,9 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                     tileByteCounts = tileByteCounts
                 )
             }
+
+            private fun readTagScalarInt(bytes: ByteArray, byteOrder: ByteOrder, entryOffset: Int, type: Int): Int =
+                readTagScalar(bytes, byteOrder, entryOffset, type).toInt()
 
             private fun readTagScalar(bytes: ByteArray, byteOrder: ByteOrder, entryOffset: Int, type: Int): Long {
                 val valueOffset = entryOffset + 8

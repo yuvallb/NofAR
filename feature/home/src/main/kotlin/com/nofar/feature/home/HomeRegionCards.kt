@@ -24,6 +24,9 @@ internal suspend fun buildHomeRegionCards(
         val isInside = region.id in insideIds
         val metadata = metadataRepository.getMetadata(region.id)
         val demSizeBytes = metadata.demSizeBytes
+        val displayEntityCount = max(region.entityCount, metadata.liveEntityCount)
+        val demTimestamp =
+            metadata.latestDemTimestamp ?: if (demSizeBytes > 0L) region.updatedAt else null
         val osmSizeBytes =
             if (demSizeBytes > 0L) {
                 max(0L, region.estimatedSizeBytes - demSizeBytes)
@@ -31,11 +34,11 @@ internal suspend fun buildHomeRegionCards(
                 region.estimatedSizeBytes
             }
         RegionCardState(
-            region = region,
+            region = region.copy(entityCount = displayEntityCount),
             isYouAreHere = HomeRegionLogic.shouldShowYouAreHere(region, isInside),
             osmSizeBytes = osmSizeBytes,
             demSizeBytes = demSizeBytes,
-            latestDemTimestamp = metadata.latestDemTimestamp
+            latestDemTimestamp = demTimestamp
         )
     }
 }

@@ -36,6 +36,7 @@ constructor(
 
     override suspend fun incrementRefCount(tileId: String) {
         demTileDao.incrementRefCount(tileId)
+        demTileDao.touch(tileId, Instant.now().toEpochMilli())
     }
 
     override suspend fun decrementRefCount(tileId: String) {

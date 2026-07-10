@@ -157,11 +157,7 @@ private fun RegionCardActions(
 }
 
 @Composable
-private fun RegionCardPrimaryAction(
-    region: Region,
-    onPrepare: (UUID) -> Unit,
-    modifier: Modifier = Modifier
-) {
+private fun RegionCardPrimaryAction(region: Region, onPrepare: (UUID) -> Unit, modifier: Modifier = Modifier) {
     when (region.downloadStatus) {
         DownloadStatus.NOT_DOWNLOADED ->
             NofARPrimaryButton(text = "PREPARE", onClick = { onPrepare(region.id) }, modifier = modifier)

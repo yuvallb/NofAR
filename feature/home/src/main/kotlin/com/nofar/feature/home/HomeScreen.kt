@@ -174,7 +174,7 @@ private fun GlobalEnterExploreSection(enabled: Boolean, onClick: () -> Unit) {
         if (!enabled) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Move inside a ready region to explore the horizon.",
+                text = "Add region or move inside a ready region to explore the horizon.",
                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                 color = NofARColors.TextCaption
             )

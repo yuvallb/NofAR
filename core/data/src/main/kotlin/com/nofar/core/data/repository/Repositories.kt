@@ -17,6 +17,8 @@ interface RegionRepository {
 
     suspend fun updateRegion(region: Region)
 
+    suspend fun updateRegionName(id: UUID, name: String)
+
     suspend fun deleteRegion(id: UUID)
 
     suspend fun regionsContainingPoint(lat: Double, lon: Double): List<Region>

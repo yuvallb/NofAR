@@ -1,7 +1,6 @@
 package com.nofar.core.data.prepare
 
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.ElevationSource
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.GeoEntityType
 import com.nofar.core.model.OsmType

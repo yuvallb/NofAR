@@ -33,7 +33,8 @@ class HomeRegionMetadataRepositoryTest {
         repository =
             HomeRegionMetadataRepository(
                 tileCoverageDao = database.tileCoverageDao(),
-                demTileDao = database.demTileDao()
+                demTileDao = database.demTileDao(),
+                regionEntityCoverageDao = database.regionEntityCoverageDao()
             )
     }
 
@@ -86,5 +87,6 @@ class HomeRegionMetadataRepositoryTest {
 
         assertThat(metadata.demSizeBytes).isEqualTo(350L)
         assertThat(metadata.latestDemTimestamp).isEqualTo(newer)
+        assertThat(metadata.liveEntityCount).isEqualTo(0)
     }
 }

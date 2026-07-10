@@ -174,6 +174,10 @@ constructor(
                     }
                 }
             }
+            val coverageCount = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString()).size
+            if (coverageCount != entityCount) {
+                entityCount = maxOf(entityCount, coverageCount)
+            }
             regionRepository.updateDownloadStatus(
                 regionId,
                 DownloadStatus.DOWNLOADING,
@@ -273,13 +277,13 @@ constructor(
             updateProgress(PreparePhase.POST_PROCESSING, 90, message = "Filling elevations…")
             persistProgress(90)
             postProcessor.process(regionId) { processed, total ->
-                    val pct = 90 + ((processed * 9) / total.coerceAtLeast(1))
-                    updateProgress(
-                        PreparePhase.POST_PROCESSING,
-                        pct.coerceIn(90, 99),
-                        message = "Filling elevations ($processed/$total)…"
-                    )
-                }
+                val pct = 90 + ((processed * 9) / total.coerceAtLeast(1))
+                updateProgress(
+                    PreparePhase.POST_PROCESSING,
+                    pct.coerceIn(90, 99),
+                    message = "Filling elevations ($processed/$total)…"
+                )
+            }
             updateProgress(PreparePhase.POST_PROCESSING, 100, message = "Finalizing…")
 
             val terminalStatus =
@@ -317,12 +321,13 @@ constructor(
             val entityIds = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString())
             val entities = entityIds.mapNotNull { entityId -> geoEntityRepository.getById(entityId) }
             RegionNameResolver.closestEntityName(region, entities)?.let { chosenName ->
-                regionRepository.updateRegion(region.copy(name = chosenName))
+                regionRepository.updateRegionName(regionId, chosenName)
             }
         }
     }
 
     private suspend fun linkTileCoverage(regionId: UUID, tileId: String) {
+        demTileRepository.getTile(tileId) ?: return
         tileCoverageDao.insert(
             TileCoverageEntity(
                 regionId = regionId.toString(),

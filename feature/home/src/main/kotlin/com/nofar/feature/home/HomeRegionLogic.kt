@@ -36,6 +36,14 @@ internal object HomeRegionLogic {
     fun shouldShowYouAreHere(region: Region, isInside: Boolean): Boolean =
         isInside && region.downloadStatus in EXPLORE_ELIGIBLE_STATUSES
 
+    fun exploreEligibleInside(regions: List<Region>, location: UserLocation?): List<Region> {
+        if (location == null) return emptyList()
+        return regions.filter { region ->
+            RegionBounds.containsPoint(region, location.latitude, location.longitude) &&
+                region.downloadStatus in EXPLORE_ELIGIBLE_STATUSES
+        }
+    }
+
     fun isEnterExploreEnabled(insideExploreRegions: List<Region>): Boolean = insideExploreRegions.isNotEmpty()
 
     fun resolveExploreNavigation(insideExploreRegions: List<Region>): ExploreNavigationDecision = when {

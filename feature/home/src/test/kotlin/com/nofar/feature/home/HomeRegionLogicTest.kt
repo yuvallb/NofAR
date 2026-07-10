@@ -20,14 +20,13 @@ class HomeRegionLogicTest {
         assertEquals(newer.id, sorted.first().id)
     }
 
-    private fun userLocation(lat: Double, lon: Double): UserLocation =
-        UserLocation(
-            latitude = lat,
-            longitude = lon,
-            altitudeMeters = null,
-            accuracyMeters = 10f,
-            timestampMillis = 0L
-        )
+    private fun userLocation(lat: Double, lon: Double): UserLocation = UserLocation(
+        latitude = lat,
+        longitude = lon,
+        altitudeMeters = null,
+        accuracyMeters = 10f,
+        timestampMillis = 0L
+    )
 
     @Test
     fun sortRegionsForDisplay_insideRegionsFirst() {
@@ -110,6 +109,35 @@ class HomeRegionLogicTest {
                 listOf(sampleRegion(downloadStatus = DownloadStatus.PARTIAL))
             )
         )
+    }
+
+    @Test
+    fun exploreEligibleInside_requiresReadyStatusAndLocationInside() {
+        val location = userLocation(lat = 32.0, lon = 35.0)
+        val ready = sampleRegion(downloadStatus = DownloadStatus.READY)
+        val downloading = sampleRegion(downloadStatus = DownloadStatus.DOWNLOADING)
+        val outside = sampleRegion(centerLat = 33.0, centerLon = 36.0, downloadStatus = DownloadStatus.READY)
+
+        val eligible = HomeRegionLogic.exploreEligibleInside(listOf(ready, downloading, outside), location)
+        assertEquals(listOf(ready.id), eligible.map { it.id })
+    }
+
+    @Test
+    fun exploreEligibleInside_enablesExploreWhenRegionBecomesReadyWithoutNewGpsFix() {
+        val location = userLocation(lat = 32.0, lon = 35.0)
+        val ready = sampleRegion(downloadStatus = DownloadStatus.READY)
+        val notReady = sampleRegion(downloadStatus = DownloadStatus.DOWNLOADING)
+
+        val notReadyEligible = HomeRegionLogic.exploreEligibleInside(listOf(notReady), location)
+        assertFalse(HomeRegionLogic.isEnterExploreEnabled(notReadyEligible))
+        val readyEligible = HomeRegionLogic.exploreEligibleInside(listOf(ready), location)
+        assertTrue(HomeRegionLogic.isEnterExploreEnabled(readyEligible))
+    }
+
+    @Test
+    fun exploreEligibleInside_returnsEmptyWithoutLocation() {
+        val ready = sampleRegion(downloadStatus = DownloadStatus.READY)
+        assertTrue(HomeRegionLogic.exploreEligibleInside(listOf(ready), location = null).isEmpty())
     }
 
     @Test
