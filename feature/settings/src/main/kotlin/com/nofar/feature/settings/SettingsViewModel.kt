@@ -4,6 +4,7 @@ package com.nofar.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nofar.core.common.text.UiText
 import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.repository.StorageRepository
@@ -11,6 +12,7 @@ import com.nofar.core.data.usecase.EvictUnusedDemTilesUseCase
 import com.nofar.core.data.usecase.ForceLruEvictionUseCase
 import com.nofar.core.data.usecase.LruEvictionUseCase
 import com.nofar.core.model.AppConfig
+import com.nofar.core.model.AppLanguage
 import com.nofar.core.model.DownloadStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -30,10 +32,11 @@ data class SettingsUiState(
     val wifiOnlyDownloads: Boolean = false,
     val showRawSensorOverlay: Boolean = false,
     val keepRawGeoTiff: Boolean = false,
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM,
     val prepareDownloadActive: Boolean = false,
     val showPurgeConfirm: Boolean = false,
     val showForceEvictConfirm: Boolean = false,
-    val snackbarMessage: String? = null
+    val snackbarMessage: UiText? = null
 )
 
 @HiltViewModel
@@ -62,13 +65,15 @@ constructor(
                 userPreferencesRepository.wifiOnlyDownloads,
                 userPreferencesRepository.demCacheLimitBytes,
                 userPreferencesRepository.showRawSensorOverlay,
-                userPreferencesRepository.keepRawGeoTiff
-            ) { wifiOnly, cacheLimitBytes, showRaw, keepTif ->
+                userPreferencesRepository.keepRawGeoTiff,
+                userPreferencesRepository.appLanguage
+            ) { wifiOnly, cacheLimitBytes, showRaw, keepTif, appLanguage ->
                 PreferenceSnapshot(
                     wifiOnly = wifiOnly,
                     cacheLimitMb = cacheLimitBytes / (1024f * 1024f),
                     showRaw = showRaw,
-                    keepTif = keepTif
+                    keepTif = keepTif,
+                    appLanguage = appLanguage
                 )
             }.collect { snapshot ->
                 _uiState.update {
@@ -76,7 +81,8 @@ constructor(
                         wifiOnlyDownloads = snapshot.wifiOnly,
                         evictionThresholdMb = snapshot.cacheLimitMb,
                         showRawSensorOverlay = snapshot.showRaw,
-                        keepRawGeoTiff = snapshot.keepTif
+                        keepRawGeoTiff = snapshot.keepTif,
+                        appLanguage = snapshot.appLanguage
                     )
                 }
             }
@@ -103,6 +109,12 @@ constructor(
                     regionCount = stats.regionCount
                 )
             }
+        }
+    }
+
+    fun onAppLanguageChanged(language: AppLanguage) {
+        viewModelScope.launch {
+            userPreferencesRepository.setAppLanguage(language)
         }
     }
 
@@ -150,9 +162,12 @@ constructor(
             val message =
                 if (result.tilesEvicted > 0) {
                     val freedMb = result.bytesFreed / (1024.0 * 1024.0)
-                    "Freed %.1f MB (%d unused tile(s) removed).".format(freedMb, result.tilesEvicted)
+                    UiText.Resource(
+                        resId = R.string.settings_snackbar_freed,
+                        args = listOf(freedMb, result.tilesEvicted)
+                    )
                 } else {
-                    "No unused tiles to remove."
+                    UiText.Resource(R.string.settings_snackbar_no_unused)
                 }
             _uiState.update {
                 it.copy(showPurgeConfirm = false, snackbarMessage = message)
@@ -177,12 +192,12 @@ constructor(
             val freedMb = result.bytesFreed / (1024.0 * 1024.0)
             val message =
                 if (result.tilesEvicted > 0) {
-                    "Removed %d tile(s), freeing %.1f MB. Affected regions marked partial.".format(
-                        result.tilesEvicted,
-                        freedMb
+                    UiText.Resource(
+                        resId = R.string.settings_snackbar_force_evicted,
+                        args = listOf(result.tilesEvicted, freedMb)
                     )
                 } else {
-                    "Cache is already within the limit."
+                    UiText.Resource(R.string.settings_snackbar_within_limit)
                 }
             _uiState.update {
                 it.copy(showForceEvictConfirm = false, snackbarMessage = message)
@@ -206,6 +221,7 @@ constructor(
         val wifiOnly: Boolean,
         val cacheLimitMb: Float,
         val showRaw: Boolean,
-        val keepTif: Boolean
+        val keepTif: Boolean,
+        val appLanguage: AppLanguage
     )
 }

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_settings">הגדרות</string>
+    <string name="home_add_region">+ הוסף אזור</string>
+    <string name="home_local_regions">אזורים מקומיים</string>
+    <string name="home_enter_explore">כניסה לחקירה</string>
+    <string name="home_enter_explore_hint">הוסף אזור או היכנס לאזור מוכן כדי לחקור את האופק.</string>
+    <string name="home_no_regions">אין אזורים עדיין. הורד נתוני מפה לאזור כדי להתחיל.</string>
+    <string name="home_add_region_button">הוסף אזור</string>
+    <string name="home_delete_region">מחק אזור</string>
+    <string name="home_delete_title">למחוק את %1$s?</string>
+    <string name="home_delete_message">פעולה זו מסירה את האזור ואת כל הישויות או אריחי DEM שאינם משותפים עם אזורים אחרים.</string>
+    <string name="home_delete_confirm">מחק</string>
+    <string name="home_cancel">ביטול</string>
+    <string name="home_overlap_title">מספר אזורים מכסים את האזור הזה</string>
+    <string name="home_overlap_message">באיזה הקשר נתונים תרצה להשתמש?</string>
+    <string name="home_confirm">אישור</string>
+    <string name="home_region_deleted">%1$s נמחק</string>
+</resources>

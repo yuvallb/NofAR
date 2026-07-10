@@ -22,8 +22,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nofar.core.designsystem.R
 import com.nofar.core.designsystem.theme.NofARColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,7 +35,7 @@ fun NofARHomeTopBar(modifier: Modifier = Modifier, onSettingsClick: () -> Unit, 
         modifier = modifier,
         title = {
             Text(
-                text = "NofAR",
+                text = stringResource(R.string.app_brand),
                 style = MaterialTheme.typography.headlineSmall,
                 color = NofARColors.PrimaryYellow,
                 fontWeight = FontWeight.Bold

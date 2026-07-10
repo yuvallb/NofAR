@@ -13,6 +13,7 @@ android {
         versionCode = 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        resourceConfigurations += listOf("en", "iw")
     }
 
     buildTypes {
@@ -40,6 +41,7 @@ dependencies {
     implementation(project(":feature:explore"))
     implementation(project(":feature:settings"))
 
+    implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)

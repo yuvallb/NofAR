@@ -8,7 +8,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.nofar.core.designsystem.R
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.model.DownloadStatus
 
@@ -29,14 +31,24 @@ fun NofARStatusBadge(status: DownloadStatus, progressPct: Int = 0, modifier: Mod
     }
 }
 
+@Composable
 private fun statusBadgeColors(status: DownloadStatus, progressPct: Int): Triple<String, Color, Color> = when (status) {
-    DownloadStatus.READY -> Triple("READY", NofARColors.StatusReady, Color.White)
-    DownloadStatus.PARTIAL -> Triple("PARTIAL", NofARColors.StatusPartial, Color.Black)
-    DownloadStatus.DOWNLOADING -> {
-        val label = "DOWNLOADING $progressPct%"
-        Triple(label, NofARColors.StatusDownloading, Color.White)
-    }
-    DownloadStatus.NOT_DOWNLOADED -> Triple("NOT DOWNLOADED", NofARColors.StatusNotDownloaded, Color.White)
+    DownloadStatus.READY ->
+        Triple(stringResource(R.string.badge_ready), NofARColors.StatusReady, Color.White)
+    DownloadStatus.PARTIAL ->
+        Triple(stringResource(R.string.badge_partial), NofARColors.StatusPartial, Color.Black)
+    DownloadStatus.DOWNLOADING ->
+        Triple(
+            stringResource(R.string.badge_downloading, progressPct),
+            NofARColors.StatusDownloading,
+            Color.White
+        )
+    DownloadStatus.NOT_DOWNLOADED ->
+        Triple(
+            stringResource(R.string.badge_not_downloaded),
+            NofARColors.StatusNotDownloaded,
+            Color.White
+        )
 }
 
 @Composable
@@ -47,7 +59,7 @@ fun NofARYouAreHereBadge(modifier: Modifier = Modifier) {
         color = NofARColors.YouAreHere
     ) {
         Text(
-            text = "YOU ARE HERE",
+            text = stringResource(R.string.badge_you_are_here),
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelMedium,
             color = NofARColors.OnPrimaryYellow

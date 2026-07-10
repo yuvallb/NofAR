@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="badge_ready">מוכן</string>
+    <string name="badge_partial">חלקי</string>
+    <string name="badge_downloading">מוריד %1$d%%</string>
+    <string name="badge_not_downloaded">לא הורד</string>
+    <string name="badge_you_are_here">אתה כאן</string>
+    <string name="region_card_center">מרכז: %1$s | רדיוס: %2$s</string>
+    <string name="region_card_size_breakdown">גודל: OSM %1$s + DEM %2$s</string>
+    <string name="region_card_size_estimate">גודל: %1$s</string>
+    <string name="region_card_entities">ישויות: %1$s | %2$s</string>
+    <string name="region_card_timestamps">OSM: %1$s | DEM: %2$s</string>
+    <string name="region_card_prepare">הכן</string>
+    <string name="region_card_view_progress">צפה בהתקדמות</string>
+    <string name="region_card_update_data">עדכן נתונים</string>
+    <string name="storage_summary_title">אחסון</string>
+    <string name="storage_dem_cache">מטמון DEM: %1$s</string>
+    <string name="storage_entities_db">מסד ישויות: %1$s</string>
+    <string name="storage_free_space">מקום פנוי: %1$s</string>
+    <string name="storage_advanced">אחסון מתקדם</string>
+    <string name="pipeline_downloading">מוריד: %1$s</string>
+    <string name="pipeline_total_progress">התקדמות כוללת: %1$d%%</string>
+    <string name="pipeline_eta">זמן משוער שנותר: %1$s</string>
+    <string name="pipeline_estimated_size">גודל משוער</string>
+    <string name="pipeline_osm_data">נתוני OSM: %1$s</string>
+    <string name="pipeline_dem_tiles">אריחי DEM (%1$d): %2$s</string>
+    <string name="pipeline_total">סה״כ: %1$s</string>
+    <string name="explore_hud_alt">גובה %1$s מ׳</string>
+    <string name="explore_hud_max_range">טווח מקסימלי %1$d ק״מ</string>
+    <string name="explore_hud_more_count">+ %1$d נוספים</string>
+    <string name="explore_hud_elevation_m">%1$d מ׳</string>
+</resources>

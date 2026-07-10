@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_exit">יציאה מחקירה</string>
+    <string name="explore_debug_az_smoothed">אזימוט מוחלק: %1$.1f°</string>
+    <string name="explore_debug_az_raw">אזימוט גולמי: %1$.1f°</string>
+    <string name="explore_debug_fov">שדה ראייה: %1$.1f° × %2$.1f°</string>
+    <string name="explore_debug_visible">נראים: %1$d</string>
+</resources>

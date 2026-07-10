@@ -5,6 +5,7 @@ import android.os.StatFs
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nofar.core.common.text.UiText
 import com.nofar.core.data.repository.HomeRegionMetadataRepository
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.repository.StorageRepository
@@ -40,7 +41,7 @@ data class HomeUiState(
     val overlappingRegionsDialog: List<Region>? = null,
     val lastSelectedOverlapRegionId: UUID? = null,
     val navigateToExploreRegionId: UUID? = null,
-    val snackbarMessage: String? = null,
+    val snackbarMessage: UiText? = null,
     val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED,
     val waitingForGpsFix: Boolean = false,
     val loading: Boolean = true
@@ -194,7 +195,14 @@ constructor(
         viewModelScope.launch {
             regionDeletionUseCase.execute(region.id)
             _uiState.update {
-                it.copy(deleteConfirmRegion = null, snackbarMessage = "${region.name} deleted")
+                it.copy(
+                    deleteConfirmRegion = null,
+                    snackbarMessage =
+                    UiText.Resource(
+                        resId = R.string.home_region_deleted,
+                        args = listOf(region.name)
+                    )
+                )
             }
             refreshStorageStats()
         }

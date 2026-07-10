@@ -5,9 +5,12 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.nofar.core.designsystem.component.NofARExploreBottomHud
 import com.nofar.core.model.AppConfig
@@ -36,19 +39,27 @@ internal fun ExploreScreenRoot(
                 onScreenSizeChanged(size.width.toFloat(), size.height.toFloat())
             }
     ) {
-        ExploreGateContent(
-            gate = uiState.exploreGate,
-            uiState = uiState,
-            permissionState = permissionState,
-            onNavigateBack = onNavigateBack,
-            onFieldOfViewChanged = onFieldOfViewChanged,
-            onHiddenCountClick = onHiddenCountClick
-        )
+        CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+            ExploreGateContent(
+                gate = uiState.exploreGate,
+                uiState = uiState,
+                permissionState = permissionState,
+                onNavigateBack = onNavigateBack,
+                onFieldOfViewChanged = onFieldOfViewChanged,
+                onHiddenCountClick = onHiddenCountClick
+            )
 
-        if (uiState.exploreGate == ExploreGate.READY) {
-            ExploreReadyChrome(uiState = uiState, onNavigateBack = onNavigateBack)
-        } else if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
-            ExploreExitButton(onNavigateBack = onNavigateBack)
+            if (uiState.exploreGate == ExploreGate.READY) {
+                ExploreReadyChrome(uiState = uiState, onNavigateBack = onNavigateBack)
+            } else if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
+                ExploreExitButton(onNavigateBack = onNavigateBack)
+            }
+
+            if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
+                ExploreOsmWatermark(modifier = Modifier.align(Alignment.BottomEnd))
+            }
+
+            debugOverlay()
         }
 
         if (uiState.exploreGate == ExploreGate.GRACE_EXPIRED) {
@@ -61,12 +72,6 @@ internal fun ExploreScreenRoot(
         uiState.expandedCluster?.let { cluster ->
             ExploreExpandedBucketDialog(cluster = cluster, onDismiss = onDismissExpandedBucket)
         }
-
-        if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
-            ExploreOsmWatermark(modifier = Modifier.align(Alignment.BottomEnd))
-        }
-
-        debugOverlay()
     }
 }
 

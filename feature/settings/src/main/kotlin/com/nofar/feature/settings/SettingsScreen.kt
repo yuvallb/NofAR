@@ -1,5 +1,6 @@
 package com.nofar.feature.settings
 
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -15,11 +16,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nofar.core.common.locale.LocaleApplier
 import com.nofar.core.designsystem.component.NofARBackTopBar
 import com.nofar.core.designsystem.theme.NofARColors
 
@@ -32,6 +36,7 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val lifecycleOwner = LocalLifecycleOwner.current
+    val activity = LocalContext.current as? ComponentActivity
 
     DisposableEffect(lifecycleOwner) {
         val observer =
@@ -44,8 +49,10 @@ fun SettingsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val context = LocalContext.current
+
     LaunchedEffect(uiState.snackbarMessage) {
-        uiState.snackbarMessage?.let { message ->
+        uiState.snackbarMessage?.asString(context)?.let { message ->
             snackbarHostState.showSnackbar(message)
             viewModel.dismissSnackbar()
         }
@@ -57,18 +64,23 @@ fun SettingsScreen(
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
             NofARBackTopBar(
-                title = "Settings",
+                title = stringResource(R.string.settings_title),
                 onNavigateBack = onNavigateBack,
                 navigationIcon = {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
+                        contentDescription = stringResource(R.string.settings_back),
                         tint = NofARColors.PrimaryYellow
                     )
                 }
             )
             SettingsContent(
                 uiState = uiState,
+                onAppLanguageChanged = { language ->
+                    viewModel.onAppLanguageChanged(language)
+                    LocaleApplier.apply(language)
+                    activity?.recreate()
+                },
                 onWifiOnlyChanged = viewModel::onWifiOnlyDownloadsChanged,
                 onEvictionThresholdChanged = viewModel::onEvictionThresholdChanged,
                 onShowPurgeConfirm = viewModel::showPurgeConfirm,

@@ -1,9 +1,12 @@
 package com.nofar.feature.prepare
 
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import com.nofar.core.data.prepare.PreparePhase
 import com.nofar.core.designsystem.component.PipelineStep
 import com.nofar.core.designsystem.component.PipelineStepState
 
+@Composable
 internal fun buildPipelineSteps(uiState: PrepareUiState): List<PipelineStep> = listOf(
     initPipelineStep(uiState),
     osmPipelineStep(uiState),
@@ -12,60 +15,64 @@ internal fun buildPipelineSteps(uiState: PrepareUiState): List<PipelineStep> = l
     finalizePipelineStep(uiState)
 )
 
+@Composable
 private fun initPipelineStep(uiState: PrepareUiState): PipelineStep {
     val progress = uiState.progress
     return PipelineStep(
-        title = "Initializing local database entries",
+        title = stringResource(R.string.prepare_step_init),
         state = if (progress != null) PipelineStepState.COMPLETE else PipelineStepState.ACTIVE
     )
 }
 
+@Composable
 private fun osmPipelineStep(uiState: PrepareUiState): PipelineStep {
     val progress = uiState.progress
     val phase = progress?.phase
     return PipelineStep(
-        title = "Step 1: Querying OpenStreetMap Features",
+        title = stringResource(R.string.prepare_step_osm),
         state = pipelineStateForPhase(phase, PreparePhase.OSM),
         detailLines = osmDetailLines(phase, progress?.message),
         progress = phaseProgress(phase, PreparePhase.OSM, progress?.overallPercent)
     )
 }
 
+@Composable
 private fun demPipelineStep(uiState: PrepareUiState): PipelineStep {
     val progress = uiState.progress
     val phase = progress?.phase
     val tileIndex = progress?.demTileIndex ?: 0
     val tileCount = progress?.demTileCount ?: uiState.demTileCount
     return PipelineStep(
-        title = "Step 2: Downloading Elevation Tiles ($tileIndex/$tileCount)",
+        title = stringResource(R.string.prepare_step_dem, tileIndex, tileCount),
         state = demPipelineState(phase),
         detailLines = demDetailLines(phase, progress?.remainingBytesEstimate, progress?.message),
         progress = phaseProgress(phase, PreparePhase.DEM, progress?.overallPercent)
     )
 }
 
+@Composable
 private fun postProcessPipelineStep(uiState: PrepareUiState): PipelineStep {
     val progress = uiState.progress
     val phase = progress?.phase
+    val defaultDetail = stringResource(R.string.prepare_step_enrich_detail)
     return PipelineStep(
-        title = "Step 3: Enriching Feature Elevations",
+        title = stringResource(R.string.prepare_step_enrich),
         state = postProcessPipelineState(phase, progress != null, progress?.overallPercent ?: 0),
         detailLines =
         if (phase == PreparePhase.POST_PROCESSING) {
-            listOf(
-                progress.message.takeIf { it.isNotBlank() }
-                    ?: "Sampling elevations from downloaded DEM tiles…"
-            )
+            listOf(progress.message.takeIf { it.isNotBlank() } ?: defaultDetail)
         } else {
             emptyList()
         }
     )
 }
 
+@Composable
 private fun finalizePipelineStep(uiState: PrepareUiState): PipelineStep {
     val progress = uiState.progress
+    val defaultDetail = stringResource(R.string.prepare_step_finalize_detail)
     return PipelineStep(
-        title = "Finalizing Region",
+        title = stringResource(R.string.prepare_step_finalize),
         state =
         when {
             uiState.downloadUiState == PrepareDownloadUiState.COMPLETE -> PipelineStepState.COMPLETE
@@ -75,7 +82,7 @@ private fun finalizePipelineStep(uiState: PrepareUiState): PipelineStep {
         },
         detailLines =
         if (progress?.phase == PreparePhase.POST_PROCESSING && progress.overallPercent >= 100) {
-            listOf(progress.message.ifBlank { "Finalizing…" })
+            listOf(progress.message.ifBlank { defaultDetail })
         } else {
             emptyList()
         }

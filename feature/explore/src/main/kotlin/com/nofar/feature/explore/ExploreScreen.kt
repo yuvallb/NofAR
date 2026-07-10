@@ -14,6 +14,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -104,14 +105,17 @@ internal fun BoxScope.ExploreDebugOverlay(uiState: ExploreUiState) {
     Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 120.dp)) {
         androidx.compose.foundation.layout.Column {
             uiState.debugSmoothedAzimuthDeg?.let { smoothed ->
-                Text(text = "Az smoothed: ${"%.1f".format(smoothed)}°", color = NofARColors.ArAccent)
+                Text(text = stringResource(R.string.explore_debug_az_smoothed, smoothed), color = NofARColors.ArAccent)
             }
             uiState.debugRawAzimuthDeg?.let { raw ->
-                Text(text = "Az raw: ${"%.1f".format(raw)}°", color = Color.White)
+                Text(text = stringResource(R.string.explore_debug_az_raw, raw), color = Color.White)
             }
-            Text(text = "FOV: ${"%.1f".format(hFov)}° × ${"%.1f".format(vFov)}°", color = Color.White)
+            Text(text = stringResource(R.string.explore_debug_fov, hFov, vFov), color = Color.White)
             if (uiState.visibleEntityCount > 0) {
-                Text(text = "Visible: ${uiState.visibleEntityCount}", color = NofARColors.ArAccent)
+                Text(
+                    text = stringResource(R.string.explore_debug_visible, uiState.visibleEntityCount),
+                    color = NofARColors.ArAccent
+                )
             }
         }
     }
@@ -126,7 +130,7 @@ internal fun BoxScope.ExploreExitButton(onNavigateBack: () -> Unit) {
             .padding(start = 16.dp, bottom = 72.dp)
     ) {
         NofARIconActionButton(onClick = onNavigateBack) {
-            Icon(Icons.Default.Close, contentDescription = "Exit Explore", tint = Color.White)
+            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.explore_exit), tint = Color.White)
         }
     }
 }

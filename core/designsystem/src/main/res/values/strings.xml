@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="badge_ready">Ready</string>
+    <string name="badge_partial">Partial</string>
+    <string name="badge_downloading">Downloading %1$d%%</string>
+    <string name="badge_not_downloaded">Not downloaded</string>
+    <string name="badge_you_are_here">You are here</string>
+    <string name="region_card_center">Center: %1$s | Radius: %2$s</string>
+    <string name="region_card_size_breakdown">Size: OSM %1$s + DEM %2$s</string>
+    <string name="region_card_size_estimate">Size: %1$s</string>
+    <string name="region_card_entities">Entities: %1$s | %2$s</string>
+    <string name="region_card_timestamps">OSM: %1$s | DEM: %2$s</string>
+    <string name="region_card_prepare">Prepare</string>
+    <string name="region_card_view_progress">View progress</string>
+    <string name="region_card_update_data">Update data</string>
+    <string name="storage_summary_title">Storage</string>
+    <string name="storage_dem_cache">DEM cache: %1$s</string>
+    <string name="storage_entities_db">Entities DB: %1$s</string>
+    <string name="storage_free_space">Free space: %1$s</string>
+    <string name="storage_advanced">Advanced storage</string>
+    <string name="pipeline_downloading">Downloading: %1$s</string>
+    <string name="pipeline_total_progress">Total progress: %1$d%%</string>
+    <string name="pipeline_eta">Estimated time remaining: %1$s</string>
+    <string name="pipeline_step_complete" translatable="false">✓</string>
+    <string name="pipeline_step_active" translatable="false">▶</string>
+    <string name="pipeline_estimated_size">Estimated size</string>
+    <string name="pipeline_osm_data">OSM data: %1$s</string>
+    <string name="pipeline_dem_tiles">DEM tiles (%1$d): %2$s</string>
+    <string name="pipeline_total">Total: %1$s</string>
+    <string name="explore_hud_alt">Alt %1$s m</string>
+    <string name="explore_hud_max_range">Max range %1$d km</string>
+    <string name="explore_hud_range_icon" translatable="false">◎</string>
+    <string name="explore_hud_more_count">+ %1$d more</string>
+    <string name="explore_hud_peak_marker" translatable="false">▲</string>
+    <string name="explore_hud_settlement_marker" translatable="false">■</string>
+    <string name="explore_hud_elevation_m">%1$dm</string>
+    <string name="explore_hud_expand" translatable="false">▼</string>
+    <string name="app_brand" translatable="false">NofAR</string>
+</resources>

@@ -26,10 +26,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.nofar.core.designsystem.R
 import com.nofar.core.designsystem.theme.NofARColors
 
 private val arTextShadow =
@@ -81,7 +83,7 @@ fun NofARCompassRibbon(headings: List<String>, centerHeading: String, modifier: 
             }
         }
         Text(
-            text = "▼",
+            text = stringResource(R.string.explore_hud_expand),
             modifier =
             Modifier
                 .align(Alignment.BottomCenter)
@@ -110,7 +112,12 @@ fun NofARArLabel(label: ArLabel, modifier: Modifier = Modifier, onHiddenCountCli
 
 @Composable
 private fun ArLabelTextBlock(label: ArLabel, onHiddenCountClick: ((Int) -> Unit)? = null) {
-    val marker = if (label.isPeak) "▲" else "■"
+    val marker =
+        if (label.isPeak) {
+            stringResource(R.string.explore_hud_peak_marker)
+        } else {
+            stringResource(R.string.explore_hud_settlement_marker)
+        }
     Surface(
         shape = RoundedCornerShape(4.dp),
         color = NofARColors.ArOverlayBackground
@@ -124,7 +131,7 @@ private fun ArLabelTextBlock(label: ArLabel, onHiddenCountClick: ((Int) -> Unit)
             )
             label.elevationM?.let { elevation ->
                 Text(
-                    text = "${elevation}m",
+                    text = stringResource(R.string.explore_hud_elevation_m, elevation),
                     style = MaterialTheme.typography.bodySmall.copy(shadow = arTextShadow),
                     color = Color.White,
                     fontWeight = FontWeight.Medium
@@ -155,7 +162,7 @@ private fun ArLabelHiddenCountCapsule(count: Int, onClick: () -> Unit) {
         modifier = Modifier.clickable(onClick = onClick)
     ) {
         Text(
-            text = "+ $count more",
+            text = stringResource(R.string.explore_hud_more_count, count),
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             style = MaterialTheme.typography.labelMedium,
             color = NofARColors.ArAccent
@@ -198,19 +205,19 @@ fun NofARExploreBottomHud(altitudeM: String, maxRangeKm: Int, modifier: Modifier
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = "ALT $altitudeM m",
+            text = stringResource(R.string.explore_hud_alt, altitudeM),
             style = MaterialTheme.typography.labelMedium.copy(shadow = arTextShadow),
             color = Color.White,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = "◎",
+            text = stringResource(R.string.explore_hud_range_icon),
             style = MaterialTheme.typography.titleLarge,
             color = NofARColors.ArAccent,
             textAlign = TextAlign.Center
         )
         Text(
-            text = "MAX RANGE $maxRangeKm km",
+            text = stringResource(R.string.explore_hud_max_range, maxRangeKm),
             style = MaterialTheme.typography.labelMedium.copy(shadow = arTextShadow),
             color = Color.White,
             fontWeight = FontWeight.Bold

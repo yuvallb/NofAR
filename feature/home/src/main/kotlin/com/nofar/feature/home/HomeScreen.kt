@@ -29,6 +29,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -73,8 +75,10 @@ fun HomeScreen(
         }
     }
 
+    val context = LocalContext.current
+
     LaunchedEffect(uiState.snackbarMessage) {
-        uiState.snackbarMessage?.let { message ->
+        uiState.snackbarMessage?.asString(context)?.let { message ->
             snackbarHostState.showSnackbar(message)
             viewModel.onSnackbarShown()
         }
@@ -126,7 +130,7 @@ private fun HomeScreenContent(
             settingsIcon = {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
+                    contentDescription = stringResource(R.string.home_settings),
                     tint = NofARColors.PrimaryYellow
                 )
             }
@@ -140,12 +144,12 @@ private fun HomeScreenContent(
             onClick = onGlobalEnterExplore
         )
         NofARSecondaryOutlinedButton(
-            text = "+ ADD REGION",
+            text = stringResource(R.string.home_add_region),
             onClick = { onNavigateToPrepare(null) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))
-        NofARSectionHeader(title = "LOCAL REGIONS")
+        NofARSectionHeader(title = stringResource(R.string.home_local_regions))
         HomeRegionList(
             regions = uiState.regions,
             onPrepare = { regionId -> onNavigateToPrepare(regionId) },
@@ -166,7 +170,7 @@ private fun HomeScreenContent(
 private fun GlobalEnterExploreSection(enabled: Boolean, onClick: () -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         NofARPrimaryButton(
-            text = "ENTER EXPLORE",
+            text = stringResource(R.string.home_enter_explore),
             onClick = onClick,
             modifier = Modifier.fillMaxWidth(),
             enabled = enabled
@@ -174,7 +178,7 @@ private fun GlobalEnterExploreSection(enabled: Boolean, onClick: () -> Unit) {
         if (!enabled) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Add region or move inside a ready region to explore the horizon.",
+                text = stringResource(R.string.home_enter_explore_hint),
                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                 color = NofARColors.TextCaption
             )
@@ -194,12 +198,12 @@ private fun HomeRegionList(
     if (regions.isEmpty()) {
         Column(modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(
-                text = "No regions yet. Download map data for an area to get started.",
+                text = stringResource(R.string.home_no_regions),
                 color = NofARColors.TextSecondary
             )
             Spacer(modifier = Modifier.height(12.dp))
             NofARPrimaryButton(
-                text = "ADD REGION",
+                text = stringResource(R.string.home_add_region_button),
                 onClick = onAddRegion,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -218,7 +222,7 @@ private fun HomeRegionList(
                 deleteIcon = {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete region",
+                        contentDescription = stringResource(R.string.home_delete_region),
                         tint = NofARColors.TextSecondary
                     )
                 }
@@ -255,20 +259,18 @@ private fun HomeScreenDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
 private fun DeleteRegionDialog(region: Region, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete ${region.name}?") },
+        title = { Text(stringResource(R.string.home_delete_title, region.name)) },
         text = {
-            Text(
-                "This removes the region and any entities or DEM tiles not shared with other regions."
-            )
+            Text(stringResource(R.string.home_delete_message))
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("DELETE", color = NofARColors.ErrorDestructive)
+                Text(stringResource(R.string.home_delete_confirm), color = NofARColors.ErrorDestructive)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL")
+                Text(stringResource(R.string.home_cancel))
             }
         }
     )
@@ -285,10 +287,10 @@ private fun OverlappingRegionsDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Multiple regions cover this area") },
+        title = { Text(stringResource(R.string.home_overlap_title)) },
         text = {
             Column {
-                Text("Which data context would you like to use?")
+                Text(stringResource(R.string.home_overlap_message))
                 Spacer(modifier = Modifier.height(8.dp))
                 regions.forEach { region ->
                     androidx.compose.foundation.layout.Row(
@@ -306,12 +308,12 @@ private fun OverlappingRegionsDialog(
         },
         confirmButton = {
             TextButton(onClick = { onSelect(selectedId) }) {
-                Text("CONFIRM")
+                Text(stringResource(R.string.home_confirm))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL")
+                Text(stringResource(R.string.home_cancel))
             }
         }
     )

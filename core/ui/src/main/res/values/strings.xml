@@ -22,7 +22,7 @@
     <string name="explore_outside_region_message">Leaving data coverage zone for %1$s. Explore mode will suspend in %2$d seconds.</string>
     <string name="explore_grace_expired_title">Explore mode suspended</string>
     <string name="explore_grace_expired_message">You have moved outside the downloaded boundary of %1$s.</string>
-    <string name="explore_return_to_home">Return to Home Mode</string>
+    <string name="explore_return_to_home">Return to Home mode</string>
     <string name="explore_no_visible_entities">No labeled features visible in this direction.</string>
     <string name="explore_osm_watermark">© OpenStreetMap contributors</string>
     <string name="explore_expanded_bucket_title">Nearby features</string>

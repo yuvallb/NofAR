@@ -4,6 +4,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 
 @Composable
 internal fun SettingsDialogs(uiState: SettingsUiState, viewModel: SettingsViewModel) {
@@ -25,21 +26,18 @@ internal fun SettingsDialogs(uiState: SettingsUiState, viewModel: SettingsViewMo
 private fun PurgeConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Clear unused DEM tiles?") },
+        title = { Text(stringResource(R.string.settings_purge_title)) },
         text = {
-            Text(
-                "This will remove all elevation raster blocks (.bin) that are no longer " +
-                    "associated with your active circular regions. Saved regions will not be affected. Proceed?"
-            )
+            Text(stringResource(R.string.settings_purge_message))
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("PROCEED")
+                Text(stringResource(R.string.settings_proceed))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL")
+                Text(stringResource(R.string.settings_cancel))
             }
         }
     )
@@ -49,22 +47,18 @@ private fun PurgeConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
 private fun ForceEvictConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Cache still over limit") },
+        title = { Text(stringResource(R.string.settings_force_evict_title)) },
         text = {
-            Text(
-                "Unused tiles were removed but the DEM cache still exceeds your limit. " +
-                    "Delete oldest tiles (including those used by regions) to free space? " +
-                    "Affected regions will be marked partial and may lose terrain accuracy."
-            )
+            Text(stringResource(R.string.settings_force_evict_message))
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text("DELETE OLDEST TILES")
+                Text(stringResource(R.string.settings_delete_oldest_tiles))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("CANCEL")
+                Text(stringResource(R.string.settings_cancel))
             }
         }
     )

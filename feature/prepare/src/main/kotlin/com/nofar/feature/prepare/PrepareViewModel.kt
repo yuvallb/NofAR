@@ -2,9 +2,11 @@
 
 package com.nofar.feature.prepare
 
+import android.content.Context
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nofar.core.common.text.UiText
 import com.nofar.core.data.network.NetworkConnectivityMonitor
 import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.prepare.PrepareDownloadOrchestrator
@@ -23,7 +25,9 @@ import com.nofar.core.model.LocationAccessState
 import com.nofar.core.model.Region
 import com.nofar.core.model.RegionBounds
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import java.time.Instant
+import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
 import kotlinx.coroutines.delay
@@ -55,10 +59,10 @@ data class PrepareUiState(
     val estimateBytes: Long = 0L,
     val demTileCount: Int = 0,
     val progress: PrepareProgress? = null,
-    val errorMessage: String? = null,
+    val errorMessage: UiText? = null,
     val showCellularWarning: Boolean = false,
     val showWifiOnlyBlocked: Boolean = false,
-    val nameError: String? = null,
+    val nameError: UiText? = null,
     val mapRecenterNonce: Long = 0L,
     val waitingForGpsFix: Boolean = false,
     val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED
@@ -82,6 +86,7 @@ constructor(
     private val networkConnectivityMonitor: NetworkConnectivityMonitor,
     private val locationRepository: LocationRepository,
     private val locationController: LocationController,
+    @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(PrepareUiState())
@@ -256,7 +261,11 @@ constructor(
         _uiState.update {
             val name =
                 if (suggestName && it.regionName.isBlank()) {
-                    "Region near ${"%.2f".format(lat)}, ${"%.2f".format(lon)}"
+                    context.getString(
+                        R.string.prepare_region_near,
+                        "%.2f".format(Locale.US, lat),
+                        "%.2f".format(Locale.US, lon)
+                    )
                 } else {
                     it.regionName
                 }
@@ -318,7 +327,7 @@ constructor(
             _uiState.update {
                 it.copy(
                     downloadUiState = PrepareDownloadUiState.ERROR,
-                    errorMessage = "No network connection. Connect to Wi-Fi or mobile data to download."
+                    errorMessage = UiText.Resource(R.string.prepare_error_no_network)
                 )
             }
             return
@@ -342,7 +351,7 @@ constructor(
                         _uiState.update {
                             it.copy(
                                 downloadUiState = PrepareDownloadUiState.ERROR,
-                                errorMessage = gate.message
+                                errorMessage = gate.reason.toUiText()
                             )
                         }
                     }
@@ -519,7 +528,7 @@ constructor(
                             it.copy(
                                 downloadUiState = PrepareDownloadUiState.ERROR,
                                 step = PrepareStep.ESTIMATE,
-                                errorMessage = "Download failed. You can retry to continue.",
+                                errorMessage = UiText.Resource(R.string.prepare_error_download_failed),
                                 existingRegion = region,
                                 progress = null
                             )
@@ -558,10 +567,17 @@ constructor(
         }
     }
 
-    private fun validateName(name: String): String? = when {
-        name.isBlank() -> "Name is required"
-        name.length > 40 -> "Name must be 40 characters or fewer"
+    private fun validateName(name: String): UiText? = when {
+        name.isBlank() -> UiText.Resource(R.string.prepare_error_name_required)
+        name.length > 40 -> UiText.Resource(R.string.prepare_error_name_too_long)
         else -> null
+    }
+
+    private fun PrepareDownloadPolicy.BlockedReason.toUiText(): UiText = when (this) {
+        PrepareDownloadPolicy.BlockedReason.NO_NETWORK ->
+            UiText.Resource(R.string.prepare_error_no_network)
+        PrepareDownloadPolicy.BlockedReason.WIFI_ONLY ->
+            UiText.Resource(R.string.prepare_error_wifi_only)
     }
 
     override fun onCleared() {

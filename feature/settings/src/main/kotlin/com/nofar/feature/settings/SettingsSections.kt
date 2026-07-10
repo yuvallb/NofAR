@@ -13,6 +13,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
@@ -20,14 +22,18 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import com.nofar.core.designsystem.R as DesignSystemR
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
+import com.nofar.core.model.AppLanguage
 import com.nofar.core.model.AppMetadata
 import com.nofar.core.network.OverpassConfig
 
@@ -37,6 +43,7 @@ internal const val APACHE_LICENSE_URL = "https://www.apache.org/licenses/LICENSE
 @Composable
 internal fun SettingsContent(
     uiState: SettingsUiState,
+    onAppLanguageChanged: (AppLanguage) -> Unit,
     onWifiOnlyChanged: (Boolean) -> Unit,
     onEvictionThresholdChanged: (Float) -> Unit,
     onShowPurgeConfirm: () -> Unit,
@@ -51,6 +58,11 @@ internal fun SettingsContent(
             .verticalScroll(scrollState)
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
+        SettingsLanguageSection(
+            selectedLanguage = uiState.appLanguage,
+            onLanguageChanged = onAppLanguageChanged
+        )
+        SettingsSectionDivider()
         SettingsGeneralSection(
             wifiOnlyDownloads = uiState.wifiOnlyDownloads,
             onWifiOnlyChanged = onWifiOnlyChanged
@@ -96,11 +108,53 @@ internal fun SettingsSectionTitle(title: String) {
 }
 
 @Composable
+private fun SettingsLanguageSection(selectedLanguage: AppLanguage, onLanguageChanged: (AppLanguage) -> Unit) {
+    SettingsSectionTitle(stringResource(R.string.settings_language_section))
+    LanguageOptionRow(
+        label = stringResource(R.string.settings_language_system),
+        selected = selectedLanguage == AppLanguage.SYSTEM,
+        onSelect = { onLanguageChanged(AppLanguage.SYSTEM) },
+        testTag = "language_system"
+    )
+    LanguageOptionRow(
+        label = stringResource(R.string.settings_language_english),
+        selected = selectedLanguage == AppLanguage.ENGLISH,
+        onSelect = { onLanguageChanged(AppLanguage.ENGLISH) },
+        testTag = "language_english"
+    )
+    LanguageOptionRow(
+        label = stringResource(R.string.settings_language_hebrew),
+        selected = selectedLanguage == AppLanguage.HEBREW,
+        onSelect = { onLanguageChanged(AppLanguage.HEBREW) },
+        testTag = "language_hebrew"
+    )
+}
+
+@Composable
+private fun LanguageOptionRow(label: String, selected: Boolean, onSelect: () -> Unit, testTag: String) {
+    androidx.compose.foundation.layout.Row(
+        modifier =
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onSelect)
+            .testTag(testTag),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        RadioButton(
+            selected = selected,
+            onClick = onSelect,
+            colors = RadioButtonDefaults.colors(selectedColor = NofARColors.PrimaryYellow)
+        )
+        Text(text = label, style = MaterialTheme.typography.bodyMedium, color = NofARColors.TextPrimary)
+    }
+}
+
+@Composable
 private fun SettingsGeneralSection(wifiOnlyDownloads: Boolean, onWifiOnlyChanged: (Boolean) -> Unit) {
-    SettingsSectionTitle("GENERAL")
+    SettingsSectionTitle(stringResource(R.string.settings_general_section))
     SettingsToggleRow(
-        title = "Wi-Fi only downloads",
-        subtitle = "Block Prepare downloads on cellular data",
+        title = stringResource(R.string.settings_wifi_only_title),
+        subtitle = stringResource(R.string.settings_wifi_only_subtitle),
         checked = wifiOnlyDownloads,
         onCheckedChange = onWifiOnlyChanged,
         testTag = "wifi_only_toggle"
@@ -108,7 +162,7 @@ private fun SettingsGeneralSection(wifiOnlyDownloads: Boolean, onWifiOnlyChanged
     Spacer(modifier = Modifier.height(8.dp))
     val cellularMb = AppConfig.CELLULAR_DOWNLOAD_WARNING_BYTES / (1024 * 1024)
     Text(
-        text = "Cellular warning threshold: $cellularMb MB (read-only)",
+        text = stringResource(R.string.settings_cellular_threshold, cellularMb),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
@@ -120,31 +174,35 @@ private fun SettingsStorageSection(
     onEvictionThresholdChanged: (Float) -> Unit,
     onShowPurgeConfirm: () -> Unit
 ) {
-    SettingsSectionTitle("STORAGE")
+    SettingsSectionTitle(stringResource(R.string.settings_storage_section))
     Text(
-        text = "DEM cache: ${NofARFormatters.formatMegabytes(uiState.demCacheBytes)}",
+        text = stringResource(R.string.settings_dem_cache, NofARFormatters.formatMegabytes(uiState.demCacheBytes)),
         style = MaterialTheme.typography.bodyMedium,
         color = NofARColors.TextPrimary
     )
     Text(
-        text = "Entity database: ${NofARFormatters.formatMegabytes(uiState.entityDbSizeBytes)}",
+        text =
+        stringResource(
+            R.string.settings_entity_database,
+            NofARFormatters.formatMegabytes(uiState.entityDbSizeBytes)
+        ),
         style = MaterialTheme.typography.bodyMedium,
         color = NofARColors.TextPrimary
     )
     Text(
-        text = "Regions: ${uiState.regionCount}",
+        text = stringResource(R.string.settings_regions, uiState.regionCount),
         style = MaterialTheme.typography.bodyMedium,
         color = NofARColors.TextPrimary
     )
     val entityLabel = NofARFormatters.formatCount(uiState.entityRowCount)
     Text(
-        text = "Entity rows: $entityLabel",
+        text = stringResource(R.string.settings_entity_rows, entityLabel),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
     Spacer(modifier = Modifier.height(8.dp))
     Text(
-        text = "Typical 3–5 regions: ~150–500 MB",
+        text = stringResource(R.string.settings_typical_usage),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextCaption
     )
@@ -160,11 +218,11 @@ private fun SettingsStorageSection(
         enabled = !uiState.prepareDownloadActive,
         modifier = Modifier.testTag("clear_unused_tiles_button")
     ) {
-        Text("CLEAR UNUSED DEM TILES", color = NofARColors.PrimaryYellow)
+        Text(stringResource(R.string.settings_clear_unused_tiles), color = NofARColors.PrimaryYellow)
     }
     if (uiState.prepareDownloadActive) {
         Text(
-            text = "Storage actions are disabled while a download is in progress.",
+            text = stringResource(R.string.settings_storage_disabled),
             style = MaterialTheme.typography.bodySmall,
             color = NofARColors.TextCaption
         )
@@ -174,12 +232,12 @@ private fun SettingsStorageSection(
 @Composable
 private fun SettingsEvictionThreshold(thresholdMb: Float, enabled: Boolean, onThresholdChanged: (Float) -> Unit) {
     Text(
-        text = "DEM cache limit",
+        text = stringResource(R.string.settings_dem_cache_limit),
         style = MaterialTheme.typography.labelMedium,
         color = NofARColors.TextCaption
     )
     Text(
-        text = "LRU limit: ${thresholdMb.toInt()} MB",
+        text = stringResource(R.string.settings_lru_limit, thresholdMb.toInt()),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
@@ -198,7 +256,7 @@ private fun SettingsEvictionThreshold(thresholdMb: Float, enabled: Boolean, onTh
     )
     val defaultMb = AppConfig.DEM_CACHE_DEFAULT_LIMIT_BYTES / (1024 * 1024)
     Text(
-        text = "Default: $defaultMb MB",
+        text = stringResource(R.string.settings_default_limit, defaultMb),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextCaption
     )
@@ -207,37 +265,34 @@ private fun SettingsEvictionThreshold(thresholdMb: Float, enabled: Boolean, onTh
 @Composable
 internal fun SettingsLegalSection() {
     val context = LocalContext.current
-    SettingsSectionTitle("LEGAL")
+    SettingsSectionTitle(stringResource(R.string.settings_legal_section))
     SettingsLinkText(
-        text = "© OpenStreetMap contributors",
+        text = stringResource(R.string.settings_osm_attribution),
         testTag = "osm_attribution",
         onClick = { openHttpsUrl(context, OSM_COPYRIGHT_URL) }
     )
     Text(
-        text = "Copernicus DEM, ESA / Airbus",
+        text = stringResource(R.string.settings_copernicus_attribution),
         modifier = Modifier.testTag("copernicus_attribution"),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
     Spacer(modifier = Modifier.height(8.dp))
     Text(
-        text = "Map data retrieved via the public Overpass API during Prepare mode.",
+        text = stringResource(R.string.settings_overpass_note),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
     OverpassConfig.mirrorBaseUrls.forEach { mirror ->
         Text(
-            text = "• $mirror",
+            text = stringResource(R.string.settings_mirror_bullet, mirror),
             style = MaterialTheme.typography.bodySmall,
             color = NofARColors.TextCaption
         )
     }
     Spacer(modifier = Modifier.height(8.dp))
     Text(
-        text =
-        "OpenStreetMap data is available under the Open Database License (ODbL). " +
-            "You are free to copy, distribute, transmit, and adapt OSM data as long as " +
-            "you credit OpenStreetMap and its contributors.",
+        text = stringResource(R.string.settings_odbl_notice),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextCaption
     )
@@ -246,36 +301,36 @@ internal fun SettingsLegalSection() {
 @Composable
 internal fun SettingsAboutSection() {
     val context = LocalContext.current
-    SettingsSectionTitle("ABOUT")
+    SettingsSectionTitle(stringResource(R.string.settings_about_section))
     Text(
-        text = "NofAR",
+        text = stringResource(DesignSystemR.string.app_brand),
         style = MaterialTheme.typography.titleMedium,
         color = NofARColors.TextPrimary
     )
     Text(
-        text = "point, explore, discover",
+        text = stringResource(R.string.settings_tagline),
         style = MaterialTheme.typography.bodyMedium,
         color = NofARColors.TextSecondary
     )
     Text(
-        text = "Version ${AppMetadata.VERSION_NAME} (${AppMetadata.VERSION_CODE})",
+        text = stringResource(R.string.settings_version, AppMetadata.VERSION_NAME, AppMetadata.VERSION_CODE),
         modifier = Modifier.testTag("app_version"),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
     Spacer(modifier = Modifier.height(8.dp))
     SettingsLinkText(
-        text = "Source code on GitHub",
+        text = stringResource(R.string.settings_github),
         onClick = { openHttpsUrl(context, AppMetadata.GITHUB_REPOSITORY_URL) }
     )
     SettingsLinkText(
-        text = "Licensed under Apache License 2.0",
+        text = stringResource(R.string.settings_apache_license),
         testTag = "apache_license",
         onClick = { openHttpsUrl(context, APACHE_LICENSE_URL) }
     )
     Spacer(modifier = Modifier.height(8.dp))
     Text(
-        text = "No accounts, no analytics, no data leaves your device except during map downloads.",
+        text = stringResource(R.string.settings_privacy_note),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextCaption
     )
@@ -288,23 +343,23 @@ private fun SettingsDebugSection(
     onShowRawSensorChanged: (Boolean) -> Unit,
     onKeepRawGeoTiffChanged: (Boolean) -> Unit
 ) {
-    SettingsSectionTitle("DEBUG")
+    SettingsSectionTitle(stringResource(R.string.settings_debug_section))
     SettingsToggleRow(
-        title = "Use raw sensor overlay",
-        subtitle = "Project AR labels with unsmoothed compass values",
+        title = stringResource(R.string.settings_raw_sensor_title),
+        subtitle = stringResource(R.string.settings_raw_sensor_subtitle),
         checked = showRawSensorOverlay,
         onCheckedChange = onShowRawSensorChanged
     )
     Spacer(modifier = Modifier.height(8.dp))
     SettingsToggleRow(
-        title = "Keep raw GeoTIFF after conversion",
-        subtitle = "Retain source .tif files in dem/raw (uses more storage)",
+        title = stringResource(R.string.settings_keep_geotiff_title),
+        subtitle = stringResource(R.string.settings_keep_geotiff_subtitle),
         checked = keepRawGeoTiff,
         onCheckedChange = onKeepRawGeoTiffChanged
     )
     Spacer(modifier = Modifier.height(8.dp))
     Text(
-        text = "Resolution level: ${AppConfig.defaultResolutionLevel.name} (read-only)",
+        text = stringResource(R.string.settings_resolution_level, AppConfig.defaultResolutionLevel.name),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
@@ -320,7 +375,7 @@ internal fun SettingsToggleRow(
 ) {
     androidx.compose.foundation.layout.Row(
         modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(text = title, style = MaterialTheme.typography.bodyMedium, color = NofARColors.TextPrimary)

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="permission_rationale_location">NofAR זקוק למיקום מדויק כדי להציג באיזה אזור אתה נמצא וליישר תוויות אופק בזמן חקירה לא מקוונת.</string>
+    <string name="permission_rationale_camera">NofAR משתמש במצלמה כמצלמה חיה לתוויות במצב חקירה. תמונות אינן מועלות.</string>
+    <string name="permission_rationale_internet">אינטרנט נדרש רק במצב Prepare להורדת OpenStreetMap ונתוני גובה.</string>
+    <string name="location_permission_denied">נדרש גישה למיקום כדי לזהות באיזה אזור אתה נמצא וליישר תוויות אופק.</string>
+    <string name="location_permission_denied_permanent">הגישה למיקום נדחתה. פתח הגדרות כדי לאשר גישה מדויקת למיקום עבור NofAR.</string>
+    <string name="location_waiting_for_fix">ממתין לקבלת GPS…</string>
+    <string name="location_open_settings">פתח הגדרות</string>
+    <string name="location_grant_permission">אשר מיקום</string>
+    <string name="location_permission_rationale_action">הפעל מיקום לזיהוי אזור ויישור אופק.</string>
+    <string name="compass_calibration_hint">הנע את הטלפון בתבנית 8 כדי לכייל את המצפן.</string>
+    <string name="explore_camera_permission_rationale">NofAR זקוק לגישה למצלמה כדי להקרין סמני שטח מעל האופק.</string>
+    <string name="explore_grant_camera">אשר גישה למצלמה</string>
+    <string name="explore_open_settings">פתח הגדרות</string>
+    <string name="explore_waiting_for_gps">משיג נעילת לוויינים… ודא שיש לך מבט פתוח לשמיים.</string>
+    <string name="explore_compass_unavailable">מכשיר לא תואם. למכשיר זה חסרים חיישן מגנטומטר או חיישני וקטור סיבוב נדרשים.</string>
+    <string name="explore_exit_to_home">יציאה לדף הבית</string>
+    <string name="explore_region_data_missing">נתוני האזור חסרים או פגומים. חזור לדף הבית והורד מחדש את האזור.</string>
+    <string name="explore_partial_region_warning">אזור חלקי — נתוני גובה לא שלמים; דיוק הסתרה עשוי להיות מופחת.</string>
+    <string name="explore_outside_region_title">מחוץ לגבול האזור הפעיל</string>
+    <string name="explore_outside_region_message">יוצאים מאזור כיסוי הנתונים של %1$s. מצב חקירה יושעה בעוד %2$d שניות.</string>
+    <string name="explore_grace_expired_title">מצב חקירה הושעה</string>
+    <string name="explore_grace_expired_message">עברת מחוץ לגבול שהורד של %1$s.</string>
+    <string name="explore_return_to_home">חזרה למצב בית</string>
+    <string name="explore_no_visible_entities">אין ישויות מתויגות נראות בכיוון זה.</string>
+    <string name="explore_osm_watermark">© OpenStreetMap contributors</string>
+    <string name="explore_expanded_bucket_title">ישויות קרובות</string>
+    <string name="explore_dismiss">סגור</string>
+</resources>

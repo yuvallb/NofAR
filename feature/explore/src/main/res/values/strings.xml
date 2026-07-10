@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="explore_exit">Exit Explore</string>
+    <string name="explore_debug_az_smoothed">Az smoothed: %1$.1f°</string>
+    <string name="explore_debug_az_raw">Az raw: %1$.1f°</string>
+    <string name="explore_debug_fov">FOV: %1$.1f° × %2$.1f°</string>
+    <string name="explore_debug_visible">Visible: %1$d</string>
+</resources>

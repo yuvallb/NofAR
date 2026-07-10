@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="download_contacting_osm">מתקשר לשרתי OpenStreetMap…</string>
+    <string name="download_osm_data">מוריד נתוני OSM…</string>
+    <string name="download_saving_osm">שומר ישויות OpenStreetMap…</string>
+    <string name="download_saving_osm_progress">שומר ישויות OpenStreetMap (%1$d/%2$d)…</string>
+    <string name="download_dem_tile">מוריד אריח DEM %1$d/%2$d</string>
+    <string name="download_converting_tile">ממיר אריח %1$d/%2$d לבינארי מקומי…</string>
+    <string name="download_filling_elevations">ממלא גבהים…</string>
+    <string name="download_filling_elevations_progress">ממלא גבהים (%1$d/%2$d)…</string>
+    <string name="download_finalizing">מסיים…</string>
+</resources>

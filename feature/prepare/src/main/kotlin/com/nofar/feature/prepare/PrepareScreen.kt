@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -54,6 +55,7 @@ import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.ui.permission.rememberNofARPermissionState
+import com.nofar.core.ui.text.uiTextResourceNotNull
 import kotlin.math.hypot
 import kotlin.math.roundToInt
 import org.osmdroid.config.Configuration
@@ -103,9 +105,9 @@ fun PrepareScreen(
     Column(modifier = modifier.fillMaxSize()) {
         val title =
             if (isDownloading && uiState.regionName.isNotBlank()) {
-                "Downloading: ${uiState.regionName}"
+                stringResource(R.string.prepare_downloading_title, uiState.regionName)
             } else {
-                "Prepare Region"
+                stringResource(R.string.prepare_region_title)
             }
         NofARBackTopBar(
             title = title,
@@ -113,7 +115,7 @@ fun PrepareScreen(
             navigationIcon = {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                    contentDescription = "Back",
+                    contentDescription = stringResource(R.string.prepare_back),
                     tint = NofARColors.PrimaryYellow
                 )
             },
@@ -121,14 +123,14 @@ fun PrepareScreen(
                 if (isDownloading) {
                     Icon(
                         imageVector = Icons.Default.MoreVert,
-                        contentDescription = "More options",
+                        contentDescription = stringResource(R.string.prepare_more_options),
                         tint = NofARColors.TextSecondary,
                         modifier = Modifier.padding(end = 8.dp)
                     )
                 } else {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Help,
-                        contentDescription = "Help",
+                        contentDescription = stringResource(R.string.prepare_help),
                         tint = NofARColors.TextSecondary,
                         modifier = Modifier.padding(end = 8.dp)
                     )
@@ -207,7 +209,7 @@ private fun DefineRegionContent(
         ) {
             Icon(
                 imageVector = Icons.Default.MyLocation,
-                contentDescription = "Move marker to current location",
+                contentDescription = stringResource(R.string.prepare_recenter),
                 modifier = Modifier.size(24.dp)
             )
         }
@@ -222,16 +224,21 @@ private fun DefineRegionContent(
             OutlinedTextField(
                 value = uiState.regionName,
                 onValueChange = onRegionNameChanged,
-                label = { Text("Region name") },
+                label = { Text(stringResource(R.string.prepare_region_name_label)) },
                 isError = uiState.nameError != null,
-                supportingText = uiState.nameError?.let { { Text(it) } },
+                supportingText =
+                uiState.nameError?.let { error ->
+                    {
+                        Text(uiTextResourceNotNull(error))
+                    }
+                },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = outlinedFieldColors()
             )
 
             Text(
-                text = "Radius: ${uiState.radiusKm.roundToInt()} km",
+                text = stringResource(R.string.prepare_radius, uiState.radiusKm.roundToInt()),
                 style = MaterialTheme.typography.bodyMedium,
                 color = NofARColors.TextPrimary
             )
@@ -259,18 +266,22 @@ private fun DefineRegionContent(
             when (uiState.downloadUiState) {
                 PrepareDownloadUiState.ERROR -> {
                     uiState.errorMessage?.let { message ->
-                        Text(text = message, color = NofARColors.ErrorDestructive)
+                        Text(text = uiTextResourceNotNull(message), color = NofARColors.ErrorDestructive)
                     }
-                    NofARPrimaryButton(text = "RETRY", onClick = onRetry, modifier = Modifier.fillMaxWidth())
+                    NofARPrimaryButton(
+                        text = stringResource(R.string.prepare_retry),
+                        onClick = onRetry,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
                 PrepareDownloadUiState.COMPLETE -> {
                     val status = uiState.existingRegion?.downloadStatus ?: DownloadStatus.READY
                     Text(
                         text =
                         when (status) {
-                            DownloadStatus.PARTIAL -> "Download complete with partial DEM coverage."
-                            DownloadStatus.READY -> "Region is ready for Explore."
-                            else -> "Download complete."
+                            DownloadStatus.PARTIAL -> stringResource(R.string.prepare_complete_partial)
+                            DownloadStatus.READY -> stringResource(R.string.prepare_complete_ready)
+                            else -> stringResource(R.string.prepare_complete)
                         },
                         color = NofARColors.TextSecondary
                     )
@@ -278,9 +289,9 @@ private fun DefineRegionContent(
                 else -> {
                     val label =
                         if (uiState.existingRegion?.downloadStatus == DownloadStatus.PARTIAL) {
-                            "RE-DOWNLOAD DATA"
+                            stringResource(R.string.prepare_redownload)
                         } else {
-                            "DOWNLOAD DATA"
+                            stringResource(R.string.prepare_download_data)
                         }
                     NofARPrimaryButton(text = label, onClick = onDownloadClicked, modifier = Modifier.fillMaxWidth())
                 }
@@ -304,7 +315,7 @@ private fun DownloadingContent(uiState: PrepareUiState, onCancelDownload: () -> 
             modifier = Modifier.weight(1f)
         )
         NofARSecondaryOutlinedButton(
-            text = "PAUSE DOWNLOAD",
+            text = stringResource(R.string.prepare_pause_download),
             onClick = onCancelDownload,
             modifier =
             Modifier
@@ -318,15 +329,13 @@ private fun DownloadingContent(uiState: PrepareUiState, onCancelDownload: () -> 
 private fun WifiOnlyBlockedDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Wi-Fi only downloads") },
+        title = { Text(stringResource(R.string.prepare_wifi_only_title)) },
         text = {
-            Text(
-                "Wi-Fi only downloads are enabled in Settings. Connect to Wi-Fi before downloading map data."
-            )
+            Text(stringResource(R.string.prepare_wifi_only_message))
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("OK")
+                Text(stringResource(R.string.prepare_ok))
             }
         }
     )
@@ -343,28 +352,30 @@ private fun CellularWarningDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Large Download Warning") },
+        title = { Text(stringResource(R.string.prepare_large_download_title)) },
         text = {
             Column {
                 Text(
-                    "This region requires $demTileCount DEM tiles " +
-                        "(~${NofARFormatters.formatMegabytes(estimateBytes)}). " +
-                        "Download over cellular or wait for Wi-Fi?"
+                    stringResource(
+                        R.string.prepare_large_download_message,
+                        demTileCount,
+                        NofARFormatters.formatMegabytes(estimateBytes)
+                    )
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = dontShowAgain, onCheckedChange = { dontShowAgain = it })
-                    Text("Don't show again")
+                    Text(stringResource(R.string.prepare_dont_show_again))
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDownloadAnyway) {
-                Text("DOWNLOAD ANYWAY")
+                Text(stringResource(R.string.prepare_download_anyway))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("WI-FI ONLY")
+                Text(stringResource(R.string.prepare_wifi_only_action))
             }
         }
     )

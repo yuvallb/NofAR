@@ -3,10 +3,15 @@ package com.nofar.feature.prepare
 import com.nofar.core.model.AppConfig
 
 internal object PrepareDownloadPolicy {
+    enum class BlockedReason {
+        NO_NETWORK,
+        WIFI_ONLY
+    }
+
     sealed interface GateResult {
         data object Proceed : GateResult
 
-        data class Blocked(val message: String) : GateResult
+        data class Blocked(val reason: BlockedReason) : GateResult
 
         data object CellularWarning : GateResult
     }
@@ -17,14 +22,8 @@ internal object PrepareDownloadPolicy {
         onCellularNetwork: Boolean,
         estimateBytes: Long
     ): GateResult = when {
-        !networkAvailable ->
-            GateResult.Blocked(
-                "No network connection. Connect to Wi-Fi or mobile data to download."
-            )
-        wifiOnlyDownloads && onCellularNetwork ->
-            GateResult.Blocked(
-                "Wi-Fi only downloads are enabled. Connect to Wi-Fi to continue."
-            )
+        !networkAvailable -> GateResult.Blocked(BlockedReason.NO_NETWORK)
+        wifiOnlyDownloads && onCellularNetwork -> GateResult.Blocked(BlockedReason.WIFI_ONLY)
         onCellularNetwork && estimateBytes > AppConfig.CELLULAR_DOWNLOAD_WARNING_BYTES ->
             GateResult.CellularWarning
         else -> GateResult.Proceed

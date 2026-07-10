@@ -20,8 +20,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nofar.core.designsystem.R
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.DownloadStatus
@@ -84,30 +86,48 @@ private fun RegionCardMetadata(state: RegionCardState) {
     val region = state.region
     Spacer(modifier = Modifier.height(8.dp))
     val center =
-        "Center: ${NofARFormatters.formatCoordinate(region.centerLat)}, " +
+        "${NofARFormatters.formatCoordinate(region.centerLat)}, " +
             NofARFormatters.formatCoordinate(region.centerLon)
     Text(
-        text = "$center | Radius: ${NofARFormatters.formatRadiusKm(region.radiusM)}",
+        text =
+        stringResource(
+            R.string.region_card_center,
+            center,
+            NofARFormatters.formatRadiusKm(region.radiusM)
+        ),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
     val sizeText =
         if (state.demSizeBytes > 0L) {
-            "Size: OSM ${NofARFormatters.formatMegabytes(state.osmSizeBytes)} + " +
-                "DEM ${NofARFormatters.formatMegabytes(state.demSizeBytes)}"
+            stringResource(
+                R.string.region_card_size_breakdown,
+                NofARFormatters.formatMegabytes(state.osmSizeBytes),
+                NofARFormatters.formatMegabytes(state.demSizeBytes)
+            )
         } else {
-            "Size: ${NofARFormatters.formatMegabytes(region.estimatedSizeBytes)}"
+            stringResource(
+                R.string.region_card_size_estimate,
+                NofARFormatters.formatMegabytes(region.estimatedSizeBytes)
+            )
         }
     Text(
         text =
-        "Entities: ${NofARFormatters.formatCount(region.entityCount)} | $sizeText",
+        stringResource(
+            R.string.region_card_entities,
+            NofARFormatters.formatCount(region.entityCount),
+            sizeText
+        ),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
     Text(
         text =
-        "OSM: ${NofARFormatters.formatTimestamp(region.osmDatasetVersion)} | " +
-            "DEM: ${NofARFormatters.formatTimestamp(state.latestDemTimestamp)}",
+        stringResource(
+            R.string.region_card_timestamps,
+            NofARFormatters.formatTimestamp(region.osmDatasetVersion),
+            NofARFormatters.formatTimestamp(state.latestDemTimestamp)
+        ),
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
@@ -160,16 +180,20 @@ private fun RegionCardActions(
 private fun RegionCardPrimaryAction(region: Region, onPrepare: (UUID) -> Unit, modifier: Modifier = Modifier) {
     when (region.downloadStatus) {
         DownloadStatus.NOT_DOWNLOADED ->
-            NofARPrimaryButton(text = "PREPARE", onClick = { onPrepare(region.id) }, modifier = modifier)
+            NofARPrimaryButton(
+                text = stringResource(R.string.region_card_prepare),
+                onClick = { onPrepare(region.id) },
+                modifier = modifier
+            )
         DownloadStatus.DOWNLOADING ->
             NofARSecondaryOutlinedButton(
-                text = "VIEW PROGRESS",
+                text = stringResource(R.string.region_card_view_progress),
                 onClick = { onPrepare(region.id) },
                 modifier = modifier
             )
         else ->
             NofARPrimaryButton(
-                text = "UPDATE DATA",
+                text = stringResource(R.string.region_card_update_data),
                 onClick = { onPrepare(region.id) },
                 modifier = modifier
             )
@@ -192,29 +216,29 @@ fun NofARStorageSummary(
             .padding(16.dp)
     ) {
         Text(
-            text = "STORAGE",
+            text = stringResource(R.string.storage_summary_title),
             style = MaterialTheme.typography.labelMedium,
             color = NofARColors.TextCaption
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "DEM Cache: ${NofARFormatters.formatMegabytes(demCacheBytes)}",
+            text = stringResource(R.string.storage_dem_cache, NofARFormatters.formatMegabytes(demCacheBytes)),
             style = MaterialTheme.typography.bodySmall,
             color = NofARColors.TextSecondary
         )
         Text(
-            text = "Entities DB: ${NofARFormatters.formatMegabytes(entitiesDbBytes)}",
+            text = stringResource(R.string.storage_entities_db, NofARFormatters.formatMegabytes(entitiesDbBytes)),
             style = MaterialTheme.typography.bodySmall,
             color = NofARColors.TextSecondary
         )
         Text(
-            text = "Free Space: ${NofARFormatters.formatMegabytes(freeSpaceBytes)}",
+            text = stringResource(R.string.storage_free_space, NofARFormatters.formatMegabytes(freeSpaceBytes)),
             style = MaterialTheme.typography.bodySmall,
             color = NofARColors.TextSecondary
         )
         Spacer(modifier = Modifier.height(12.dp))
         NofARSecondaryOutlinedButton(
-            text = "ADVANCED STORAGE",
+            text = stringResource(R.string.storage_advanced),
             onClick = onAdvancedStorageClick,
             modifier = Modifier.fillMaxWidth()
         )

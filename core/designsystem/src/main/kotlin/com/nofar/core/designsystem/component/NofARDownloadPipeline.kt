@@ -16,8 +16,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nofar.core.designsystem.R
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.designsystem.util.NofARFormatters
 
@@ -47,7 +49,7 @@ fun NofARDownloadPipeline(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = "Downloading: $regionName",
+            text = stringResource(R.string.pipeline_downloading, regionName),
             style = MaterialTheme.typography.titleLarge,
             color = NofARColors.TextPrimary,
             fontWeight = FontWeight.Bold
@@ -59,7 +61,7 @@ fun NofARDownloadPipeline(
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = "Total progress: $overallPercent%",
+            text = stringResource(R.string.pipeline_total_progress, overallPercent),
             style = MaterialTheme.typography.bodyMedium,
             color = NofARColors.TextSecondary
         )
@@ -71,7 +73,7 @@ fun NofARDownloadPipeline(
         )
         estimatedTimeRemaining?.let { eta ->
             Text(
-                text = "Estimated time remaining: $eta",
+                text = stringResource(R.string.pipeline_eta, eta),
                 style = MaterialTheme.typography.bodySmall,
                 color = NofARColors.TextCaption
             )
@@ -83,8 +85,8 @@ fun NofARDownloadPipeline(
 private fun PipelineStepRow(step: PipelineStep) {
     val indicator =
         when (step.state) {
-            PipelineStepState.COMPLETE -> "✓"
-            PipelineStepState.ACTIVE -> "▶"
+            PipelineStepState.COMPLETE -> stringResource(R.string.pipeline_step_complete)
+            PipelineStepState.ACTIVE -> stringResource(R.string.pipeline_step_active)
             PipelineStepState.PENDING -> " "
         }
     val indicatorColor =
@@ -152,23 +154,28 @@ fun NofAREstimatePanel(
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(
-                text = "ESTIMATED SIZE",
+                text = stringResource(R.string.pipeline_estimated_size),
                 style = MaterialTheme.typography.labelMedium,
                 color = NofARColors.TextCaption
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "OSM Data: ${NofARFormatters.formatMegabytes(osmEstimateBytes)}",
+                text = stringResource(R.string.pipeline_osm_data, NofARFormatters.formatMegabytes(osmEstimateBytes)),
                 style = MaterialTheme.typography.bodySmall,
                 color = NofARColors.TextSecondary
             )
             Text(
-                text = "DEM Tiles ($demTileCount): ${NofARFormatters.formatMegabytes(demEstimateBytes)}",
+                text =
+                stringResource(
+                    R.string.pipeline_dem_tiles,
+                    demTileCount,
+                    NofARFormatters.formatMegabytes(demEstimateBytes)
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = NofARColors.TextSecondary
             )
             Text(
-                text = "Total: ${NofARFormatters.formatMegabytes(totalEstimateBytes)}",
+                text = stringResource(R.string.pipeline_total, NofARFormatters.formatMegabytes(totalEstimateBytes)),
                 style = MaterialTheme.typography.bodyMedium,
                 color = NofARColors.PrimaryYellow,
                 fontWeight = FontWeight.Bold

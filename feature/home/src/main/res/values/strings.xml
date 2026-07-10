@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_settings">Settings</string>
+    <string name="home_add_region">+ Add region</string>
+    <string name="home_local_regions">Local regions</string>
+    <string name="home_enter_explore">Enter Explore</string>
+    <string name="home_enter_explore_hint">Add a region or move inside a ready region to explore the horizon.</string>
+    <string name="home_no_regions">No regions yet. Download map data for an area to get started.</string>
+    <string name="home_add_region_button">Add region</string>
+    <string name="home_delete_region">Delete region</string>
+    <string name="home_delete_title">Delete %1$s?</string>
+    <string name="home_delete_message">This removes the region and any entities or DEM tiles not shared with other regions.</string>
+    <string name="home_delete_confirm">Delete</string>
+    <string name="home_cancel">Cancel</string>
+    <string name="home_overlap_title">Multiple regions cover this area</string>
+    <string name="home_overlap_message">Which data context would you like to use?</string>
+    <string name="home_confirm">Confirm</string>
+    <string name="home_region_deleted">%1$s deleted</string>
+</resources>

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="prepare_downloading_title">Downloading: %1$s</string>
+    <string name="prepare_region_title">Prepare region</string>
+    <string name="prepare_back">Back</string>
+    <string name="prepare_more_options">More options</string>
+    <string name="prepare_help">Help</string>
+    <string name="prepare_recenter">Move marker to current location</string>
+    <string name="prepare_region_name_label">Region name</string>
+    <string name="prepare_radius">Radius: %1$d km</string>
+    <string name="prepare_retry">Retry</string>
+    <string name="prepare_complete_partial">Download complete with partial DEM coverage.</string>
+    <string name="prepare_complete_ready">Region is ready for Explore.</string>
+    <string name="prepare_complete">Download complete.</string>
+    <string name="prepare_redownload">Re-download data</string>
+    <string name="prepare_download_data">Download data</string>
+    <string name="prepare_pause_download">Pause download</string>
+    <string name="prepare_wifi_only_title">Wi-Fi only downloads</string>
+    <string name="prepare_wifi_only_message">Wi-Fi only downloads are enabled in Settings. Connect to Wi-Fi before downloading map data.</string>
+    <string name="prepare_ok">OK</string>
+    <string name="prepare_large_download_title">Large download warning</string>
+    <string name="prepare_large_download_message">This region requires %1$d DEM tiles (~%2$s). Download over cellular or wait for Wi-Fi?</string>
+    <string name="prepare_dont_show_again">Don\'t show again</string>
+    <string name="prepare_download_anyway">Download anyway</string>
+    <string name="prepare_wifi_only_action">Wi-Fi only</string>
+    <string name="prepare_region_near">Region near %1$s, %2$s</string>
+    <string name="prepare_error_no_network">No network connection. Connect to Wi-Fi or mobile data to download.</string>
+    <string name="prepare_error_wifi_only">Wi-Fi only downloads are enabled. Connect to Wi-Fi to continue.</string>
+    <string name="prepare_error_download_failed">Download failed. You can retry to continue.</string>
+    <string name="prepare_error_name_required">Name is required</string>
+    <string name="prepare_error_name_too_long">Name must be 40 characters or fewer</string>
+    <string name="prepare_step_init">Initializing local database entries</string>
+    <string name="prepare_step_osm">Step 1: Querying OpenStreetMap features</string>
+    <string name="prepare_step_dem">Step 2: Downloading elevation tiles (%1$d/%2$d)</string>
+    <string name="prepare_step_enrich">Step 3: Enriching feature elevations</string>
+    <string name="prepare_step_enrich_detail">Sampling elevations from downloaded DEM tiles…</string>
+    <string name="prepare_step_finalize">Finalizing region</string>
+    <string name="prepare_step_finalize_detail">Finalizing…</string>
+    <string name="prepare_step_streaming">Streaming ingestion in progress…</string>
+    <string name="prepare_step_eta">~%1$s remaining</string>
+</resources>

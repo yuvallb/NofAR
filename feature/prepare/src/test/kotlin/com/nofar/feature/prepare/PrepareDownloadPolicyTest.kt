@@ -18,8 +18,8 @@ class PrepareDownloadPolicyTest {
 
         assertTrue(result is PrepareDownloadPolicy.GateResult.Blocked)
         assertEquals(
-            "Wi-Fi only downloads are enabled. Connect to Wi-Fi to continue.",
-            (result as PrepareDownloadPolicy.GateResult.Blocked).message
+            PrepareDownloadPolicy.BlockedReason.WIFI_ONLY,
+            (result as PrepareDownloadPolicy.GateResult.Blocked).reason
         )
     }
 
