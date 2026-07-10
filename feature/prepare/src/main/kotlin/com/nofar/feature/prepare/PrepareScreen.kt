@@ -77,6 +77,19 @@ fun PrepareScreen(
     val isDownloading =
         uiState.downloadUiState == PrepareDownloadUiState.DOWNLOADING ||
             uiState.downloadUiState == PrepareDownloadUiState.ESTIMATING
+    var trackDownloadForAutoNavigate by remember { mutableStateOf(false) }
+
+    LaunchedEffect(uiState.downloadUiState) {
+        if (uiState.downloadUiState == PrepareDownloadUiState.DOWNLOADING ||
+            uiState.downloadUiState == PrepareDownloadUiState.ESTIMATING
+        ) {
+            trackDownloadForAutoNavigate = true
+        } else if (trackDownloadForAutoNavigate &&
+            uiState.downloadUiState == PrepareDownloadUiState.COMPLETE
+        ) {
+            onNavigateBack()
+        }
+    }
 
     DisposableEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName

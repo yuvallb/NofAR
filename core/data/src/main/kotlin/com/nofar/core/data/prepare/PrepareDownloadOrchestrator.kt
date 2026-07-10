@@ -281,13 +281,15 @@ constructor(
                 }
             persistProgress(99)
             updateProgress(PreparePhase.POST_PROCESSING, 100, message = "Finalizing…")
-            persistProgress(100)
-            enforceDemCacheLimit()
 
-            if (demFailures > 0 || !postSuccess) {
-                regionRepository.updateDownloadStatus(regionId, DownloadStatus.PARTIAL, progressPct = 100)
-            } else {
-                regionRepository.updateDownloadStatus(regionId, DownloadStatus.READY, progressPct = 100)
+            val terminalStatus =
+                if (demFailures > 0 || !postSuccess) DownloadStatus.PARTIAL else DownloadStatus.READY
+            regionRepository.updateDownloadStatus(regionId, terminalStatus, progressPct = 100)
+
+            try {
+                enforceDemCacheLimit()
+            } catch (_: Exception) {
+                // Region is already READY/PARTIAL; cache eviction is best-effort.
             }
             Result.success(Unit)
         } catch (cancelled: CancellationException) {

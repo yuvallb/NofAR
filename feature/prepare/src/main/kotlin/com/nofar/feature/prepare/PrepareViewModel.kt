@@ -154,16 +154,22 @@ constructor(
         when (region.downloadStatus) {
             DownloadStatus.DOWNLOADING -> {
                 _uiState.update { state ->
-                    state.copy(
-                        progress =
-                        state.progress?.copy(overallPercent = region.downloadProgressPct)
-                            ?: PrepareProgress(
-                                phase = PreparePhase.OSM,
-                                overallPercent = region.downloadProgressPct
-                            ),
-                        downloadUiState = PrepareDownloadUiState.DOWNLOADING,
-                        step = PrepareStep.DOWNLOAD
-                    )
+                    if (state.downloadUiState == PrepareDownloadUiState.COMPLETE ||
+                        state.downloadUiState == PrepareDownloadUiState.ERROR
+                    ) {
+                        state
+                    } else {
+                        state.copy(
+                            progress =
+                            state.progress?.copy(overallPercent = region.downloadProgressPct)
+                                ?: PrepareProgress(
+                                    phase = PreparePhase.OSM,
+                                    overallPercent = region.downloadProgressPct
+                                ),
+                            downloadUiState = PrepareDownloadUiState.DOWNLOADING,
+                            step = PrepareStep.DOWNLOAD
+                        )
+                    }
                 }
             }
             DownloadStatus.READY, DownloadStatus.PARTIAL -> {

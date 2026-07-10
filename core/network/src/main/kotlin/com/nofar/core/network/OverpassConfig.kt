@@ -7,8 +7,8 @@ package com.nofar.core.network
 object OverpassConfig {
     val mirrorBaseUrls: List<String> =
         listOf(
+            "https://osm.hpi.de/overpass/api/interpreter",
             "https://overpass-api.de/api/interpreter",
-            "https://overpass.kumi.systems/api/interpreter",
             "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
         )
 
