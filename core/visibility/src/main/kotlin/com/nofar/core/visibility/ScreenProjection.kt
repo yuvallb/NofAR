@@ -3,6 +3,15 @@ package com.nofar.core.visibility
 import kotlin.math.abs
 
 data class CameraFieldOfView(val horizontalDeg: Float, val verticalDeg: Float, val isFallback: Boolean = false) {
+    /**
+     * Maps sensor-space horizontal/vertical FOV to the current screen axes.
+     * In landscape the camera sensor axes swap relative to screen width/height.
+     */
+    fun orientedForScreen(screenWidthPx: Float, screenHeightPx: Float): CameraFieldOfView {
+        if (screenWidthPx <= screenHeightPx) return this
+        return copy(horizontalDeg = verticalDeg, verticalDeg = horizontalDeg)
+    }
+
     companion object {
         fun fallback(): CameraFieldOfView = CameraFieldOfView(
             horizontalDeg = com.nofar.core.model.AppConfig.CAMERA_HORIZONTAL_FOV_FALLBACK_DEG,
