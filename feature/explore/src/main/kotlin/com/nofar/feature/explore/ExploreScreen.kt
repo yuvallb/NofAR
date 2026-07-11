@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ import kotlin.math.roundToInt
 @Composable
 fun ExploreScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: ExploreViewModel = hiltViewModel()
 ) {
@@ -43,10 +45,17 @@ fun ExploreScreen(
         uiState = uiState,
         permissionState = permissionState,
         onNavigateBack = onNavigateBack,
+        onNavigateToSettings = onNavigateToSettings,
         onScreenSizeChanged = viewModel::onScreenSizeChanged,
         onFieldOfViewChanged = viewModel::onCameraFieldOfViewChanged,
         onHiddenCountClick = viewModel::onHiddenCountClicked,
         onDismissExpandedBucket = viewModel::onDismissExpandedBucket,
+        onDownloadRegionConfirmed = viewModel::onDownloadRegionConfirmed,
+        onDownloadPromptDismissed = viewModel::onDownloadPromptDismissed,
+        onShowDownloadPrompt = viewModel::onShowDownloadPrompt,
+        onConfirmCellularDownload = viewModel::confirmCellularDownload,
+        onDismissCellularWarning = viewModel::dismissCellularWarning,
+        onDismissWifiOnlyBlocked = viewModel::dismissWifiOnlyBlocked,
         debugOverlay =
         if (BuildConfig.DEBUG) {
             { ExploreDebugOverlay(uiState = uiState) }
@@ -127,6 +136,20 @@ internal fun BoxScope.ExploreExitButton(onNavigateBack: () -> Unit) {
     ) {
         NofARIconActionButton(onClick = onNavigateBack) {
             Icon(Icons.Default.Close, contentDescription = "Exit Explore", tint = Color.White)
+        }
+    }
+}
+
+@Composable
+internal fun BoxScope.ExploreSettingsButton(onNavigateToSettings: () -> Unit) {
+    Box(
+        modifier =
+        Modifier
+            .align(Alignment.BottomStart)
+            .padding(start = 16.dp, bottom = 72.dp)
+    ) {
+        NofARIconActionButton(onClick = onNavigateToSettings) {
+            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White)
         }
     }
 }

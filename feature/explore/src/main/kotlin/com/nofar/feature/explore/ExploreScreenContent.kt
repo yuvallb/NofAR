@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import com.nofar.core.designsystem.component.NofARExploreBottomHud
+import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
 import com.nofar.core.ui.compass.CompassCalibrationHint
 import com.nofar.core.ui.location.LocationPermissionBanner
@@ -21,10 +22,17 @@ internal fun ExploreScreenRoot(
     uiState: ExploreUiState,
     permissionState: PermissionState,
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     onScreenSizeChanged: (Float, Float) -> Unit,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
     onHiddenCountClick: (Int) -> Unit,
     onDismissExpandedBucket: () -> Unit,
+    onDownloadRegionConfirmed: () -> Unit,
+    onDownloadPromptDismissed: () -> Unit,
+    onShowDownloadPrompt: () -> Unit,
+    onConfirmCellularDownload: () -> Unit,
+    onDismissCellularWarning: () -> Unit,
+    onDismissWifiOnlyBlocked: () -> Unit,
     modifier: Modifier = Modifier,
     debugOverlay: @Composable BoxScope.() -> Unit = {}
 ) {
@@ -42,13 +50,24 @@ internal fun ExploreScreenRoot(
             permissionState = permissionState,
             onNavigateBack = onNavigateBack,
             onFieldOfViewChanged = onFieldOfViewChanged,
-            onHiddenCountClick = onHiddenCountClick
+            onHiddenCountClick = onHiddenCountClick,
+            onDownloadRegionConfirmed = onDownloadRegionConfirmed,
+            onDownloadPromptDismissed = onDownloadPromptDismissed,
+            onShowDownloadPrompt = onShowDownloadPrompt
         )
 
         if (uiState.exploreGate == ExploreGate.READY) {
-            ExploreReadyChrome(uiState = uiState, onNavigateBack = onNavigateBack)
-        } else if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
-            ExploreExitButton(onNavigateBack = onNavigateBack)
+            ExploreReadyChrome(
+                uiState = uiState,
+                onNavigateBack = onNavigateBack,
+                onNavigateToSettings = onNavigateToSettings
+            )
+        } else {
+            ExploreTopChrome(
+                uiState = uiState,
+                onNavigateBack = onNavigateBack,
+                onNavigateToSettings = onNavigateToSettings
+            )
         }
 
         if (uiState.exploreGate == ExploreGate.GRACE_EXPIRED) {
@@ -62,11 +81,37 @@ internal fun ExploreScreenRoot(
             ExploreExpandedBucketDialog(cluster = cluster, onDismiss = onDismissExpandedBucket)
         }
 
+        if (uiState.showCellularWarning && uiState.downloadPrompt != null) {
+            ExploreCellularWarningDialog(
+                demTileCount = uiState.downloadPrompt.demTileCount,
+                estimateDisplay = NofARFormatters.formatMegabytes(uiState.downloadPrompt.estimateBytes),
+                onDownloadAnyway = onConfirmCellularDownload,
+                onDismiss = onDismissCellularWarning
+            )
+        }
+
+        if (uiState.showWifiOnlyBlocked) {
+            ExploreWifiOnlyBlockedDialog(onDismiss = onDismissWifiOnlyBlocked)
+        }
+
         if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
             ExploreOsmWatermark(modifier = Modifier.align(Alignment.BottomEnd))
         }
 
         debugOverlay()
+    }
+}
+
+@Composable
+private fun BoxScope.ExploreTopChrome(
+    uiState: ExploreUiState,
+    onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit
+) {
+    if (uiState.simpleModeEnabled) {
+        ExploreSettingsButton(onNavigateToSettings = onNavigateToSettings)
+    } else if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
+        ExploreExitButton(onNavigateBack = onNavigateBack)
     }
 }
 
@@ -77,26 +122,52 @@ private fun BoxScope.ExploreGateContent(
     permissionState: PermissionState,
     onNavigateBack: () -> Unit,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
-    onHiddenCountClick: (Int) -> Unit
+    onHiddenCountClick: (Int) -> Unit,
+    onDownloadRegionConfirmed: () -> Unit,
+    onDownloadPromptDismissed: () -> Unit,
+    onShowDownloadPrompt: () -> Unit
 ) {
     when (gate) {
-        ExploreGate.READY -> {
-            if (permissionState.cameraGranted) {
-                ExploreCameraPreview(
-                    modifier = Modifier.fillMaxSize(),
-                    onFieldOfViewChanged = onFieldOfViewChanged
-                )
-            }
-            ExploreArOverlay(uiState = uiState, onHiddenCountClick = onHiddenCountClick)
-        }
-        ExploreGate.WAITING_GPS -> {
-            ExploreWaitingForGpsOverlay()
-            LocationPermissionBanner(
-                permissionState = permissionState,
-                waitingForGpsFix = uiState.waitingForGpsFix,
-                modifier = Modifier.align(Alignment.Center)
+        ExploreGate.READY -> ExploreReadyGateContent(
+            uiState = uiState,
+            permissionState = permissionState,
+            onFieldOfViewChanged = onFieldOfViewChanged,
+            onHiddenCountClick = onHiddenCountClick
+        )
+        ExploreGate.REGION_DOWNLOAD_DISMISSED -> ExploreSimpleModeCameraGate(
+            permissionState = permissionState,
+            onFieldOfViewChanged = onFieldOfViewChanged
+        ) {
+            ExploreDownloadDismissedBanner(
+                onShowDownloadPrompt = onShowDownloadPrompt,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
             )
         }
+        ExploreGate.REGION_DOWNLOAD_NEEDED -> ExploreSimpleModeCameraGate(
+            permissionState = permissionState,
+            onFieldOfViewChanged = onFieldOfViewChanged
+        ) {
+            uiState.downloadPrompt?.let { proposal ->
+                ExploreDownloadPromptOverlay(
+                    proposalName = proposal.name,
+                    estimateDisplay = NofARFormatters.formatMegabytes(proposal.estimateBytes),
+                    demTileCount = proposal.demTileCount,
+                    errorMessage = uiState.downloadUiMessage,
+                    onDownload = onDownloadRegionConfirmed,
+                    onDismiss = onDownloadPromptDismissed
+                )
+            }
+        }
+        ExploreGate.REGION_DOWNLOADING -> ExploreSimpleModeCameraGate(
+            permissionState = permissionState,
+            onFieldOfViewChanged = onFieldOfViewChanged
+        ) {
+            ExploreDownloadProgressOverlay(progressPct = uiState.downloadProgressPct)
+        }
+        ExploreGate.WAITING_GPS -> ExploreWaitingGpsGateContent(
+            uiState = uiState,
+            permissionState = permissionState
+        )
         ExploreGate.LOCATION_DENIED -> {
             LocationPermissionBanner(
                 permissionState = permissionState,
@@ -113,7 +184,52 @@ private fun BoxScope.ExploreGateContent(
 }
 
 @Composable
-private fun BoxScope.ExploreReadyChrome(uiState: ExploreUiState, onNavigateBack: () -> Unit) {
+private fun BoxScope.ExploreReadyGateContent(
+    uiState: ExploreUiState,
+    permissionState: PermissionState,
+    onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
+    onHiddenCountClick: (Int) -> Unit
+) {
+    if (permissionState.cameraGranted) {
+        ExploreCameraPreview(
+            modifier = Modifier.fillMaxSize(),
+            onFieldOfViewChanged = onFieldOfViewChanged
+        )
+    }
+    ExploreArOverlay(uiState = uiState, onHiddenCountClick = onHiddenCountClick)
+}
+
+@Composable
+private fun BoxScope.ExploreSimpleModeCameraGate(
+    permissionState: PermissionState,
+    onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
+    overlay: @Composable BoxScope.() -> Unit
+) {
+    if (permissionState.cameraGranted) {
+        ExploreCameraPreview(
+            modifier = Modifier.fillMaxSize(),
+            onFieldOfViewChanged = onFieldOfViewChanged
+        )
+    }
+    overlay()
+}
+
+@Composable
+private fun BoxScope.ExploreWaitingGpsGateContent(uiState: ExploreUiState, permissionState: PermissionState) {
+    ExploreWaitingForGpsOverlay()
+    LocationPermissionBanner(
+        permissionState = permissionState,
+        waitingForGpsFix = uiState.waitingForGpsFix,
+        modifier = Modifier.align(Alignment.Center)
+    )
+}
+
+@Composable
+private fun BoxScope.ExploreReadyChrome(
+    uiState: ExploreUiState,
+    onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit
+) {
     ExploreCompassRibbon(uiState = uiState)
     CompassCalibrationHint(
         calibrationState = uiState.calibrationState,
@@ -141,5 +257,9 @@ private fun BoxScope.ExploreReadyChrome(uiState: ExploreUiState, onNavigateBack:
         maxRangeKm = AppConfig.REGION_RADIUS_MAX_KM.toInt(),
         modifier = Modifier.align(Alignment.BottomCenter)
     )
-    ExploreExitButton(onNavigateBack = onNavigateBack)
+    if (uiState.simpleModeEnabled) {
+        ExploreSettingsButton(onNavigateToSettings = onNavigateToSettings)
+    } else {
+        ExploreExitButton(onNavigateBack = onNavigateBack)
+    }
 }

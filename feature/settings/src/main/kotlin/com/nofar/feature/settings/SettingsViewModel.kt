@@ -28,6 +28,7 @@ data class SettingsUiState(
     val regionCount: Int = 0,
     val evictionThresholdMb: Float = AppConfig.DEM_CACHE_DEFAULT_LIMIT_BYTES / (1024f * 1024f),
     val wifiOnlyDownloads: Boolean = false,
+    val simpleModeEnabled: Boolean = false,
     val showRawSensorOverlay: Boolean = false,
     val keepRawGeoTiff: Boolean = false,
     val prepareDownloadActive: Boolean = false,
@@ -60,12 +61,14 @@ constructor(
         viewModelScope.launch {
             combine(
                 userPreferencesRepository.wifiOnlyDownloads,
+                userPreferencesRepository.simpleModeEnabled,
                 userPreferencesRepository.demCacheLimitBytes,
                 userPreferencesRepository.showRawSensorOverlay,
                 userPreferencesRepository.keepRawGeoTiff
-            ) { wifiOnly, cacheLimitBytes, showRaw, keepTif ->
+            ) { wifiOnly, simpleMode, cacheLimitBytes, showRaw, keepTif ->
                 PreferenceSnapshot(
                     wifiOnly = wifiOnly,
+                    simpleMode = simpleMode,
                     cacheLimitMb = cacheLimitBytes / (1024f * 1024f),
                     showRaw = showRaw,
                     keepTif = keepTif
@@ -74,6 +77,7 @@ constructor(
                 _uiState.update {
                     it.copy(
                         wifiOnlyDownloads = snapshot.wifiOnly,
+                        simpleModeEnabled = snapshot.simpleMode,
                         evictionThresholdMb = snapshot.cacheLimitMb,
                         showRawSensorOverlay = snapshot.showRaw,
                         keepRawGeoTiff = snapshot.keepTif
@@ -109,6 +113,13 @@ constructor(
     fun onWifiOnlyDownloadsChanged(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setWifiOnlyDownloads(enabled)
+        }
+    }
+
+    fun onSimpleModeChanged(enabled: Boolean, onRootChanged: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            userPreferencesRepository.setSimpleModeEnabled(enabled)
+            onRootChanged(enabled)
         }
     }
 
@@ -204,6 +215,7 @@ constructor(
 
     private data class PreferenceSnapshot(
         val wifiOnly: Boolean,
+        val simpleMode: Boolean,
         val cacheLimitMb: Float,
         val showRaw: Boolean,
         val keepTif: Boolean

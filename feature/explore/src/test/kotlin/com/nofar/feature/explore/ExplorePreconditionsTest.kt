@@ -13,15 +13,7 @@ import org.junit.Test
 class ExplorePreconditionsTest {
     @Test
     fun allPreconditionsMet_returnsReady() {
-        val gate =
-            ExplorePreconditions.resolveGate(
-                locationAccessState = LocationAccessState.GRANTED,
-                waitingForGpsFix = false,
-                cameraGranted = true,
-                calibrationState = CompassCalibrationState.OK,
-                activeRegion = sampleRegion(DownloadStatus.READY),
-                graceExpired = false
-            )
+        val gate = resolve(sampleRegion(DownloadStatus.READY))
         assertThat(gate).isEqualTo(ExploreGate.READY)
     }
 
@@ -34,13 +26,17 @@ class ExplorePreconditionsTest {
                 cameraGranted = false,
                 calibrationState = CompassCalibrationState.OK,
                 activeRegion = sampleRegion(DownloadStatus.READY),
-                graceExpired = false
+                graceExpired = false,
+                simpleModeEnabled = false,
+                regionDownloadNeeded = false,
+                regionDownloading = false,
+                downloadPromptDismissed = false
             )
         assertThat(gate).isEqualTo(ExploreGate.CAMERA_DENIED)
     }
 
     @Test
-    fun graceExpired_takesPriority() {
+    fun graceExpiredInAdvancedMode_takesPriority() {
         val gate =
             ExplorePreconditions.resolveGate(
                 locationAccessState = LocationAccessState.GRANTED,
@@ -48,22 +44,54 @@ class ExplorePreconditionsTest {
                 cameraGranted = true,
                 calibrationState = CompassCalibrationState.OK,
                 activeRegion = sampleRegion(DownloadStatus.READY),
-                graceExpired = true
+                graceExpired = true,
+                simpleModeEnabled = false,
+                regionDownloadNeeded = false,
+                regionDownloading = false,
+                downloadPromptDismissed = false
             )
         assertThat(gate).isEqualTo(ExploreGate.GRACE_EXPIRED)
     }
 
     @Test
-    fun partialRegionStillAllowsReady() {
+    fun simpleModeDownloadNeeded_returnsDownloadNeededGate() {
         val gate =
             ExplorePreconditions.resolveGate(
                 locationAccessState = LocationAccessState.GRANTED,
                 waitingForGpsFix = false,
                 cameraGranted = true,
                 calibrationState = CompassCalibrationState.OK,
-                activeRegion = sampleRegion(DownloadStatus.PARTIAL),
-                graceExpired = false
+                activeRegion = null,
+                graceExpired = false,
+                simpleModeEnabled = true,
+                regionDownloadNeeded = true,
+                regionDownloading = false,
+                downloadPromptDismissed = false
             )
+        assertThat(gate).isEqualTo(ExploreGate.REGION_DOWNLOAD_NEEDED)
+    }
+
+    @Test
+    fun simpleModeDismissedPrompt_returnsDismissedGate() {
+        val gate =
+            ExplorePreconditions.resolveGate(
+                locationAccessState = LocationAccessState.GRANTED,
+                waitingForGpsFix = false,
+                cameraGranted = true,
+                calibrationState = CompassCalibrationState.OK,
+                activeRegion = null,
+                graceExpired = false,
+                simpleModeEnabled = true,
+                regionDownloadNeeded = true,
+                regionDownloading = false,
+                downloadPromptDismissed = true
+            )
+        assertThat(gate).isEqualTo(ExploreGate.REGION_DOWNLOAD_DISMISSED)
+    }
+
+    @Test
+    fun partialRegionStillAllowsReady() {
+        val gate = resolve(sampleRegion(DownloadStatus.PARTIAL))
         assertThat(gate).isEqualTo(ExploreGate.READY)
     }
 
@@ -79,6 +107,19 @@ class ExplorePreconditionsTest {
         assertThat(fov.horizontalDeg).isGreaterThan(AppConfig.CAMERA_HORIZONTAL_FOV_FALLBACK_DEG / 2f)
         assertThat(fov.verticalDeg).isGreaterThan(AppConfig.CAMERA_VERTICAL_FOV_FALLBACK_DEG / 2f)
     }
+
+    private fun resolve(activeRegion: Region?): ExploreGate = ExplorePreconditions.resolveGate(
+        locationAccessState = LocationAccessState.GRANTED,
+        waitingForGpsFix = false,
+        cameraGranted = true,
+        calibrationState = CompassCalibrationState.OK,
+        activeRegion = activeRegion,
+        graceExpired = false,
+        simpleModeEnabled = false,
+        regionDownloadNeeded = false,
+        regionDownloading = false,
+        downloadPromptDismissed = false
+    )
 
     private fun sampleRegion(status: DownloadStatus): Region = Region(
         id = UUID.randomUUID(),

@@ -38,6 +38,8 @@ class InsideRegionUseCaseTest {
             ) = Unit
 
             override suspend fun hasActiveDownload(): Boolean = false
+
+            override suspend fun findDownloadingRegion(): Region? = null
         }
 
     private val useCase = InsideRegionUseCase(repository)

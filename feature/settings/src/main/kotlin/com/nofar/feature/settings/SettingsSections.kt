@@ -23,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
 import com.nofar.core.designsystem.theme.NofARColors
@@ -38,6 +39,7 @@ internal const val APACHE_LICENSE_URL = "https://www.apache.org/licenses/LICENSE
 internal fun SettingsContent(
     uiState: SettingsUiState,
     onWifiOnlyChanged: (Boolean) -> Unit,
+    onSimpleModeChanged: (Boolean) -> Unit,
     onEvictionThresholdChanged: (Float) -> Unit,
     onShowPurgeConfirm: () -> Unit,
     onShowRawSensorChanged: (Boolean) -> Unit,
@@ -52,7 +54,9 @@ internal fun SettingsContent(
             .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         SettingsGeneralSection(
+            simpleModeEnabled = uiState.simpleModeEnabled,
             wifiOnlyDownloads = uiState.wifiOnlyDownloads,
+            onSimpleModeChanged = onSimpleModeChanged,
             onWifiOnlyChanged = onWifiOnlyChanged
         )
         SettingsSectionDivider()
@@ -96,11 +100,24 @@ internal fun SettingsSectionTitle(title: String) {
 }
 
 @Composable
-private fun SettingsGeneralSection(wifiOnlyDownloads: Boolean, onWifiOnlyChanged: (Boolean) -> Unit) {
+private fun SettingsGeneralSection(
+    simpleModeEnabled: Boolean,
+    wifiOnlyDownloads: Boolean,
+    onSimpleModeChanged: (Boolean) -> Unit,
+    onWifiOnlyChanged: (Boolean) -> Unit
+) {
     SettingsSectionTitle("GENERAL")
     SettingsToggleRow(
+        title = stringResource(com.nofar.core.ui.R.string.settings_simple_mode_title),
+        subtitle = stringResource(com.nofar.core.ui.R.string.settings_simple_mode_subtitle),
+        checked = simpleModeEnabled,
+        onCheckedChange = onSimpleModeChanged,
+        testTag = "simple_mode_toggle"
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    SettingsToggleRow(
         title = "Wi-Fi only downloads",
-        subtitle = "Block Prepare downloads on cellular data",
+        subtitle = stringResource(com.nofar.core.ui.R.string.settings_wifi_only_subtitle),
         checked = wifiOnlyDownloads,
         onCheckedChange = onWifiOnlyChanged,
         testTag = "wifi_only_toggle"

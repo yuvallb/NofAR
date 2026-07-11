@@ -8,6 +8,9 @@ object RegionNamePolicy {
     private val AUTO_NAME_REGEX = Regex("""Region near -?\d+\.\d+, -?\d+\.\d+""")
 
     fun isUserProvidedName(name: String): Boolean = name.isNotBlank() && !AUTO_NAME_REGEX.matches(name.trim())
+
+    fun formatAutoName(centerLat: Double, centerLon: Double): String =
+        "Region near ${"%.2f".format(centerLat)}, ${"%.2f".format(centerLon)}"
 }
 
 object RegionNameResolver {

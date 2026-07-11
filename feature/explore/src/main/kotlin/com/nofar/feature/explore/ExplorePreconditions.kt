@@ -13,6 +13,9 @@ enum class ExploreGate {
     COMPASS_UNAVAILABLE,
     REGION_MISSING,
     REGION_OUTSIDE,
+    REGION_DOWNLOAD_NEEDED,
+    REGION_DOWNLOADING,
+    REGION_DOWNLOAD_DISMISSED,
     GRACE_EXPIRED
 }
 
@@ -23,20 +26,62 @@ object ExplorePreconditions {
         cameraGranted: Boolean,
         calibrationState: CompassCalibrationState,
         activeRegion: Region?,
-        graceExpired: Boolean
-    ): ExploreGate = when {
-        graceExpired -> ExploreGate.GRACE_EXPIRED
+        graceExpired: Boolean,
+        simpleModeEnabled: Boolean,
+        regionDownloadNeeded: Boolean,
+        regionDownloading: Boolean,
+        downloadPromptDismissed: Boolean
+    ): ExploreGate {
+        val permissionGate =
+            resolvePermissionGate(
+                locationAccessState,
+                waitingForGpsFix,
+                cameraGranted,
+                calibrationState
+            )
+        return when {
+            graceExpired && !simpleModeEnabled -> ExploreGate.GRACE_EXPIRED
+            permissionGate != null -> permissionGate
+            simpleModeEnabled ->
+                resolveSimpleModeGate(regionDownloadNeeded, regionDownloading, downloadPromptDismissed)
+            else -> resolveAdvancedRegionGate(activeRegion)
+        }
+    }
+
+    private fun resolvePermissionGate(
+        locationAccessState: LocationAccessState,
+        waitingForGpsFix: Boolean,
+        cameraGranted: Boolean,
+        calibrationState: CompassCalibrationState
+    ): ExploreGate? = when {
         locationAccessState == LocationAccessState.DENIED ||
             locationAccessState == LocationAccessState.DENIED_PERMANENTLY -> ExploreGate.LOCATION_DENIED
         locationAccessState == LocationAccessState.NOT_REQUESTED ||
             waitingForGpsFix -> ExploreGate.WAITING_GPS
         !cameraGranted -> ExploreGate.CAMERA_DENIED
         calibrationState == CompassCalibrationState.UNAVAILABLE -> ExploreGate.COMPASS_UNAVAILABLE
-        activeRegion == null ||
-            (
-                activeRegion.downloadStatus != DownloadStatus.READY &&
-                    activeRegion.downloadStatus != DownloadStatus.PARTIAL
-                ) -> ExploreGate.REGION_MISSING
+        else -> null
+    }
+
+    private fun resolveSimpleModeGate(
+        regionDownloadNeeded: Boolean,
+        regionDownloading: Boolean,
+        downloadPromptDismissed: Boolean
+    ): ExploreGate = when {
+        regionDownloading -> ExploreGate.REGION_DOWNLOADING
+        regionDownloadNeeded && !downloadPromptDismissed -> ExploreGate.REGION_DOWNLOAD_NEEDED
+        regionDownloadNeeded && downloadPromptDismissed -> ExploreGate.REGION_DOWNLOAD_DISMISSED
         else -> ExploreGate.READY
+    }
+
+    private fun resolveAdvancedRegionGate(activeRegion: Region?): ExploreGate = if (activeRegion == null ||
+        (
+            activeRegion.downloadStatus != DownloadStatus.READY &&
+                activeRegion.downloadStatus != DownloadStatus.PARTIAL
+            )
+    ) {
+        ExploreGate.REGION_MISSING
+    } else {
+        ExploreGate.READY
     }
 }

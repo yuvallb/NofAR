@@ -27,6 +27,10 @@ interface UserPreferencesRepository {
 
     val keepRawGeoTiff: Flow<Boolean>
 
+    val simpleModeEnabled: Flow<Boolean>
+
+    val simpleModeDefaultsApplied: Flow<Boolean>
+
     suspend fun setWifiOnlyDownloads(enabled: Boolean)
 
     suspend fun setDemCacheLimitBytes(bytes: Long)
@@ -34,6 +38,10 @@ interface UserPreferencesRepository {
     suspend fun setShowRawSensorOverlay(enabled: Boolean)
 
     suspend fun setKeepRawGeoTiff(enabled: Boolean)
+
+    suspend fun setSimpleModeEnabled(enabled: Boolean)
+
+    suspend fun markSimpleModeDefaultsApplied()
 }
 
 @Singleton
@@ -63,6 +71,16 @@ constructor(@ApplicationContext context: Context) :
             prefs[KEEP_RAW_GEOTIFF_KEY] ?: false
         }
 
+    override val simpleModeEnabled: Flow<Boolean> =
+        dataStore.data.map { prefs ->
+            prefs[SIMPLE_MODE_ENABLED_KEY] ?: false
+        }
+
+    override val simpleModeDefaultsApplied: Flow<Boolean> =
+        dataStore.data.map { prefs ->
+            prefs[SIMPLE_MODE_DEFAULTS_APPLIED_KEY] ?: false
+        }
+
     override suspend fun setWifiOnlyDownloads(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[WIFI_ONLY_KEY] = enabled
@@ -87,10 +105,24 @@ constructor(@ApplicationContext context: Context) :
         }
     }
 
+    override suspend fun setSimpleModeEnabled(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[SIMPLE_MODE_ENABLED_KEY] = enabled
+        }
+    }
+
+    override suspend fun markSimpleModeDefaultsApplied() {
+        dataStore.edit { prefs ->
+            prefs[SIMPLE_MODE_DEFAULTS_APPLIED_KEY] = true
+        }
+    }
+
     companion object {
         private val WIFI_ONLY_KEY = booleanPreferencesKey("wifi_only_downloads")
         private val DEM_CACHE_LIMIT_KEY = longPreferencesKey("dem_cache_limit_bytes")
         private val SHOW_RAW_SENSOR_KEY = booleanPreferencesKey("show_raw_sensor_overlay")
         private val KEEP_RAW_GEOTIFF_KEY = booleanPreferencesKey("keep_raw_geotiff")
+        private val SIMPLE_MODE_ENABLED_KEY = booleanPreferencesKey("simple_mode_enabled")
+        private val SIMPLE_MODE_DEFAULTS_APPLIED_KEY = booleanPreferencesKey("simple_mode_defaults_applied")
     }
 }
