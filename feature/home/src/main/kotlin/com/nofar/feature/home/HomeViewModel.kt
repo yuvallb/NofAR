@@ -9,6 +9,7 @@ import com.nofar.core.data.repository.HomeRegionMetadataRepository
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.repository.StorageRepository
 import com.nofar.core.data.usecase.InsideRegionUseCase
+import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
 import com.nofar.core.data.usecase.RegionDeletionUseCase
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
@@ -57,6 +58,7 @@ constructor(
     private val regionDeletionUseCase: RegionDeletionUseCase,
     private val insideRegionUseCase: InsideRegionUseCase,
     private val metadataRepository: HomeRegionMetadataRepository,
+    private val regionCoverageRepairUseCase: RegionCoverageRepairUseCase,
     private val locationRepository: LocationRepository,
     private val locationController: LocationController,
     private val declinationCorrector: DeclinationCorrector
@@ -80,6 +82,7 @@ constructor(
                 currentLocation
             ) { regions, location -> regions to location }
                 .mapLatest { (regions, location) ->
+                    regions.forEach { region -> regionCoverageRepairUseCase.repairIfNeeded(region) }
                     val insideExplore = HomeRegionLogic.exploreEligibleInside(regions, location)
                     insideExploreRegions.value = insideExplore
                     val cards =

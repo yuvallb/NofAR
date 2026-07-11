@@ -8,6 +8,7 @@ import com.nofar.core.database.dao.GeoEntityDao
 import com.nofar.core.database.dao.GeoEntityUpserter
 import com.nofar.core.database.dao.RegionDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
+import com.nofar.core.database.dao.TileCoverageDao
 
 object TestDatabase {
     fun inMemory(context: Context = ApplicationProvider.getApplicationContext()): NofARDatabase =

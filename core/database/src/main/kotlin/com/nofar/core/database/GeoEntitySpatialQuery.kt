@@ -20,18 +20,43 @@ class GeoEntitySpatialQuery(
         lon: Double,
         radiusM: Double,
         resolutionLevel: ResolutionLevel
-    ): List<GeoEntityEntity> = queryWithinRadiusInternal(null, lat, lon, radiusM, resolutionLevel)
+    ): List<GeoEntityEntity> = queryWithinRadiusInternal(
+        regionId = null,
+        regionCenterLat = null,
+        regionCenterLon = null,
+        regionRadiusM = null,
+        lat = lat,
+        lon = lon,
+        radiusM = radiusM,
+        resolutionLevel = resolutionLevel
+    )
 
     suspend fun queryWithinRadiusForRegion(
         regionId: String,
+        regionCenterLat: Double,
+        regionCenterLon: Double,
+        regionRadiusM: Double,
         lat: Double,
         lon: Double,
         radiusM: Double,
         resolutionLevel: ResolutionLevel
-    ): List<GeoEntityEntity> = queryWithinRadiusInternal(regionId, lat, lon, radiusM, resolutionLevel)
+    ): List<GeoEntityEntity> =
+        queryWithinRadiusInternal(
+            regionId = regionId,
+            regionCenterLat = regionCenterLat,
+            regionCenterLon = regionCenterLon,
+            regionRadiusM = regionRadiusM,
+            lat = lat,
+            lon = lon,
+            radiusM = radiusM,
+            resolutionLevel = resolutionLevel
+        )
 
     private suspend fun queryWithinRadiusInternal(
         regionId: String?,
+        regionCenterLat: Double?,
+        regionCenterLon: Double?,
+        regionRadiusM: Double?,
         lat: Double,
         lon: Double,
         radiusM: Double,
@@ -39,6 +64,23 @@ class GeoEntitySpatialQuery(
     ): List<GeoEntityEntity> {
         val regionEntityIds = regionId?.let { regionEntityCoverageDao.getEntityIdsForRegion(it).toSet() }
         if (regionId != null && regionEntityIds.isNullOrEmpty()) {
+            val centerLat = regionCenterLat
+            val centerLon = regionCenterLon
+            val radius = regionRadiusM
+            if (centerLat != null && centerLon != null && radius != null) {
+                return queryWithinRadiusInternal(
+                    regionId = null,
+                    regionCenterLat = null,
+                    regionCenterLon = null,
+                    regionRadiusM = null,
+                    lat = lat,
+                    lon = lon,
+                    radiusM = radiusM,
+                    resolutionLevel = resolutionLevel
+                ).filter { entity ->
+                    RegionBounds.haversineDistanceM(centerLat, centerLon, entity.lat, entity.lon) <= radius
+                }
+            }
             return emptyList()
         }
 

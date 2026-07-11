@@ -80,6 +80,9 @@ constructor(
         val entities =
             geoEntityRepository.queryWithinRadiusForRegion(
                 regionId = region.id,
+                regionCenterLat = region.centerLat,
+                regionCenterLon = region.centerLon,
+                regionRadiusM = region.radiusM,
                 lat = location.latitude,
                 lon = location.longitude,
                 radiusM = region.radiusM,

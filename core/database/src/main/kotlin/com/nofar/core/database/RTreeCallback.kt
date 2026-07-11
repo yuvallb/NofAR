@@ -10,10 +10,20 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 class RTreeCallback : RoomDatabase.Callback() {
     override fun onCreate(db: SupportSQLiteDatabase) {
         super.onCreate(db)
-        createRTree(db)
+        ensureRTree(db)
+    }
+
+    override fun onOpen(db: SupportSQLiteDatabase) {
+        super.onOpen(db)
+        ensureRTree(db)
     }
 
     internal companion object {
+        fun ensureRTree(db: SupportSQLiteDatabase) {
+            createRTree(db)
+            backfillMissingEntries(db)
+        }
+
         fun createRTree(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
@@ -49,6 +59,17 @@ class RTreeCallback : RoomDatabase.Callback() {
                 CREATE TRIGGER IF NOT EXISTS geo_entity_ad AFTER DELETE ON geo_entity BEGIN
                     DELETE FROM geo_entity_rtree WHERE row_id = OLD.row_id;
                 END
+                """.trimIndent()
+            )
+        }
+
+        private fun backfillMissingEntries(db: SupportSQLiteDatabase) {
+            db.execSQL(
+                """
+                INSERT INTO geo_entity_rtree(row_id, min_lat, max_lat, min_lon, max_lon)
+                SELECT g.row_id, g.lat, g.lat, g.lon, g.lon
+                FROM geo_entity AS g
+                WHERE g.row_id NOT IN (SELECT row_id FROM geo_entity_rtree)
                 """.trimIndent()
             )
         }

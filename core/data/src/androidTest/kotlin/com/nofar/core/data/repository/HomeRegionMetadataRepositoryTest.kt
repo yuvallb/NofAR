@@ -89,4 +89,48 @@ class HomeRegionMetadataRepositoryTest {
         assertThat(metadata.latestDemTimestamp).isEqualTo(newer)
         assertThat(metadata.liveEntityCount).isEqualTo(0)
     }
+
+    @Test
+    fun getMetadata_withoutTileCoverage_fallsBackToIntersectingDemTiles() = runTest {
+        val regionId = UUID.randomUUID()
+        val timestamp = Instant.parse("2025-06-01T00:00:00Z")
+        database.demTileDao().upsert(
+            DemTileEntity(
+                tileId = "Copernicus_DSM_COG_10_N32_00_E035_00_DEM",
+                filePath = "/tmp/tile-a",
+                width = 4,
+                height = 4,
+                tileLat = 32,
+                tileLon = 35,
+                noDataValue = -9999f,
+                sizeBytes = 180,
+                refCount = 1,
+                lastAccessedAt = timestamp.toEpochMilli()
+            )
+        )
+        val region =
+            com.nofar.core.model.Region(
+                id = regionId,
+                name = "Fallback",
+                centerLat = 32.5,
+                centerLon = 35.5,
+                radiusM = 10_000.0,
+                minLat = 32.4,
+                maxLat = 32.6,
+                minLon = 35.4,
+                maxLon = 35.6,
+                createdAt = timestamp,
+                updatedAt = timestamp,
+                downloadStatus = com.nofar.core.model.DownloadStatus.READY,
+                downloadProgressPct = 100,
+                osmDatasetVersion = timestamp,
+                estimatedSizeBytes = 0,
+                entityCount = 0
+            )
+
+        val metadata = repository.getMetadata(regionId, region)
+
+        assertThat(metadata.demSizeBytes).isEqualTo(180L)
+        assertThat(metadata.latestDemTimestamp).isEqualTo(timestamp)
+    }
 }

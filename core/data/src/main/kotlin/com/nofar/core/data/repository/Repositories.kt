@@ -50,6 +50,9 @@ interface GeoEntityRepository {
 
     suspend fun queryWithinRadiusForRegion(
         regionId: UUID,
+        regionCenterLat: Double,
+        regionCenterLon: Double,
+        regionRadiusM: Double,
         lat: Double,
         lon: Double,
         radiusM: Double,

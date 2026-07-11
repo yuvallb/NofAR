@@ -5,6 +5,7 @@ import com.google.common.truth.Truth.assertThat
 import com.nofar.core.database.model.GeoEntityEntity
 import com.nofar.core.database.model.RegionEntity
 import com.nofar.core.database.model.RegionEntityCoverageEntity
+import com.nofar.core.database.model.DemTileEntity
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.GeoEntityType
 import com.nofar.core.model.ResolutionLevel
@@ -123,6 +124,56 @@ class GeoEntityDaoTest {
             )
         assertThat(results).isNotEmpty()
         assertThat(results.all { it.type == GeoEntityType.CITY.name }).isTrue()
+    }
+
+    @Test
+    fun rTreeBackfill_restoresMissingSpatialIndexRows() = runTest {
+        fixtures.geoEntityUpserter.upsert(
+            sampleEntity(
+                id = "node/backfill",
+                lat = 32.01,
+                lon = 35.01,
+                type = GeoEntityType.TOWN.name
+            )
+        )
+        fixtures.database.openHelper.writableDatabase.execSQL("DELETE FROM geo_entity_rtree")
+        RTreeCallback.ensureRTree(fixtures.database.openHelper.writableDatabase)
+
+        val results =
+            fixtures.spatialQuery.queryWithinRadius(
+                lat = 32.01,
+                lon = 35.01,
+                radiusM = 2_000.0,
+                resolutionLevel = ResolutionLevel.Medium
+            )
+
+        assertThat(results.map { it.id }).contains("node/backfill")
+    }
+
+    @Test
+    fun regionQuery_withoutCoverage_fallsBackToEntitiesInRegionBounds() = runTest {
+        fixtures.geoEntityUpserter.upsert(
+            sampleEntity(
+                id = "node/fallback",
+                lat = 32.02,
+                lon = 35.02,
+                type = GeoEntityType.VILLAGE.name
+            )
+        )
+        val regionId = UUID.randomUUID().toString()
+        val results =
+            fixtures.spatialQuery.queryWithinRadiusForRegion(
+                regionId = regionId,
+                regionCenterLat = 32.0,
+                regionCenterLon = 35.0,
+                regionRadiusM = 10_000.0,
+                lat = 32.0,
+                lon = 35.0,
+                radiusM = 10_000.0,
+                resolutionLevel = ResolutionLevel.Medium
+            )
+
+        assertThat(results.map { it.id }).contains("node/fallback")
     }
 
     @Test
