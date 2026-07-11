@@ -2,10 +2,10 @@ package com.nofar.core.database
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.nofar.core.database.model.DemTileEntity
 import com.nofar.core.database.model.GeoEntityEntity
 import com.nofar.core.database.model.RegionEntity
 import com.nofar.core.database.model.RegionEntityCoverageEntity
-import com.nofar.core.database.model.DemTileEntity
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.GeoEntityType
 import com.nofar.core.model.ResolutionLevel
@@ -137,7 +137,7 @@ class GeoEntityDaoTest {
             )
         )
         fixtures.database.openHelper.writableDatabase.execSQL("DELETE FROM geo_entity_rtree")
-        RTreeCallback.ensureRTree(fixtures.database.openHelper.writableDatabase)
+        RTreeCallback.backfillMissingEntriesSafely(fixtures.database.openHelper.writableDatabase)
 
         val results =
             fixtures.spatialQuery.queryWithinRadius(

@@ -10,20 +10,16 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 class RTreeCallback : RoomDatabase.Callback() {
     override fun onCreate(db: SupportSQLiteDatabase) {
         super.onCreate(db)
-        ensureRTree(db)
+        createRTree(db)
+        backfillMissingEntriesSafely(db)
     }
 
     override fun onOpen(db: SupportSQLiteDatabase) {
         super.onOpen(db)
-        ensureRTree(db)
+        createRTree(db)
     }
 
     internal companion object {
-        fun ensureRTree(db: SupportSQLiteDatabase) {
-            createRTree(db)
-            backfillMissingEntries(db)
-        }
-
         fun createRTree(db: SupportSQLiteDatabase) {
             db.execSQL(
                 """
@@ -63,15 +59,20 @@ class RTreeCallback : RoomDatabase.Callback() {
             )
         }
 
-        private fun backfillMissingEntries(db: SupportSQLiteDatabase) {
-            db.execSQL(
-                """
-                INSERT INTO geo_entity_rtree(row_id, min_lat, max_lat, min_lon, max_lon)
-                SELECT g.row_id, g.lat, g.lat, g.lon, g.lon
-                FROM geo_entity AS g
-                WHERE g.row_id NOT IN (SELECT row_id FROM geo_entity_rtree)
-                """.trimIndent()
-            )
+        fun backfillMissingEntriesSafely(db: SupportSQLiteDatabase) {
+            try {
+                db.execSQL(
+                    """
+                    INSERT INTO geo_entity_rtree(row_id, min_lat, max_lat, min_lon, max_lon)
+                    SELECT g.row_id, g.lat, g.lat, g.lon, g.lon
+                    FROM geo_entity AS g
+                    LEFT JOIN geo_entity_rtree AS r ON g.row_id = r.row_id
+                    WHERE r.row_id IS NULL
+                    """.trimIndent()
+                )
+            } catch (_: Exception) {
+                // Best-effort repair; spatial queries may return incomplete results until backfill succeeds.
+            }
         }
     }
 }

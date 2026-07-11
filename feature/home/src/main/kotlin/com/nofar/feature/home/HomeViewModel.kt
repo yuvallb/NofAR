@@ -21,10 +21,12 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.flow.update
@@ -81,8 +83,11 @@ constructor(
                 regionRepository.observeAllRegions(),
                 currentLocation
             ) { regions, location -> regions to location }
+                .flowOn(Dispatchers.IO)
                 .mapLatest { (regions, location) ->
-                    regions.forEach { region -> regionCoverageRepairUseCase.repairIfNeeded(region) }
+                    regions.forEach { region ->
+                        runCatching { regionCoverageRepairUseCase.repairIfNeeded(region) }
+                    }
                     val insideExplore = HomeRegionLogic.exploreEligibleInside(regions, location)
                     insideExploreRegions.value = insideExplore
                     val cards =
@@ -157,7 +162,7 @@ constructor(
     }
 
     private fun refreshStorageStats() {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val stats = storageRepository.getStorageStats()
             _uiState.update {
                 it.copy(

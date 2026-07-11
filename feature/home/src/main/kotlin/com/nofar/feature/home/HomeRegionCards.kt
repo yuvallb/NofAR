@@ -30,7 +30,7 @@ internal suspend fun buildHomeRegionCards(
             metadata.latestDemTimestamp
                 ?: if (
                     region.downloadStatus == DownloadStatus.READY ||
-                        region.downloadStatus == DownloadStatus.PARTIAL
+                    region.downloadStatus == DownloadStatus.PARTIAL
                 ) {
                     region.updatedAt
                 } else {

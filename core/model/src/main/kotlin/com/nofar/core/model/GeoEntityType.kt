@@ -16,5 +16,8 @@ enum class GeoEntityType {
 
     companion object {
         fun fromTag(tag: String): GeoEntityType? = entries.find { it.name.equals(tag, ignoreCase = true) }
+
+        fun fromStoredName(name: String): GeoEntityType? =
+            runCatching { valueOf(name) }.getOrNull()
     }
 }

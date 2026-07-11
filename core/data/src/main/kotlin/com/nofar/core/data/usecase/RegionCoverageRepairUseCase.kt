@@ -2,6 +2,7 @@ package com.nofar.core.data.usecase
 
 import com.nofar.core.data.repository.DemTileRepository
 import com.nofar.core.database.GeoEntitySpatialQuery
+import com.nofar.core.database.RTreeMaintenance
 import com.nofar.core.database.dao.CoverageLinker
 import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
@@ -20,6 +21,7 @@ import javax.inject.Inject
 class RegionCoverageRepairUseCase
 @Inject
 constructor(
+    private val rTreeMaintenance: RTreeMaintenance,
     private val regionEntityCoverageDao: RegionEntityCoverageDao,
     private val tileCoverageDao: TileCoverageDao,
     private val demTileDao: DemTileDao,
@@ -28,6 +30,7 @@ constructor(
     private val spatialQuery: GeoEntitySpatialQuery
 ) {
     suspend fun repairIfNeeded(region: Region) {
+        rTreeMaintenance.backfillMissingEntriesIfNeeded()
         if (region.downloadStatus != DownloadStatus.READY && region.downloadStatus != DownloadStatus.PARTIAL) {
             return
         }

@@ -31,7 +31,7 @@ constructor(
     override fun openReader(tileId: String): DemTileReader? {
         val file = demFile(tileId)
         if (!file.exists()) return null
-        return DemTileReader.open(file)
+        return runCatching { DemTileReader.open(file) }.getOrNull()
     }
 
     override suspend fun incrementRefCount(tileId: String) {

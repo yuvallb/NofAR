@@ -40,17 +40,16 @@ class GeoEntitySpatialQuery(
         lon: Double,
         radiusM: Double,
         resolutionLevel: ResolutionLevel
-    ): List<GeoEntityEntity> =
-        queryWithinRadiusInternal(
-            regionId = regionId,
-            regionCenterLat = regionCenterLat,
-            regionCenterLon = regionCenterLon,
-            regionRadiusM = regionRadiusM,
-            lat = lat,
-            lon = lon,
-            radiusM = radiusM,
-            resolutionLevel = resolutionLevel
-        )
+    ): List<GeoEntityEntity> = queryWithinRadiusInternal(
+        regionId = regionId,
+        regionCenterLat = regionCenterLat,
+        regionCenterLon = regionCenterLon,
+        regionRadiusM = regionRadiusM,
+        lat = lat,
+        lon = lon,
+        radiusM = radiusM,
+        resolutionLevel = resolutionLevel
+    )
 
     private suspend fun queryWithinRadiusInternal(
         regionId: String?,
@@ -64,24 +63,15 @@ class GeoEntitySpatialQuery(
     ): List<GeoEntityEntity> {
         val regionEntityIds = regionId?.let { regionEntityCoverageDao.getEntityIdsForRegion(it).toSet() }
         if (regionId != null && regionEntityIds.isNullOrEmpty()) {
-            val centerLat = regionCenterLat
-            val centerLon = regionCenterLon
-            val radius = regionRadiusM
-            if (centerLat != null && centerLon != null && radius != null) {
-                return queryWithinRadiusInternal(
-                    regionId = null,
-                    regionCenterLat = null,
-                    regionCenterLon = null,
-                    regionRadiusM = null,
-                    lat = lat,
-                    lon = lon,
-                    radiusM = radiusM,
-                    resolutionLevel = resolutionLevel
-                ).filter { entity ->
-                    RegionBounds.haversineDistanceM(centerLat, centerLon, entity.lat, entity.lon) <= radius
-                }
-            }
-            return emptyList()
+            return queryWithoutCoverageFallback(
+                regionCenterLat = regionCenterLat,
+                regionCenterLon = regionCenterLon,
+                regionRadiusM = regionRadiusM,
+                lat = lat,
+                lon = lon,
+                radiusM = radiusM,
+                resolutionLevel = resolutionLevel
+            )
         }
 
         val box = RegionBounds.boundingBox(lat, lon, radiusM)
@@ -94,8 +84,37 @@ class GeoEntitySpatialQuery(
                 .filter { entity ->
                     (regionEntityIds == null || entity.id in regionEntityIds) &&
                         RegionBounds.haversineDistanceM(lat, lon, entity.lat, entity.lon) <= radiusM &&
-                        GeoEntityType.valueOf(entity.type).matchesResolution(resolutionLevel)
+                        GeoEntityType.fromStoredName(entity.type)?.matchesResolution(resolutionLevel) == true
                 }
+        }
+    }
+
+    private suspend fun queryWithoutCoverageFallback(
+        regionCenterLat: Double?,
+        regionCenterLon: Double?,
+        regionRadiusM: Double?,
+        lat: Double,
+        lon: Double,
+        radiusM: Double,
+        resolutionLevel: ResolutionLevel
+    ): List<GeoEntityEntity> {
+        val centerLat = regionCenterLat
+        val centerLon = regionCenterLon
+        val radius = regionRadiusM
+        if (centerLat == null || centerLon == null || radius == null) {
+            return emptyList()
+        }
+        return queryWithinRadiusInternal(
+            regionId = null,
+            regionCenterLat = null,
+            regionCenterLon = null,
+            regionRadiusM = null,
+            lat = lat,
+            lon = lon,
+            radiusM = radiusM,
+            resolutionLevel = resolutionLevel
+        ).filter { entity ->
+            RegionBounds.haversineDistanceM(centerLat, centerLon, entity.lat, entity.lon) <= radius
         }
     }
 
