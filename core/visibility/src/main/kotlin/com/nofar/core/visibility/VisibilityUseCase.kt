@@ -2,17 +2,17 @@ package com.nofar.core.visibility
 
 import android.util.Log
 import com.nofar.core.data.dem.DemTileReader
+import com.nofar.core.data.dem.RegionDemTileResolver
 import com.nofar.core.data.repository.DemTileRepository
 import com.nofar.core.data.repository.GeoEntityRepository
+import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.dao.TileCoverageDao
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.Region
 import com.nofar.core.model.RegionBounds
 import com.nofar.core.model.ResolutionLevel
 import com.nofar.core.model.UserLocation
-import java.util.UUID
 import javax.inject.Inject
 
 class VisibilityUseCase
@@ -21,6 +21,7 @@ constructor(
     private val geoEntityRepository: GeoEntityRepository,
     private val demTileRepository: DemTileRepository,
     private val tileCoverageDao: TileCoverageDao,
+    private val demTileDao: DemTileDao,
     private val visibilityEngine: VisibilityEngine,
     private val observerElevationResolver: ObserverElevationResolver
 ) : RegionVisibilityComputer {
@@ -33,11 +34,8 @@ constructor(
         resolutionLevel: ResolutionLevel
     ): VisibilityResult {
         val warnings = mutableSetOf<VisibilityWarning>()
-        if (region.downloadStatus == DownloadStatus.PARTIAL) {
-            warnings += VisibilityWarning.DEM_TILE_MISSING
-        }
 
-        val demReaders = openDemReaders(region.id, warnings)
+        val demReaders = openDemReaders(region, warnings)
         val sampler = DemElevationSampler(demReaders)
         val observerElevation =
             observerElevationResolver.resolve(
@@ -83,11 +81,18 @@ constructor(
                 regionCenterLat = region.centerLat,
                 regionCenterLon = region.centerLon,
                 regionRadiusM = region.radiusM,
-                lat = location.latitude,
-                lon = location.longitude,
+                lat = region.centerLat,
+                lon = region.centerLon,
                 radiusM = region.radiusM,
                 resolutionLevel = resolutionLevel
             )
+
+        if (entities.isEmpty()) {
+            Log.w(
+                TAG,
+                "No visibility candidates for region ${region.id} at ${location.latitude},${location.longitude}"
+            )
+        }
 
         if (entities.size > AppConfig.VISIBILITY_MAX_CANDIDATES) {
             Log.w(TAG, "R-Tree returned ${entities.size} candidates; capping at ${AppConfig.VISIBILITY_MAX_CANDIDATES}")
@@ -108,18 +113,28 @@ constructor(
     }
 
     private suspend fun openDemReaders(
-        regionId: UUID,
+        region: Region,
         warnings: MutableSet<VisibilityWarning>
     ): Map<String, DemTileReader> {
-        val tileIds = tileCoverageDao.getTileIdsForRegion(regionId.toString())
+        val tileIds =
+            RegionDemTileResolver.resolveTileIds(
+                region = region,
+                tileCoverageDao = tileCoverageDao,
+                demTileDao = demTileDao,
+                tileReadable = demTileRepository::isBinReadable
+            )
         val readers = LinkedHashMap<String, DemTileReader>()
         for (tileId in tileIds) {
+            demTileRepository.ensureRegisteredFromBin(tileId)
             val reader = demTileRepository.openReader(tileId)
             if (reader == null) {
-                warnings += VisibilityWarning.DEM_TILE_MISSING
+                Log.w(TAG, "Skipping unreadable DEM tile $tileId for region ${region.id}")
                 continue
             }
             readers[tileId] = reader
+        }
+        if (readers.isEmpty() && tileIds.isNotEmpty()) {
+            warnings += VisibilityWarning.DEM_TILE_MISSING
         }
         return readers
     }

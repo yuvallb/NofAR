@@ -1,5 +1,6 @@
 package com.nofar.core.data.usecase
 
+import com.nofar.core.data.dem.RegionDemTileResolver
 import com.nofar.core.data.repository.DemTileRepository
 import com.nofar.core.database.GeoEntitySpatialQuery
 import com.nofar.core.database.RTreeMaintenance
@@ -55,18 +56,29 @@ constructor(
 
     private suspend fun repairTileCoverage(region: Region) {
         val regionId = region.id.toString()
-        if (tileCoverageDao.getTileIdsForRegion(regionId).isNotEmpty()) return
+        registerIntersectingBins(region)
         val tileIds =
-            DemTileId.intersectingTiles(
-                RegionBounds.boundingBox(region.centerLat, region.centerLon, region.radiusM)
-            ).map { (tileLat, tileLon) -> DemTileId.fromCoordinates(tileLat, tileLon) }
-                .filter { candidateId -> demTileDao.getById(candidateId) != null }
+            RegionDemTileResolver.resolveTileIds(
+                region = region,
+                tileCoverageDao = tileCoverageDao,
+                demTileDao = demTileDao,
+                tileReadable = demTileRepository::isBinReadable
+            )
         if (tileIds.isEmpty()) return
-        coverageLinker.linkTiles(regionId, tileIds)
+        if (tileCoverageDao.getTileIdsForRegion(regionId).isEmpty()) {
+            coverageLinker.linkTiles(regionId, tileIds)
+        }
         tileIds.forEach { tileId ->
             if (demTileRepository.getTile(tileId)?.refCount == 0) {
                 demTileRepository.incrementRefCount(tileId)
             }
         }
+    }
+
+    private suspend fun registerIntersectingBins(region: Region) {
+        DemTileId.intersectingTiles(
+            RegionBounds.boundingBox(region.centerLat, region.centerLon, region.radiusM)
+        ).map { (tileLat, tileLon) -> DemTileId.fromCoordinates(tileLat, tileLon) }
+            .forEach { tileId -> demTileRepository.ensureRegisteredFromBin(tileId) }
     }
 }

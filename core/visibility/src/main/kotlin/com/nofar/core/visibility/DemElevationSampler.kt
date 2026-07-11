@@ -11,9 +11,7 @@ import com.nofar.core.model.DemTileId
  */
 class DemElevationSampler(demReaders: Map<String, DemTileReader>) {
     private val readersByOrigin: Map<Pair<Int, Int>, DemTileReader> =
-        demReaders.mapNotNull { (tileId, reader) ->
-            DemTileId.parse(tileId)?.let { origin -> origin to reader }
-        }.toMap()
+        demReaders.values.associateBy { reader -> reader.tileLat to reader.tileLon }
 
     fun elevationAt(lat: Double, lon: Double): Float? {
         val (tileLat, tileLon) = DemTileId.coordinatesForPoint(lat, lon)

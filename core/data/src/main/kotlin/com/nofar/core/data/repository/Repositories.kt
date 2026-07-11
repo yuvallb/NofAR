@@ -62,10 +62,15 @@ interface GeoEntityRepository {
     suspend fun garbageCollectOrphans(): Int
 }
 
+@Suppress("TooManyFunctions")
 interface DemTileRepository {
     suspend fun registerTile(tile: DemTile)
 
     suspend fun getTile(tileId: String): DemTile?
+
+    fun isBinReadable(tileId: String): Boolean
+
+    suspend fun ensureRegisteredFromBin(tileId: String): Boolean
 
     fun openReader(tileId: String): DemTileReader?
 

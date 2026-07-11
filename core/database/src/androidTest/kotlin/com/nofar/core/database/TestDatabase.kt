@@ -24,6 +24,8 @@ class DatabaseTestFixtures(val database: NofARDatabase) {
     val coverageDao: RegionEntityCoverageDao = database.regionEntityCoverageDao()
     val demTileDao: DemTileDao = database.demTileDao()
     val tileCoverageDao: TileCoverageDao = database.tileCoverageDao()
-    val spatialQuery: GeoEntitySpatialQuery = GeoEntitySpatialQuery(database, geoEntityDao, coverageDao)
+    val spatialQuery: GeoEntitySpatialQuery =
+        GeoEntitySpatialQuery(database.geoEntitySpatialDao(), geoEntityDao, coverageDao)
+    val geoEntitySpatialDao = database.geoEntitySpatialDao()
     val geoEntityUpserter: GeoEntityUpserter = GeoEntityUpserter(geoEntityDao)
 }

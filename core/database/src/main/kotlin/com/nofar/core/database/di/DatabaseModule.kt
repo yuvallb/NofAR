@@ -7,6 +7,7 @@ import com.nofar.core.database.NofARDatabase
 import com.nofar.core.database.dao.CoverageLinker
 import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.dao.GeoEntityDao
+import com.nofar.core.database.dao.GeoEntitySpatialDao
 import com.nofar.core.database.dao.GeoEntityUpserter
 import com.nofar.core.database.dao.RegionDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
@@ -41,6 +42,9 @@ object DatabaseModule {
     fun provideGeoEntityDao(database: NofARDatabase): GeoEntityDao = database.geoEntityDao()
 
     @Provides
+    fun provideGeoEntitySpatialDao(database: NofARDatabase): GeoEntitySpatialDao = database.geoEntitySpatialDao()
+
+    @Provides
     fun provideRegionEntityCoverageDao(database: NofARDatabase): RegionEntityCoverageDao =
         database.regionEntityCoverageDao()
 
@@ -64,8 +68,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideGeoEntitySpatialQuery(
-        database: NofARDatabase,
+        geoEntitySpatialDao: GeoEntitySpatialDao,
         geoEntityDao: GeoEntityDao,
         regionEntityCoverageDao: RegionEntityCoverageDao
-    ): GeoEntitySpatialQuery = GeoEntitySpatialQuery(database, geoEntityDao, regionEntityCoverageDao)
+    ): GeoEntitySpatialQuery = GeoEntitySpatialQuery(geoEntitySpatialDao, geoEntityDao, regionEntityCoverageDao)
 }

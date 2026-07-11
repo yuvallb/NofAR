@@ -111,7 +111,7 @@ constructor(
                         VisibilityResult(
                             entities = emptyList(),
                             computationTimeMs = 0L,
-                            warnings = setOf(VisibilityWarning.DEM_TILE_MISSING)
+                            warnings = emptySet()
                         )
                     }
                 if (passSequence == sequenceNumber) {

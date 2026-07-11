@@ -9,13 +9,17 @@ import kotlinx.coroutines.withContext
 @Singleton
 class RTreeMaintenance
 @Inject
-constructor(private val database: NofARDatabase) {
-    private val backfillAttempted = AtomicBoolean(false)
+constructor(private val spatialQuery: GeoEntitySpatialQuery) {
+    private val backfillInFlight = AtomicBoolean(false)
 
     suspend fun backfillMissingEntriesIfNeeded() {
-        if (!backfillAttempted.compareAndSet(false, true)) return
-        withContext(Dispatchers.IO) {
-            RTreeCallback.backfillMissingEntriesSafely(database.openHelper.writableDatabase)
+        if (!backfillInFlight.compareAndSet(false, true)) return
+        try {
+            withContext(Dispatchers.IO) {
+                spatialQuery.backfillMissingRTreeEntries()
+            }
+        } finally {
+            backfillInFlight.set(false)
         }
     }
 }

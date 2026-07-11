@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.repository.RegionRepository
+import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.CompassCalibrationState
@@ -29,6 +30,7 @@ import com.nofar.core.visibility.VisibleEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -77,6 +79,7 @@ constructor(
     private val declinationCorrector: DeclinationCorrector,
     private val visibilityPassScheduler: VisibilityPassScheduler,
     private val regionRepository: RegionRepository,
+    private val regionCoverageRepairUseCase: RegionCoverageRepairUseCase,
     private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ExploreUiState())
@@ -228,15 +231,20 @@ constructor(
         .maxByOrNull { it.updatedAt }
 
     private fun applyActiveRegion(region: Region?) {
-        visibilityPassScheduler.setActiveRegion(region)
-        _uiState.update {
-            it.copy(
-                activeRegion = region,
-                activeRegionName = region?.name,
-                partialRegionWarning = region?.downloadStatus == DownloadStatus.PARTIAL
-            )
+        viewModelScope.launch(Dispatchers.IO) {
+            region?.let { active ->
+                runCatching { regionCoverageRepairUseCase.repairIfNeeded(active) }
+            }
+            visibilityPassScheduler.setActiveRegion(region)
+            _uiState.update {
+                it.copy(
+                    activeRegion = region,
+                    activeRegionName = region?.name,
+                    partialRegionWarning = region?.downloadStatus == DownloadStatus.PARTIAL
+                )
+            }
+            refreshGate()
         }
-        refreshGate()
     }
 
     private fun onOrientation(orientation: DeviceOrientation) {

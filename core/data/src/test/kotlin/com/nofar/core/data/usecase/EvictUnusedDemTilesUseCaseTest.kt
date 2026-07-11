@@ -50,6 +50,10 @@ private class FakeDemTileRepository(tiles: List<DemTile>) : DemTileRepository {
 
     override suspend fun getTile(tileId: String): DemTile? = store[tileId]
 
+    override fun isBinReadable(tileId: String): Boolean = store.containsKey(tileId)
+
+    override suspend fun ensureRegisteredFromBin(tileId: String): Boolean = store.containsKey(tileId)
+
     override fun openReader(tileId: String) = null
 
     override suspend fun incrementRefCount(tileId: String) = Unit

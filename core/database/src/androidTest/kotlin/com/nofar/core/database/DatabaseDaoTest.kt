@@ -136,8 +136,10 @@ class GeoEntityDaoTest {
                 type = GeoEntityType.TOWN.name
             )
         )
-        fixtures.database.openHelper.writableDatabase.execSQL("DELETE FROM geo_entity_rtree")
-        RTreeCallback.backfillMissingEntriesSafely(fixtures.database.openHelper.writableDatabase)
+        fixtures.database.geoEntitySpatialDao().executeStatement(
+            androidx.sqlite.db.SimpleSQLiteQuery("DELETE FROM geo_entity_rtree")
+        )
+        fixtures.spatialQuery.backfillMissingRTreeEntries()
 
         val results =
             fixtures.spatialQuery.queryWithinRadius(
@@ -174,6 +176,39 @@ class GeoEntityDaoTest {
             )
 
         assertThat(results.map { it.id }).contains("node/fallback")
+    }
+
+    @Test
+    fun regionQuery_withCoverage_fallsBackWhenRTreeEmpty() = runTest {
+        val regionId = UUID.randomUUID().toString()
+        fixtures.geoEntityUpserter.upsert(
+            sampleEntity(
+                id = "node/coverage-fallback",
+                lat = 32.02,
+                lon = 35.02,
+                type = GeoEntityType.TOWN.name
+            )
+        )
+        fixtures.coverageDao.insert(
+            RegionEntityCoverageEntity(regionId = regionId, entityId = "node/coverage-fallback")
+        )
+        fixtures.database.geoEntitySpatialDao().executeStatement(
+            androidx.sqlite.db.SimpleSQLiteQuery("DELETE FROM geo_entity_rtree")
+        )
+
+        val results =
+            fixtures.spatialQuery.queryWithinRadiusForRegion(
+                regionId = regionId,
+                regionCenterLat = 32.0,
+                regionCenterLon = 35.0,
+                regionRadiusM = 10_000.0,
+                lat = 32.0,
+                lon = 35.0,
+                radiusM = 10_000.0,
+                resolutionLevel = ResolutionLevel.Medium
+            )
+
+        assertThat(results.map { it.id }).contains("node/coverage-fallback")
     }
 
     @Test

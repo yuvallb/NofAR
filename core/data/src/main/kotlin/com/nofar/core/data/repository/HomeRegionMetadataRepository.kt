@@ -1,11 +1,10 @@
 package com.nofar.core.data.repository
 
+import com.nofar.core.data.dem.RegionDemTileResolver
 import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
 import com.nofar.core.database.dao.TileCoverageDao
-import com.nofar.core.model.DemTileId
 import com.nofar.core.model.Region
-import com.nofar.core.model.RegionBounds
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -17,17 +16,21 @@ class HomeRegionMetadataRepository
 constructor(
     private val tileCoverageDao: TileCoverageDao,
     private val demTileDao: DemTileDao,
+    private val demTileRepository: DemTileRepository,
     private val regionEntityCoverageDao: RegionEntityCoverageDao
 ) {
     suspend fun getMetadata(regionId: UUID, region: Region? = null): HomeRegionMetadata {
-        var tileIds = tileCoverageDao.getTileIdsForRegion(regionId.toString())
-        if (tileIds.isEmpty() && region != null) {
-            tileIds =
-                DemTileId.intersectingTiles(
-                    RegionBounds.boundingBox(region.centerLat, region.centerLon, region.radiusM)
-                ).map { (tileLat, tileLon) -> DemTileId.fromCoordinates(tileLat, tileLon) }
-                    .filter { candidateId -> demTileDao.getById(candidateId) != null }
-        }
+        val tileIds =
+            if (region != null) {
+                RegionDemTileResolver.resolveTileIds(
+                    region = region,
+                    tileCoverageDao = tileCoverageDao,
+                    demTileDao = demTileDao,
+                    tileReadable = demTileRepository::isBinReadable
+                )
+            } else {
+                tileCoverageDao.getTileIdsForRegion(regionId.toString())
+            }
         val liveEntityCount = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString()).size
         if (tileIds.isEmpty()) {
             return HomeRegionMetadata(

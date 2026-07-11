@@ -34,6 +34,7 @@ class HomeRegionMetadataRepositoryTest {
             HomeRegionMetadataRepository(
                 tileCoverageDao = database.tileCoverageDao(),
                 demTileDao = database.demTileDao(),
+                demTileRepository = DefaultDemTileRepository(context, database.demTileDao()),
                 regionEntityCoverageDao = database.regionEntityCoverageDao()
             )
     }
