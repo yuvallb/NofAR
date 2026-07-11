@@ -7,6 +7,7 @@ import com.nofar.core.database.NofARDatabase
 import com.nofar.core.database.dao.CoverageLinker
 import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.dao.GeoEntityDao
+import com.nofar.core.database.dao.GeoEntitySpatialDao
 import com.nofar.core.database.dao.GeoEntityUpserter
 import com.nofar.core.database.dao.RegionDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
@@ -18,6 +19,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -30,6 +32,7 @@ object DatabaseModule {
         NofARDatabase.DATABASE_NAME
     )
         .useBundledSqliteWithRTree()
+        .setQueryCoroutineContext(Dispatchers.IO)
         .build()
 
     @Provides
@@ -37,6 +40,9 @@ object DatabaseModule {
 
     @Provides
     fun provideGeoEntityDao(database: NofARDatabase): GeoEntityDao = database.geoEntityDao()
+
+    @Provides
+    fun provideGeoEntitySpatialDao(database: NofARDatabase): GeoEntitySpatialDao = database.geoEntitySpatialDao()
 
     @Provides
     fun provideRegionEntityCoverageDao(database: NofARDatabase): RegionEntityCoverageDao =
@@ -62,8 +68,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideGeoEntitySpatialQuery(
-        database: NofARDatabase,
+        geoEntitySpatialDao: GeoEntitySpatialDao,
         geoEntityDao: GeoEntityDao,
         regionEntityCoverageDao: RegionEntityCoverageDao
-    ): GeoEntitySpatialQuery = GeoEntitySpatialQuery(database, geoEntityDao, regionEntityCoverageDao)
+    ): GeoEntitySpatialQuery = GeoEntitySpatialQuery(geoEntitySpatialDao, geoEntityDao, regionEntityCoverageDao)
 }

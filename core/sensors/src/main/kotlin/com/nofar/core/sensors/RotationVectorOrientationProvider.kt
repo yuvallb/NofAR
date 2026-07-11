@@ -20,8 +20,10 @@ import kotlinx.coroutines.flow.asSharedFlow
 @Singleton
 class RotationVectorOrientationProvider
 @Inject
-constructor(@ApplicationContext context: Context) :
-    OrientationProvider {
+constructor(
+    @ApplicationContext context: Context,
+    private val displayRotationReader: DisplayRotationReader
+) : OrientationProvider {
     private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
     private val rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
     private val _orientationFlow = MutableSharedFlow<DeviceOrientation>(extraBufferCapacity = 1)
@@ -67,9 +69,12 @@ constructor(@ApplicationContext context: Context) :
 
     private fun SensorEvent.toDeviceOrientation(accuracy: Int): DeviceOrientation? {
         val rotationMatrix = FloatArray(9)
-        val orientationAngles = FloatArray(3)
         SensorManager.getRotationMatrixFromVector(rotationMatrix, values)
-        SensorManager.getOrientation(rotationMatrix, orientationAngles)
+        val orientationAngles =
+            OrientationCoordinateRemapper.orientationAngles(
+                rotationMatrix = rotationMatrix,
+                displayRotation = displayRotationReader.currentRotationOrDefault()
+            )
 
         val azimuthRad = orientationAngles[0]
         val pitchRad = orientationAngles[1]

@@ -92,20 +92,6 @@ Release builds:
 
 CI will run `spotlessCheck`, `detekt`, `lint`, `test`, `assembleDebug`, and `assembleRelease` on pull requests.
 
-### Python prototypes (available now)
-
-Use these to experiment with visibility logic and DEM handling before or alongside Android work:
-
-```bash
-cd scripts
-uv sync   # or: pip install -e .
-python horizon_dem.py --help
-python line_dem_profile.py --help
-python download_dem.py --help
-```
-
-Downloaded DEM GeoTIFFs are cached under `scripts/dem_cache/` (gitignored).
-
 ---
 
 ## Architecture (target)

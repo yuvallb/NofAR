@@ -56,10 +56,12 @@ constructor(
         }
 
         val region = regionDao.getById(regionId.toString())?.asExternalModel() ?: return false
+        val coverageCount = entityIds.size
+        val finalCount = maxOf(coverageCount, region.entityCount)
         regionDao.upsert(
             region
                 .copy(
-                    entityCount = entityIds.size,
+                    entityCount = finalCount,
                     updatedAt = Instant.now()
                 ).asEntity()
         )

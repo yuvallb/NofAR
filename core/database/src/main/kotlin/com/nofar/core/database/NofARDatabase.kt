@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.dao.GeoEntityDao
+import com.nofar.core.database.dao.GeoEntitySpatialDao
 import com.nofar.core.database.dao.RegionDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
 import com.nofar.core.database.dao.TileCoverageDao
@@ -28,6 +29,8 @@ abstract class NofARDatabase : RoomDatabase() {
     abstract fun regionDao(): RegionDao
 
     abstract fun geoEntityDao(): GeoEntityDao
+
+    abstract fun geoEntitySpatialDao(): GeoEntitySpatialDao
 
     abstract fun regionEntityCoverageDao(): RegionEntityCoverageDao
 

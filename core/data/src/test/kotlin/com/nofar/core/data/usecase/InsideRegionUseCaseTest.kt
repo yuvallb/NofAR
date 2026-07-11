@@ -22,6 +22,8 @@ class InsideRegionUseCaseTest {
 
             override suspend fun updateRegion(region: Region) = Unit
 
+            override suspend fun updateRegionName(id: UUID, name: String) = Unit
+
             override suspend fun deleteRegion(id: UUID) = Unit
 
             override suspend fun regionsContainingPoint(lat: Double, lon: Double): List<Region> =
@@ -34,6 +36,8 @@ class InsideRegionUseCaseTest {
                 osmDatasetVersion: Instant?,
                 entityCount: Int?
             ) = Unit
+
+            override suspend fun hasActiveDownload(): Boolean = false
         }
 
     private val useCase = InsideRegionUseCase(repository)

@@ -1,5 +1,6 @@
 package com.nofar.core.visibility
 
+import android.util.Log
 import com.nofar.core.common.DispatcherProvider
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.Region
@@ -98,10 +99,19 @@ constructor(
         inFlightJob =
             launchScope.launch(dispatchers.default) {
                 val result =
-                    mutex.withLock {
-                        visibilityUseCase.computeForRegion(
-                            region = currentRegion,
-                            location = currentLocation
+                    runCatching {
+                        mutex.withLock {
+                            visibilityUseCase.computeForRegion(
+                                region = currentRegion,
+                                location = currentLocation
+                            )
+                        }
+                    }.getOrElse { error ->
+                        Log.e(TAG, "Visibility pass failed for region ${currentRegion.id}", error)
+                        VisibilityResult(
+                            entities = emptyList(),
+                            computationTimeMs = 0L,
+                            warnings = emptySet()
                         )
                     }
                 if (passSequence == sequenceNumber) {
@@ -120,4 +130,8 @@ constructor(
             lastPassAtMillis = lastPassAtMillis,
             force = force
         )
+
+    companion object {
+        private const val TAG = "VisibilityPassScheduler"
+    }
 }

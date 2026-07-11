@@ -32,10 +32,9 @@ class HomeOfflineInstrumentedTest {
         val card =
             com.nofar.core.designsystem.component.RegionCardState(
                 region = region,
-                isYouAreHere = HomeRegionLogic.shouldShowYouAreHere(region, isInside = true),
-                canEnterExplore = HomeRegionLogic.canEnterExplore(region, isInside = true)
+                isYouAreHere = HomeRegionLogic.shouldShowYouAreHere(region, isInside = true)
             )
-        assertThat(card.canEnterExplore).isTrue()
+        assertThat(card.isYouAreHere).isTrue()
         assertThat(HomeRegionLogic.isEnterExploreEnabled(listOf(region))).isTrue()
     }
 

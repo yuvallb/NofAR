@@ -100,6 +100,7 @@ object ExploreLabelRenderer {
         screenHeightPx: Float,
         expandedBucketIndex: Int? = null
     ): List<ClusteredLabel> {
+        val orientedFov = fov.orientedForScreen(screenWidthPx, screenHeightPx)
         val projected =
             entities.mapNotNull { entity ->
                 val projection =
@@ -108,8 +109,8 @@ object ExploreLabelRenderer {
                         elevationAngleDeg = entity.elevationAngleDeg,
                         trueAzimuthDeg = trueAzimuthDeg,
                         pitchDeg = pitchDeg,
-                        horizontalFovDeg = fov.horizontalDeg,
-                        verticalFovDeg = fov.verticalDeg,
+                        horizontalFovDeg = orientedFov.horizontalDeg,
+                        verticalFovDeg = orientedFov.verticalDeg,
                         screenWidthPx = screenWidthPx,
                         screenHeightPx = screenHeightPx
                     ) ?: return@mapNotNull null

@@ -41,6 +41,7 @@ import com.nofar.core.designsystem.component.NofARSectionHeader
 import com.nofar.core.designsystem.component.NofARStorageSummary
 import com.nofar.core.designsystem.component.RegionCardState
 import com.nofar.core.designsystem.theme.NofARColors
+import com.nofar.core.model.LocationAccessState
 import com.nofar.core.model.Region
 import com.nofar.core.ui.location.LocationPermissionBanner
 import com.nofar.core.ui.permission.PermissionState
@@ -62,6 +63,8 @@ fun HomeScreen(
     LaunchedEffect(permissionState.locationAccessState) {
         viewModel.onLocationPermissionChanged(permissionState.locationAccessState)
     }
+
+    HomePermissionEffects(permissionState = permissionState)
 
     LaunchedEffect(uiState.navigateToExploreRegionId) {
         uiState.navigateToExploreRegionId?.let { regionId ->
@@ -87,7 +90,6 @@ fun HomeScreen(
             onNavigateToSettings = onNavigateToSettings,
             onNavigateToPrepare = onNavigateToPrepare,
             onGlobalEnterExplore = viewModel::onGlobalEnterExploreClicked,
-            onEnterExplore = viewModel::onEnterExploreClicked,
             onDelete = viewModel::onDeleteClicked,
             modifier = Modifier.padding(padding)
         )
@@ -100,13 +102,21 @@ fun HomeScreen(
 }
 
 @Composable
+private fun HomePermissionEffects(permissionState: PermissionState) {
+    LaunchedEffect(permissionState.locationAccessState) {
+        if (permissionState.locationAccessState == LocationAccessState.NOT_REQUESTED) {
+            permissionState.requestFineLocation()
+        }
+    }
+}
+
+@Composable
 private fun HomeScreenContent(
     uiState: HomeUiState,
     permissionState: PermissionState,
     onNavigateToSettings: () -> Unit,
     onNavigateToPrepare: (UUID?) -> Unit,
     onGlobalEnterExplore: () -> Unit,
-    onEnterExplore: (UUID) -> Unit,
     onDelete: (UUID) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -125,20 +135,19 @@ private fun HomeScreenContent(
             permissionState = permissionState,
             waitingForGpsFix = uiState.waitingForGpsFix
         )
+        GlobalEnterExploreSection(
+            enabled = uiState.enterExploreEnabled,
+            onClick = onGlobalEnterExplore
+        )
         NofARSecondaryOutlinedButton(
             text = "+ ADD REGION",
             onClick = { onNavigateToPrepare(null) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))
-        GlobalEnterExploreSection(
-            enabled = uiState.enterExploreEnabled,
-            onClick = onGlobalEnterExplore
-        )
         NofARSectionHeader(title = "LOCAL REGIONS")
         HomeRegionList(
             regions = uiState.regions,
-            onEnterExplore = onEnterExplore,
             onPrepare = { regionId -> onNavigateToPrepare(regionId) },
             onAddRegion = { onNavigateToPrepare(null) },
             onDelete = onDelete,
@@ -165,7 +174,7 @@ private fun GlobalEnterExploreSection(enabled: Boolean, onClick: () -> Unit) {
         if (!enabled) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Move inside a ready region to explore the horizon.",
+                text = "Add region or move inside a ready region to explore the horizon.",
                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                 color = NofARColors.TextCaption
             )
@@ -177,7 +186,6 @@ private fun GlobalEnterExploreSection(enabled: Boolean, onClick: () -> Unit) {
 @Composable
 private fun HomeRegionList(
     regions: List<RegionCardState>,
-    onEnterExplore: (UUID) -> Unit,
     onPrepare: (UUID) -> Unit,
     onAddRegion: () -> Unit,
     onDelete: (UUID) -> Unit,
@@ -205,7 +213,6 @@ private fun HomeRegionList(
         items(regions, key = { it.region.id }) { cardState ->
             NofARRegionCard(
                 state = cardState,
-                onEnterExplore = onEnterExplore,
                 onPrepare = onPrepare,
                 onDelete = onDelete,
                 deleteIcon = {

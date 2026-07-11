@@ -41,12 +41,24 @@ constructor(
 
     override suspend fun queryWithinRadiusForRegion(
         regionId: UUID,
+        regionCenterLat: Double,
+        regionCenterLon: Double,
+        regionRadiusM: Double,
         lat: Double,
         lon: Double,
         radiusM: Double,
         resolutionLevel: ResolutionLevel
     ): List<GeoEntity> = spatialQuery
-        .queryWithinRadiusForRegion(regionId.toString(), lat, lon, radiusM, resolutionLevel)
+        .queryWithinRadiusForRegion(
+            regionId = regionId.toString(),
+            regionCenterLat = regionCenterLat,
+            regionCenterLon = regionCenterLon,
+            regionRadiusM = regionRadiusM,
+            lat = lat,
+            lon = lon,
+            radiusM = radiusM,
+            resolutionLevel = resolutionLevel
+        )
         .map { it.asExternalModel() }
 
     override suspend fun garbageCollectOrphans(): Int = geoEntityDao.deleteOrphans()

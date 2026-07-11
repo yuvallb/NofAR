@@ -8,6 +8,11 @@ class OverpassConfigTest {
     @Test
     fun mirrorListHasThreeTiers() {
         assertEquals(3, mirrorBaseUrls.size)
-        assertEquals("https://overpass-api.de/api/interpreter", mirrorBaseUrls[0])
+        assertEquals("https://osm.hpi.de/overpass/api/interpreter", mirrorBaseUrls[0])
+        assertEquals("https://overpass-api.de/api/interpreter", mirrorBaseUrls[1])
+        assertEquals(
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+            mirrorBaseUrls[2]
+        )
     }
 }

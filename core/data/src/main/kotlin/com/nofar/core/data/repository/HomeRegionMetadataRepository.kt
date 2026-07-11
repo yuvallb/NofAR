@@ -1,23 +1,43 @@
 package com.nofar.core.data.repository
 
+import com.nofar.core.data.dem.RegionDemTileResolver
 import com.nofar.core.database.dao.DemTileDao
+import com.nofar.core.database.dao.RegionEntityCoverageDao
 import com.nofar.core.database.dao.TileCoverageDao
+import com.nofar.core.model.Region
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
-data class HomeRegionMetadata(val demSizeBytes: Long, val latestDemTimestamp: Instant?)
+data class HomeRegionMetadata(val demSizeBytes: Long, val latestDemTimestamp: Instant?, val liveEntityCount: Int = 0)
 
 class HomeRegionMetadataRepository
 @Inject
 constructor(
     private val tileCoverageDao: TileCoverageDao,
-    private val demTileDao: DemTileDao
+    private val demTileDao: DemTileDao,
+    private val demTileRepository: DemTileRepository,
+    private val regionEntityCoverageDao: RegionEntityCoverageDao
 ) {
-    suspend fun getMetadata(regionId: UUID): HomeRegionMetadata {
-        val tileIds = tileCoverageDao.getTileIdsForRegion(regionId.toString())
+    suspend fun getMetadata(regionId: UUID, region: Region? = null): HomeRegionMetadata {
+        val tileIds =
+            if (region != null) {
+                RegionDemTileResolver.resolveTileIds(
+                    region = region,
+                    tileCoverageDao = tileCoverageDao,
+                    demTileDao = demTileDao,
+                    tileReadable = demTileRepository::isBinReadable
+                )
+            } else {
+                tileCoverageDao.getTileIdsForRegion(regionId.toString())
+            }
+        val liveEntityCount = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString()).size
         if (tileIds.isEmpty()) {
-            return HomeRegionMetadata(demSizeBytes = 0L, latestDemTimestamp = null)
+            return HomeRegionMetadata(
+                demSizeBytes = 0L,
+                latestDemTimestamp = null,
+                liveEntityCount = liveEntityCount
+            )
         }
         var demSizeBytes = 0L
         var latestDemTimestamp: Instant? = null
@@ -30,7 +50,8 @@ constructor(
         }
         return HomeRegionMetadata(
             demSizeBytes = demSizeBytes,
-            latestDemTimestamp = latestDemTimestamp
+            latestDemTimestamp = latestDemTimestamp,
+            liveEntityCount = liveEntityCount
         )
     }
 }

@@ -69,6 +69,18 @@ interface GeoEntityDao {
     @Query("SELECT * FROM geo_entity WHERE row_id IN (:rowIds)")
     suspend fun getByRowIds(rowIds: List<Long>): List<GeoEntityEntity>
 
+    @Query("SELECT * FROM geo_entity WHERE id IN (:osmIds)")
+    suspend fun getByOsmIds(osmIds: List<String>): List<GeoEntityEntity>
+
+    @Query(
+        """
+        SELECT * FROM geo_entity
+        WHERE lat >= :minLat AND lat <= :maxLat
+          AND lon >= :minLon AND lon <= :maxLon
+        """
+    )
+    suspend fun getInBoundingBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<GeoEntityEntity>
+
     @Query("SELECT COUNT(*) FROM geo_entity")
     suspend fun countAll(): Int
 }

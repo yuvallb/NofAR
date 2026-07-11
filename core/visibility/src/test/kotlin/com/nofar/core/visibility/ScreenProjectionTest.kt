@@ -5,6 +5,22 @@ import org.junit.Test
 
 class ScreenProjectionTest {
     @Test
+    fun orientedForScreen_landscape_swapsHorizontalAndVerticalFov() {
+        val fov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
+        val oriented = fov.orientedForScreen(screenWidthPx = 1920f, screenHeightPx = 1080f)
+        assertThat(oriented.horizontalDeg).isWithin(0.001f).of(45f)
+        assertThat(oriented.verticalDeg).isWithin(0.001f).of(60f)
+    }
+
+    @Test
+    fun orientedForScreen_portrait_keepsFovAxes() {
+        val fov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
+        val oriented = fov.orientedForScreen(screenWidthPx = 1080f, screenHeightPx = 1920f)
+        assertThat(oriented.horizontalDeg).isWithin(0.001f).of(60f)
+        assertThat(oriented.verticalDeg).isWithin(0.001f).of(45f)
+    }
+
+    @Test
     fun entityAtBearingZeroWithDeviceFacingNorth_isCenteredOnX() {
         val projection =
             ScreenProjector.projectEntityToScreen(

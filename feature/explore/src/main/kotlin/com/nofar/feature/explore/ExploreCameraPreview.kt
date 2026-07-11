@@ -49,21 +49,26 @@ fun ExploreCameraPreview(modifier: Modifier = Modifier, onFieldOfViewChanged: (C
             val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
             val listener =
                 Runnable {
-                    val cameraProvider = cameraProviderFuture.get()
-                    val preview = Preview.Builder().build()
-                    preview.setSurfaceProvider(view.surfaceProvider)
+                    runCatching {
+                        val cameraProvider = cameraProviderFuture.get()
+                        val preview = Preview.Builder().build()
+                        preview.setSurfaceProvider(view.surfaceProvider)
 
-                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-                    cameraProvider.unbindAll()
-                    val camera =
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            cameraSelector,
-                            preview
-                        )
+                        val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                        cameraProvider.unbindAll()
+                        val camera =
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                cameraSelector,
+                                preview
+                            )
 
-                    val fov = readFieldOfView(camera.cameraInfo)
-                    onFieldOfViewChanged(fov)
+                        val fov = readFieldOfView(camera.cameraInfo)
+                        onFieldOfViewChanged(fov)
+                    }.onFailure { error ->
+                        Log.e(TAG, "Camera preview bind failed; using fallback FOV", error)
+                        onFieldOfViewChanged(CameraFieldOfView.fallback())
+                    }
                 }
             cameraProviderFuture.addListener(listener, ContextCompat.getMainExecutor(context))
 

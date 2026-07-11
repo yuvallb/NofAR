@@ -58,6 +58,8 @@ class DemTileReader private constructor(
     }
 
     companion object {
+        private const val MAX_RASTER_DIMENSION = 10_000
+
         fun open(file: File): DemTileReader {
             val raf = RandomAccessFile(file, "r")
             val headerBytes = ByteArray(DemBinaryFormat.HEADER_SIZE_BYTES)
@@ -67,6 +69,9 @@ class DemTileReader private constructor(
             require(magic == DemBinaryFormat.MAGIC) { "Invalid DEM magic: $magic" }
             val width = header.getInt()
             val height = header.getInt()
+            require(width in 1..MAX_RASTER_DIMENSION && height in 1..MAX_RASTER_DIMENSION) {
+                "Invalid DEM dimensions: ${width}x$height"
+            }
             val originLat = header.getDouble()
             val originLon = header.getDouble()
             val noDataValue = header.getFloat()

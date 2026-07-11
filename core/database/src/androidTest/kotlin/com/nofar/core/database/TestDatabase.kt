@@ -8,6 +8,7 @@ import com.nofar.core.database.dao.GeoEntityDao
 import com.nofar.core.database.dao.GeoEntityUpserter
 import com.nofar.core.database.dao.RegionDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
+import com.nofar.core.database.dao.TileCoverageDao
 
 object TestDatabase {
     fun inMemory(context: Context = ApplicationProvider.getApplicationContext()): NofARDatabase =
@@ -23,6 +24,8 @@ class DatabaseTestFixtures(val database: NofARDatabase) {
     val coverageDao: RegionEntityCoverageDao = database.regionEntityCoverageDao()
     val demTileDao: DemTileDao = database.demTileDao()
     val tileCoverageDao: TileCoverageDao = database.tileCoverageDao()
-    val spatialQuery: GeoEntitySpatialQuery = GeoEntitySpatialQuery(database, geoEntityDao, coverageDao)
+    val spatialQuery: GeoEntitySpatialQuery =
+        GeoEntitySpatialQuery(database.geoEntitySpatialDao(), geoEntityDao, coverageDao)
+    val geoEntitySpatialDao = database.geoEntitySpatialDao()
     val geoEntityUpserter: GeoEntityUpserter = GeoEntityUpserter(geoEntityDao)
 }

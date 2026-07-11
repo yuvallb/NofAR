@@ -10,6 +10,7 @@ package com.nofar.core.data.prepare
 
 import android.content.Context
 import com.nofar.core.data.dem.DefaultGeoTiffConverter
+import com.nofar.core.data.dem.DemTileReader
 import com.nofar.core.data.dem.GeoTiffConverter
 import com.nofar.core.data.osm.OverpassStreamParser
 import com.nofar.core.data.preferences.UserPreferencesRepository
@@ -17,9 +18,9 @@ import com.nofar.core.data.repository.DefaultDemTileRepository
 import com.nofar.core.data.repository.GeoEntityRepository
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.usecase.LruEvictionUseCase
+import com.nofar.core.database.dao.CoverageLinker
 import com.nofar.core.database.dao.RegionEntityCoverageDao
 import com.nofar.core.database.dao.TileCoverageDao
-import com.nofar.core.database.model.RegionEntityCoverageEntity
 import com.nofar.core.database.model.TileCoverageEntity
 import com.nofar.core.model.DemTile
 import com.nofar.core.model.DemTileId
@@ -78,6 +79,7 @@ constructor(
     private val demTileFetcher: DemTileFetcher,
     private val regionEntityCoverageDao: RegionEntityCoverageDao,
     private val tileCoverageDao: TileCoverageDao,
+    private val coverageLinker: CoverageLinker,
     private val postProcessor: PreparePostProcessor,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val lruEvictionUseCase: LruEvictionUseCase,
@@ -108,6 +110,7 @@ constructor(
             regionRepository.getRegion(regionId) ?: return Result.failure(IllegalStateException("Region missing"))
 
         regionRepository.updateDownloadStatus(regionId, DownloadStatus.DOWNLOADING, progressPct = 0)
+        resetRegionCoverage(regionId)
         val bbox = OverpassQueryBuilder.boundingBoxFromCircle(region.centerLat, region.centerLon, region.radiusM)
         val estimate = PrepareEstimator.estimate(region.centerLat, region.centerLon, region.radiusM)
         var osmDatasetVersion = Instant.now()
@@ -139,6 +142,7 @@ constructor(
             osmDatasetVersion = overpassResponse.datasetVersion
             overpassResponse.body.use { stream ->
                 val parsedEntities = mutableListOf<com.nofar.core.data.osm.ParsedOsmElement>()
+                val linkedEntityIds = mutableListOf<String>()
                 entityCount =
                     overpassStreamParser.parse(stream) { element ->
                         checkCancelled()
@@ -153,12 +157,7 @@ constructor(
                     checkCancelled()
                     val geoEntity = overpassStreamParser.toGeoEntity(element)
                     geoEntityRepository.upsert(geoEntity)
-                    regionEntityCoverageDao.insert(
-                        RegionEntityCoverageEntity(
-                            regionId = regionId.toString(),
-                            entityId = geoEntity.id
-                        )
-                    )
+                    linkedEntityIds.add(geoEntity.id)
                     if ((index + 1) % 50 == 0 || index + 1 == entityCount) {
                         val ingestPct =
                             if (entityCount > 0) {
@@ -173,6 +172,13 @@ constructor(
                         )
                     }
                 }
+                if (linkedEntityIds.isNotEmpty()) {
+                    coverageLinker.linkEntities(regionId.toString(), linkedEntityIds)
+                }
+            }
+            val coverageCount = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString()).size
+            if (coverageCount != entityCount) {
+                entityCount = maxOf(entityCount, coverageCount)
             }
             regionRepository.updateDownloadStatus(
                 regionId,
@@ -181,17 +187,22 @@ constructor(
                 osmDatasetVersion = osmDatasetVersion,
                 entityCount = entityCount
             )
+            applyOsmAutoName(regionId)
 
             // DEM phase (40–90%)
             val tiles = DemTileId.intersectingTiles(
                 RegionBounds.boundingBox(region.centerLat, region.centerLon, region.radiusM)
             )
+            val linkedTileIds = mutableListOf<String>()
             tiles.forEachIndexed { index, (tileLat, tileLon) ->
                 checkCancelled()
                 val tileId = DemTileId.fromCoordinates(tileLat, tileLon)
                 val binFile = demTileRepository.demFile(tileId)
-                if (binFile.exists() && demTileRepository.getTile(tileId) != null) {
+                if (binFile.exists()) {
+                    ensureTileRegistered(tileId, binFile)
+                    demTileRepository.incrementRefCount(tileId)
                     linkTileCoverage(regionId, tileId)
+                    linkedTileIds.add(tileId)
                     val pct = 40 + ((index + 1) * 50 / tiles.size.coerceAtLeast(1))
                     updateProgress(
                         PreparePhase.DEM,
@@ -259,6 +270,7 @@ constructor(
                     }
                     demTileRepository.incrementRefCount(tileId)
                     linkTileCoverage(regionId, tileId)
+                    linkedTileIds.add(tileId)
                     val completedPct = 40 + ((index + 1) * 50 / tiles.size.coerceAtLeast(1))
                     persistProgress(completedPct)
                 } catch (error: Exception) {
@@ -266,28 +278,38 @@ constructor(
                     tifFile.delete()
                 }
             }
+            if (linkedTileIds.isNotEmpty()) {
+                val existingTileIds = tileCoverageDao.getTileIdsForRegion(regionId.toString())
+                if (existingTileIds.isEmpty()) {
+                    coverageLinker.linkTiles(regionId.toString(), linkedTileIds)
+                }
+            }
 
             // Post-processing (90–100%)
             updateProgress(PreparePhase.POST_PROCESSING, 90, message = "Filling elevations…")
             persistProgress(90)
-            val postSuccess =
-                postProcessor.process(regionId) { processed, total ->
-                    val pct = 90 + ((processed * 9) / total.coerceAtLeast(1))
-                    updateProgress(
-                        PreparePhase.POST_PROCESSING,
-                        pct.coerceIn(90, 99),
-                        message = "Filling elevations ($processed/$total)…"
-                    )
-                }
-            persistProgress(99)
+            postProcessor.process(regionId) { processed, total ->
+                val pct = 90 + ((processed * 9) / total.coerceAtLeast(1))
+                updateProgress(
+                    PreparePhase.POST_PROCESSING,
+                    pct.coerceIn(90, 99),
+                    message = "Filling elevations ($processed/$total)…"
+                )
+            }
             updateProgress(PreparePhase.POST_PROCESSING, 100, message = "Finalizing…")
-            persistProgress(100)
-            enforceDemCacheLimit()
 
-            if (demFailures > 0 || !postSuccess) {
-                regionRepository.updateDownloadStatus(regionId, DownloadStatus.PARTIAL, progressPct = 100)
-            } else {
-                regionRepository.updateDownloadStatus(regionId, DownloadStatus.READY, progressPct = 100)
+            val terminalStatus =
+                when {
+                    demFailures > 0 -> DownloadStatus.PARTIAL
+                    entityCount == 0 -> DownloadStatus.PARTIAL
+                    else -> DownloadStatus.READY
+                }
+            regionRepository.updateDownloadStatus(regionId, terminalStatus, progressPct = 100)
+
+            try {
+                enforceDemCacheLimit()
+            } catch (_: Exception) {
+                // Region is already READY/PARTIAL; cache eviction is best-effort.
             }
             Result.success(Unit)
         } catch (cancelled: CancellationException) {
@@ -302,6 +324,50 @@ constructor(
                 _progress.value = null
                 activeRegionId = null
             }
+        }
+    }
+
+    private suspend fun applyOsmAutoName(regionId: UUID) {
+        val region = regionRepository.getRegion(regionId)
+        if (region != null && !RegionNamePolicy.isUserProvidedName(region.name)) {
+            val entityIds = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString())
+            val entities = entityIds.mapNotNull { entityId -> geoEntityRepository.getById(entityId) }
+            RegionNameResolver.closestEntityName(region, entities)?.let { chosenName ->
+                regionRepository.updateRegionName(regionId, chosenName)
+            }
+        }
+    }
+
+    private suspend fun resetRegionCoverage(regionId: UUID) {
+        val regionIdString = regionId.toString()
+        val oldTileIds = tileCoverageDao.getTileIdsForRegion(regionIdString)
+        tileCoverageDao.deleteForRegion(regionIdString)
+        regionEntityCoverageDao.deleteForRegion(regionIdString)
+        oldTileIds.forEach { tileId ->
+            demTileRepository.decrementRefCount(tileId)
+            if (demTileRepository.getTile(tileId)?.refCount == 0) {
+                demTileRepository.evictTile(tileId)
+            }
+        }
+    }
+
+    private suspend fun ensureTileRegistered(tileId: String, binFile: File) {
+        if (demTileRepository.getTile(tileId) != null) return
+        DemTileReader.open(binFile).use { reader ->
+            demTileRepository.registerTile(
+                DemTile(
+                    tileId = tileId,
+                    filePath = demTileRepository.demFilePath(tileId),
+                    width = reader.width,
+                    height = reader.height,
+                    tileLat = reader.tileLat,
+                    tileLon = reader.tileLon,
+                    noDataValue = reader.noDataValue,
+                    sizeBytes = binFile.length(),
+                    refCount = 0,
+                    lastAccessedAt = Instant.now()
+                )
+            )
         }
     }
 

@@ -17,6 +17,8 @@ interface RegionRepository {
 
     suspend fun updateRegion(region: Region)
 
+    suspend fun updateRegionName(id: UUID, name: String)
+
     suspend fun deleteRegion(id: UUID)
 
     suspend fun regionsContainingPoint(lat: Double, lon: Double): List<Region>
@@ -48,6 +50,9 @@ interface GeoEntityRepository {
 
     suspend fun queryWithinRadiusForRegion(
         regionId: UUID,
+        regionCenterLat: Double,
+        regionCenterLon: Double,
+        regionRadiusM: Double,
         lat: Double,
         lon: Double,
         radiusM: Double,
@@ -57,10 +62,15 @@ interface GeoEntityRepository {
     suspend fun garbageCollectOrphans(): Int
 }
 
+@Suppress("TooManyFunctions")
 interface DemTileRepository {
     suspend fun registerTile(tile: DemTile)
 
     suspend fun getTile(tileId: String): DemTile?
+
+    fun isBinReadable(tileId: String): Boolean
+
+    suspend fun ensureRegisteredFromBin(tileId: String): Boolean
 
     fun openReader(tileId: String): DemTileReader?
 

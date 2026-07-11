@@ -26,6 +26,10 @@ constructor(private val regionDao: RegionDao) : RegionRepository {
         regionDao.upsert(region.asEntity())
     }
 
+    override suspend fun updateRegionName(id: UUID, name: String) {
+        regionDao.updateName(id.toString(), name.trim(), java.time.Instant.now().toEpochMilli())
+    }
+
     override suspend fun deleteRegion(id: UUID) {
         regionDao.deleteById(id.toString())
     }

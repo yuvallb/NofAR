@@ -2,6 +2,8 @@ package com.nofar.feature.home
 
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.Region
+import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.UserLocation
 import java.util.UUID
 
 private val EXPLORE_ELIGIBLE_STATUSES = setOf(DownloadStatus.READY, DownloadStatus.PARTIAL)
@@ -15,12 +17,32 @@ sealed interface ExploreNavigationDecision {
 }
 
 internal object HomeRegionLogic {
-    fun sortRegionsByUpdatedAt(regions: List<Region>): List<Region> = regions.sortedByDescending { it.updatedAt }
+    fun sortRegionsForDisplay(regions: List<Region>, location: UserLocation?): List<Region> {
+        if (location == null) return regions.sortedByDescending { it.updatedAt }
+        return regions.sortedWith(
+            compareBy<Region> { region ->
+                !RegionBounds.containsPoint(region, location.latitude, location.longitude)
+            }.thenBy { region ->
+                RegionBounds.haversineDistanceM(
+                    region.centerLat,
+                    region.centerLon,
+                    location.latitude,
+                    location.longitude
+                )
+            }.thenByDescending { it.updatedAt }
+        )
+    }
 
     fun shouldShowYouAreHere(region: Region, isInside: Boolean): Boolean =
         isInside && region.downloadStatus in EXPLORE_ELIGIBLE_STATUSES
 
-    fun canEnterExplore(region: Region, isInside: Boolean): Boolean = shouldShowYouAreHere(region, isInside)
+    fun exploreEligibleInside(regions: List<Region>, location: UserLocation?): List<Region> {
+        if (location == null) return emptyList()
+        return regions.filter { region ->
+            RegionBounds.containsPoint(region, location.latitude, location.longitude) &&
+                region.downloadStatus in EXPLORE_ELIGIBLE_STATUSES
+        }
+    }
 
     fun isEnterExploreEnabled(insideExploreRegions: List<Region>): Boolean = insideExploreRegions.isNotEmpty()
 
@@ -28,17 +50,6 @@ internal object HomeRegionLogic {
         insideExploreRegions.isEmpty() -> ExploreNavigationDecision.Disabled
         insideExploreRegions.size == 1 -> ExploreNavigationDecision.Direct(insideExploreRegions.single().id)
         else -> ExploreNavigationDecision.OverlapPicker(insideExploreRegions)
-    }
-
-    fun resolveExploreNavigationForRegion(
-        insideExploreRegions: List<Region>,
-        regionId: UUID
-    ): ExploreNavigationDecision {
-        val target = insideExploreRegions.find { it.id == regionId } ?: return ExploreNavigationDecision.Disabled
-        return when {
-            insideExploreRegions.size > 1 -> ExploreNavigationDecision.OverlapPicker(insideExploreRegions)
-            else -> ExploreNavigationDecision.Direct(target.id)
-        }
     }
 
     fun defaultOverlapSelection(regions: List<Region>, lastSelectedRegionId: UUID?): UUID =

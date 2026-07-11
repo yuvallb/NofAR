@@ -49,7 +49,7 @@ class PartialRegionVisibilityIntegrationTest {
                 geoEntityUpserter = GeoEntityUpserter(database.geoEntityDao()),
                 spatialQuery =
                 GeoEntitySpatialQuery(
-                    database,
+                    database.geoEntitySpatialDao(),
                     database.geoEntityDao(),
                     database.regionEntityCoverageDao()
                 )
@@ -59,6 +59,7 @@ class PartialRegionVisibilityIntegrationTest {
                 geoEntityRepository = geoEntityRepository,
                 demTileRepository = demTileRepository,
                 tileCoverageDao = database.tileCoverageDao(),
+                demTileDao = database.demTileDao(),
                 visibilityEngine = DemRaycastVisibilityEngine(DefaultDispatchers),
                 observerElevationResolver = ObserverElevationResolver()
             )
