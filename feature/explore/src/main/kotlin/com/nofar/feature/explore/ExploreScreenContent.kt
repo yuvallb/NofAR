@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -233,18 +234,18 @@ private fun BoxScope.ExploreReadyChrome(
     ExploreCompassRibbon(uiState = uiState)
     CompassCalibrationHint(
         calibrationState = uiState.calibrationState,
-        modifier = Modifier.align(Alignment.TopCenter).padding(top = 72.dp)
+        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 72.dp)
     )
     if (uiState.partialRegionWarning) {
         ExplorePartialRegionBanner(
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 120.dp)
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp)
         )
     }
     if (uiState.showRegionExitBanner) {
         ExploreRegionExitBanner(
             regionName = uiState.activeRegionName.orEmpty(),
             graceSecondsRemaining = uiState.regionExitGraceSecondsRemaining,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 120.dp)
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp)
         )
     }
     if (uiState.showNoVisibleEntitiesHint) {
@@ -255,6 +256,7 @@ private fun BoxScope.ExploreReadyChrome(
     NofARExploreBottomHud(
         altitudeM = uiState.altitudeM ?: "—",
         maxRangeKm = AppConfig.REGION_RADIUS_MAX_KM.toInt(),
+        simpleMode = uiState.simpleModeEnabled,
         modifier = Modifier.align(Alignment.BottomCenter)
     )
     if (uiState.simpleModeEnabled) {

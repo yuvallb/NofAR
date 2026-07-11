@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Settings
@@ -102,21 +103,20 @@ internal fun BoxScope.ExploreCompassRibbon(uiState: ExploreUiState) {
     NofARCompassRibbon(
         headings = uiState.compassRibbon.headings,
         centerHeading = uiState.compassRibbon.centerHeading,
-        modifier = Modifier.align(Alignment.TopCenter)
+        modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
     )
 }
 
 @Composable
 internal fun BoxScope.ExploreDebugOverlay(uiState: ExploreUiState) {
+    if (uiState.simpleModeEnabled) return
+
     val hFov = uiState.cameraFov.horizontalDeg
     val vFov = uiState.cameraFov.verticalDeg
     Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 120.dp)) {
         androidx.compose.foundation.layout.Column {
-            uiState.debugSmoothedAzimuthDeg?.let { smoothed ->
-                Text(text = "Az smoothed: ${"%.1f".format(smoothed)}°", color = NofARColors.ArAccent)
-            }
-            uiState.debugRawAzimuthDeg?.let { raw ->
-                Text(text = "Az raw: ${"%.1f".format(raw)}°", color = Color.White)
+            uiState.debugSmoothedAzimuthDeg?.let { azimuth ->
+                Text(text = "Az: ${"%.1f".format(azimuth)}°", color = NofARColors.ArAccent)
             }
             Text(text = "FOV: ${"%.1f".format(hFov)}° × ${"%.1f".format(vFov)}°", color = Color.White)
             if (uiState.visibleEntityCount > 0) {
