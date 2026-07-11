@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nofar.core.data.network.NetworkConnectivityMonitor
 import com.nofar.core.data.preferences.UserPreferencesRepository
+import com.nofar.core.data.prepare.DownloadPolicy
 import com.nofar.core.data.prepare.PrepareDownloadOrchestrator
 import com.nofar.core.data.prepare.PrepareDownloadScheduler
 import com.nofar.core.data.prepare.PrepareEstimator
@@ -15,6 +16,7 @@ import com.nofar.core.data.prepare.PrepareProgress
 import com.nofar.core.data.prepare.PrepareWorkState
 import com.nofar.core.data.prepare.RegionNamePolicy
 import com.nofar.core.data.repository.RegionRepository
+import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.AppConfig
@@ -76,6 +78,7 @@ class PrepareViewModel
 @Inject
 constructor(
     private val regionRepository: RegionRepository,
+    private val quickRegionDownloadUseCase: QuickRegionDownloadUseCase,
     private val downloadScheduler: PrepareDownloadScheduler,
     private val orchestrator: PrepareDownloadOrchestrator,
     private val downloadPreferences: UserPreferencesRepository,
@@ -328,14 +331,14 @@ constructor(
             val onCellular = networkConnectivityMonitor.isCellularNetwork()
             when (
                 val gate =
-                    PrepareDownloadPolicy.evaluateStart(
+                    DownloadPolicy.evaluateStart(
                         networkAvailable = true,
                         wifiOnlyDownloads = wifiOnly,
                         onCellularNetwork = onCellular,
                         estimateBytes = state.estimateBytes
                     )
             ) {
-                is PrepareDownloadPolicy.GateResult.Blocked -> {
+                is DownloadPolicy.GateResult.Blocked -> {
                     if (wifiOnly && onCellular) {
                         _uiState.update { it.copy(showWifiOnlyBlocked = true) }
                     } else {
@@ -347,10 +350,10 @@ constructor(
                         }
                     }
                 }
-                PrepareDownloadPolicy.GateResult.CellularWarning -> {
+                DownloadPolicy.GateResult.CellularWarning -> {
                     _uiState.update { it.copy(showCellularWarning = true) }
                 }
-                PrepareDownloadPolicy.GateResult.Proceed -> startDownload()
+                DownloadPolicy.GateResult.Proceed -> startDownload()
             }
         }
     }
@@ -409,9 +412,8 @@ constructor(
                 state.regionId ?: UUID.randomUUID().also { id ->
                     _uiState.update { it.copy(regionId = id) }
                 }
-            syncRegionRecord(regionId)
-
-            downloadScheduler.enqueue(regionId)
+            val region = buildRegionRecord(regionId)
+            quickRegionDownloadUseCase.syncAndEnqueue(region).getOrThrow()
             _uiState.update {
                 it.copy(
                     regionId = regionId,
@@ -425,37 +427,31 @@ constructor(
         }
     }
 
-    private suspend fun syncRegionRecord(regionId: UUID) {
+    private suspend fun buildRegionRecord(regionId: UUID): Region {
         val state = _uiState.value
         val now = Instant.now()
         val radiusM = state.radiusKm * 1000
         val bbox = RegionBounds.boundingBox(state.centerLat, state.centerLon, radiusM)
         val estimate = PrepareEstimator.estimate(state.centerLat, state.centerLon, radiusM)
         val existing = regionRepository.getRegion(regionId)
-        val region =
-            Region(
-                id = regionId,
-                name = state.regionName.trim(),
-                centerLat = state.centerLat,
-                centerLon = state.centerLon,
-                radiusM = radiusM,
-                minLat = bbox.minLat,
-                maxLat = bbox.maxLat,
-                minLon = bbox.minLon,
-                maxLon = bbox.maxLon,
-                createdAt = existing?.createdAt ?: now,
-                updatedAt = now,
-                downloadStatus = existing?.downloadStatus ?: DownloadStatus.NOT_DOWNLOADED,
-                downloadProgressPct = existing?.downloadProgressPct ?: 0,
-                osmDatasetVersion = existing?.osmDatasetVersion,
-                estimatedSizeBytes = estimate.totalEstimateBytes,
-                entityCount = existing?.entityCount ?: 0
-            )
-        if (existing == null) {
-            regionRepository.createRegion(region)
-        } else {
-            regionRepository.updateRegion(region)
-        }
+        return Region(
+            id = regionId,
+            name = state.regionName.trim(),
+            centerLat = state.centerLat,
+            centerLon = state.centerLon,
+            radiusM = radiusM,
+            minLat = bbox.minLat,
+            maxLat = bbox.maxLat,
+            minLon = bbox.minLon,
+            maxLon = bbox.maxLon,
+            createdAt = existing?.createdAt ?: now,
+            updatedAt = now,
+            downloadStatus = existing?.downloadStatus ?: DownloadStatus.NOT_DOWNLOADED,
+            downloadProgressPct = existing?.downloadProgressPct ?: 0,
+            osmDatasetVersion = existing?.osmDatasetVersion,
+            estimatedSizeBytes = estimate.totalEstimateBytes,
+            entityCount = existing?.entityCount ?: 0
+        )
     }
 
     private fun loadExistingRegion(regionId: UUID) {

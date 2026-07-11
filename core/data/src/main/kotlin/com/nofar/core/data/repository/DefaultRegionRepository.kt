@@ -60,4 +60,9 @@ constructor(private val regionDao: RegionDao) : RegionRepository {
 
     override suspend fun hasActiveDownload(): Boolean =
         regionDao.getAll().any { it.downloadStatus == com.nofar.core.model.DownloadStatus.DOWNLOADING.name }
+
+    override suspend fun findDownloadingRegion(): Region? = regionDao
+        .getAll()
+        .firstOrNull { it.downloadStatus == com.nofar.core.model.DownloadStatus.DOWNLOADING.name }
+        ?.asExternalModel()
 }

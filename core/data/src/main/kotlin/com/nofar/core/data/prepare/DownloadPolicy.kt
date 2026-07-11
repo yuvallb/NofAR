@@ -1,8 +1,8 @@
-package com.nofar.feature.prepare
+package com.nofar.core.data.prepare
 
 import com.nofar.core.model.AppConfig
 
-internal object PrepareDownloadPolicy {
+object DownloadPolicy {
     sealed interface GateResult {
         data object Proceed : GateResult
 

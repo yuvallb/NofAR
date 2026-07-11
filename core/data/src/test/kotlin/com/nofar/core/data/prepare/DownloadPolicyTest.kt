@@ -1,51 +1,51 @@
-package com.nofar.feature.prepare
+package com.nofar.core.data.prepare
 
 import com.nofar.core.model.AppConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class PrepareDownloadPolicyTest {
+class DownloadPolicyTest {
     @Test
     fun wifiOnlyPreference_blocksCellularDownloadStart() {
         val result =
-            PrepareDownloadPolicy.evaluateStart(
+            DownloadPolicy.evaluateStart(
                 networkAvailable = true,
                 wifiOnlyDownloads = true,
                 onCellularNetwork = true,
                 estimateBytes = 10_000_000
             )
 
-        assertTrue(result is PrepareDownloadPolicy.GateResult.Blocked)
+        assertTrue(result is DownloadPolicy.GateResult.Blocked)
         assertEquals(
             "Wi-Fi only downloads are enabled. Connect to Wi-Fi to continue.",
-            (result as PrepareDownloadPolicy.GateResult.Blocked).message
+            (result as DownloadPolicy.GateResult.Blocked).message
         )
     }
 
     @Test
     fun wifiOnlyDisabled_allowsCellularWhenUnderWarningThreshold() {
         val result =
-            PrepareDownloadPolicy.evaluateStart(
+            DownloadPolicy.evaluateStart(
                 networkAvailable = true,
                 wifiOnlyDownloads = false,
                 onCellularNetwork = true,
                 estimateBytes = AppConfig.CELLULAR_DOWNLOAD_WARNING_BYTES
             )
 
-        assertEquals(PrepareDownloadPolicy.GateResult.Proceed, result)
+        assertEquals(DownloadPolicy.GateResult.Proceed, result)
     }
 
     @Test
     fun cellularOverThreshold_showsWarning() {
         val result =
-            PrepareDownloadPolicy.evaluateStart(
+            DownloadPolicy.evaluateStart(
                 networkAvailable = true,
                 wifiOnlyDownloads = false,
                 onCellularNetwork = true,
                 estimateBytes = AppConfig.CELLULAR_DOWNLOAD_WARNING_BYTES + 1
             )
 
-        assertEquals(PrepareDownloadPolicy.GateResult.CellularWarning, result)
+        assertEquals(DownloadPolicy.GateResult.CellularWarning, result)
     }
 }

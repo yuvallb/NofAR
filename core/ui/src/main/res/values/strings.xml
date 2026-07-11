@@ -27,4 +27,15 @@
     <string name="explore_osm_watermark">© OpenStreetMap contributors</string>
     <string name="explore_expanded_bucket_title">Nearby features</string>
     <string name="explore_dismiss">Dismiss</string>
+    <string name="explore_download_map_data">Download map data</string>
+    <string name="explore_download_prompt_title">Download map data for your area</string>
+    <string name="explore_download_prompt_message">%1$s · ~%2$s · %3$d DEM tiles</string>
+    <string name="explore_download_not_now">Not now</string>
+    <string name="explore_download_in_progress">Downloading map data…</string>
+    <string name="explore_download_progress">%1$d%% complete</string>
+    <string name="explore_open_settings_gear">Settings</string>
+    <string name="explore_download_map_data_action">Download map data</string>
+    <string name="settings_simple_mode_title">Simple mode</string>
+    <string name="settings_simple_mode_subtitle">Explore-first experience with on-demand map downloads</string>
+    <string name="settings_wifi_only_subtitle">Block map downloads on cellular data</string>
 </resources>

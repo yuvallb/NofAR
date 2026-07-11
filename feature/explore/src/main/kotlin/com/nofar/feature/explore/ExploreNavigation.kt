@@ -7,8 +7,9 @@ import androidx.navigation.navArgument
 
 const val EXPLORE_ROUTE = "explore"
 const val EXPLORE_ROUTE_WITH_ARG = "explore?regionId={regionId}"
+const val EXPLORE_START_ROUTE = "explore?regionId="
 
-fun NavGraphBuilder.exploreScreen(onNavigateBack: () -> Unit) {
+fun NavGraphBuilder.exploreScreen(onNavigateBack: () -> Unit, onNavigateToSettings: () -> Unit) {
     composable(
         route = EXPLORE_ROUTE_WITH_ARG,
         arguments =
@@ -20,6 +21,9 @@ fun NavGraphBuilder.exploreScreen(onNavigateBack: () -> Unit) {
             }
         )
     ) {
-        ExploreScreen(onNavigateBack = onNavigateBack)
+        ExploreScreen(
+            onNavigateBack = onNavigateBack,
+            onNavigateToSettings = onNavigateToSettings
+        )
     }
 }

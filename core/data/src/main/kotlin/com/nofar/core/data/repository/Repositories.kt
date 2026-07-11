@@ -32,6 +32,8 @@ interface RegionRepository {
     )
 
     suspend fun hasActiveDownload(): Boolean
+
+    suspend fun findDownloadingRegion(): Region?
 }
 
 interface GeoEntityRepository {

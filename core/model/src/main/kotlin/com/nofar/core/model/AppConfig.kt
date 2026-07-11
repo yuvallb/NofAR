@@ -25,6 +25,9 @@ object AppConfig {
     /** Maximum circular region radius (kilometers). */
     const val REGION_RADIUS_MAX_KM: Double = 20.0
 
+    /** Default circular region radius for Simple Mode auto-download (meters). */
+    const val SIMPLE_MODE_DEFAULT_RADIUS_M: Double = 10_000.0
+
     /** Warn before cellular download when estimated size exceeds this (bytes). */
     const val CELLULAR_DOWNLOAD_WARNING_BYTES: Long = 50L * 1024 * 1024
 

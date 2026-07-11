@@ -32,7 +32,11 @@ class ExploreCameraPermissionInstrumentedTest {
                 cameraGranted = granted,
                 calibrationState = com.nofar.core.model.CompassCalibrationState.OK,
                 activeRegion = null,
-                graceExpired = false
+                graceExpired = false,
+                simpleModeEnabled = false,
+                regionDownloadNeeded = false,
+                regionDownloading = false,
+                downloadPromptDismissed = false
             )
         if (granted) {
             assertThat(gate).isEqualTo(ExploreGate.REGION_MISSING)

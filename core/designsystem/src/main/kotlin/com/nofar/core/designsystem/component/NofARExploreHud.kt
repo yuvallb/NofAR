@@ -187,7 +187,31 @@ private fun ArLabelAnchorDot() {
 }
 
 @Composable
-fun NofARExploreBottomHud(altitudeM: String, maxRangeKm: Int, modifier: Modifier = Modifier) {
+fun NofARExploreBottomHud(
+    altitudeM: String,
+    maxRangeKm: Int,
+    simpleMode: Boolean = false,
+    modifier: Modifier = Modifier
+) {
+    if (simpleMode) {
+        Box(
+            modifier =
+            modifier
+                .fillMaxWidth()
+                .background(NofARColors.ArOverlayBackground)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = "ALT $altitudeM m",
+                modifier = Modifier.align(Alignment.Center),
+                style = MaterialTheme.typography.labelMedium.copy(shadow = arTextShadow),
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        }
+        return
+    }
+
     Row(
         modifier =
         modifier

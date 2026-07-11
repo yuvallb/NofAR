@@ -26,6 +26,7 @@ import com.nofar.core.designsystem.theme.NofARColors
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onSimpleModeChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -70,6 +71,9 @@ fun SettingsScreen(
             SettingsContent(
                 uiState = uiState,
                 onWifiOnlyChanged = viewModel::onWifiOnlyDownloadsChanged,
+                onSimpleModeChanged = { enabled ->
+                    viewModel.onSimpleModeChanged(enabled, onSimpleModeChanged)
+                },
                 onEvictionThresholdChanged = viewModel::onEvictionThresholdChanged,
                 onShowPurgeConfirm = viewModel::showPurgeConfirm,
                 onShowRawSensorChanged = viewModel::onShowRawSensorOverlayChanged,
