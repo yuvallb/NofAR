@@ -52,17 +52,6 @@ During Explore, visibility and rendering run on two cadences: a low-frequency pa
 
 Overpass requests use a descriptive `User-Agent` and tiered public mirror failover. DEM tiles are cached globally and shared across overlapping regions.
 
----
-
-## Project status
-
-The Android app uses a modular [Now in Android](https://github.com/android/nowinandroid)-style Gradle layout. Phase 0 provides the project scaffold, design system baseline, navigation shell, and CI — feature logic arrives in later phases.
-
-What exists today:
-
-- **Multi-module Android app** (`:app`, `:core:*`, `:feature:*`, `:build-logic:convention`)
-- **[Apache 2.0](LICENSE)** license
-- **Python algorithm prototypes** in [`scripts/`](scripts/) — reference implementations for DEM download, terrain profiles, and horizon visibility (ported to Kotlin for the app; not shipped in the APK)
 
 ---
 

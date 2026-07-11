@@ -19,10 +19,6 @@ captures/
 .DS_Store
 Thumbs.db
 
-# Python prototypes
-/scripts/dem_cache
-/scripts/*.png
-
 # Internal planning docs (optional local gitignore)
 /internal
 

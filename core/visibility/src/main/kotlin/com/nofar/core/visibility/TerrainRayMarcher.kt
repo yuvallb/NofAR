@@ -81,7 +81,7 @@ class TerrainRayMarcher {
     }
 
     /**
-     * Finds the horizon index using the Python [find_horizon] max-slope algorithm.
+     * Finds the horizon index using the max-slope algorithm.
      * Exposed for golden-file parity tests.
      */
     fun findHorizonIndex(elevations: List<Double?>, fixedDistanceM: Double, observerHeightM: Double): Int {

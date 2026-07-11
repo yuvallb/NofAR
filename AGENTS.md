@@ -59,12 +59,6 @@ Once Phase 0 is complete, use these commands (requires **JDK 26** to run Gradle;
 
 CI (GitHub Actions) runs `./gradlew spotlessCheck detekt lint test assembleDebug assembleRelease` on PRs and pushes to `main` using JDK 26.
 
-**Python scripts** (algorithm prototyping only):
-
-```bash
-cd scripts && uv sync    # or pip install from pyproject.toml
-python horizon_dem.py    # see script docstrings for args
-```
 
 Do not add proprietary or analytics dependencies to the Gradle dependency tree.
 

@@ -184,7 +184,7 @@ class TerrainRayMarcherTest {
     }
 
     @Test
-    fun findHorizonIndex_matchesPythonSlopeComparison() {
+    fun findHorizonIndex_matchesSlopeComparison() {
         val elevations = listOf(100.0, 110.0, 130.0, 120.0, 115.0)
         val index = rayMarcher.findHorizonIndex(elevations, fixedDistanceM = 100.0, observerHeightM = 1.7)
         assertThat(index).isEqualTo(2)

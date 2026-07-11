@@ -7,7 +7,7 @@ import com.nofar.core.model.DemTileId
  * Multi-tile elevation lookup for ray-marching. Selects the correct [DemTileReader] by lat/lon.
  *
  * **No-data handling:** samples with no elevation (missing tile or no-data pixel) are skipped
- * during occlusion checks — they do not block line of sight, matching the Python prototype.
+ * during occlusion checks — they do not block line of sight.
  */
 class DemElevationSampler(demReaders: Map<String, DemTileReader>) {
     private val readersByOrigin: Map<Pair<Int, Int>, DemTileReader> =

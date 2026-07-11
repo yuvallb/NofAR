@@ -66,7 +66,7 @@ object AppConfig {
      */
     const val COMPASS_ACCURACY_THRESHOLD: Int = 1
 
-    /** Ray-march sample interval along terrain profile (meters). Matches Python prototype default. */
+    /** Ray-march sample interval along terrain profile (meters). */
     const val VISIBILITY_RAY_STEP_METERS: Double = 100.0
 
     /** Maximum candidate entities passed to the visibility engine per pass. */
