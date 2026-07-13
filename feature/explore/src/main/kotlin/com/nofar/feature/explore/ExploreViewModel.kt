@@ -9,12 +9,10 @@ import com.nofar.core.data.network.NetworkConnectivityMonitor
 import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.prepare.DownloadPolicy
 import com.nofar.core.data.prepare.PrepareDownloadScheduler
-import com.nofar.core.data.prepare.PrepareWorkState
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.usecase.ExploreRegionResolution
 import com.nofar.core.data.usecase.ExploreRegionResolver
 import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
-import com.nofar.core.data.usecase.QuickRegionProposal
 import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
@@ -25,64 +23,26 @@ import com.nofar.core.model.LocationAccessState
 import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
 import com.nofar.core.sensors.CompassCalibrationMonitor
-import com.nofar.core.sensors.CompassRibbonFormatter
-import com.nofar.core.sensors.CompassRibbonLabels
 import com.nofar.core.sensors.DeclinationCorrector
 import com.nofar.core.sensors.OrientationController
 import com.nofar.core.sensors.OrientationProvider
 import com.nofar.core.sensors.di.UnsmoothedOrientation
 import com.nofar.core.visibility.CameraFieldOfView
+import com.nofar.core.visibility.DisplayAltitudeResolver
 import com.nofar.core.visibility.VisibilityPassScheduler
 import com.nofar.core.visibility.VisibilityWarning
 import com.nofar.core.visibility.VisibleEntity
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
+import kotlin.math.abs
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-data class ExploreUiState(
-    val compassRibbon: CompassRibbonLabels = CompassRibbonFormatter.fromAzimuth(0f),
-    val altitudeM: String? = null,
-    val calibrationState: CompassCalibrationState = CompassCalibrationState.UNAVAILABLE,
-    val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED,
-    val waitingForGpsFix: Boolean = false,
-    val cameraGranted: Boolean = false,
-    val exploreGate: ExploreGate = ExploreGate.WAITING_GPS,
-    val simpleModeEnabled: Boolean = false,
-    val activeRegion: Region? = null,
-    val activeRegionName: String? = null,
-    val partialRegionWarning: Boolean = false,
-    val regionResolution: ExploreRegionResolution? = null,
-    val downloadPrompt: QuickRegionProposal? = null,
-    val downloadPromptDismissed: Boolean = false,
-    val downloadProgressPct: Int = 0,
-    val downloadUiMessage: String? = null,
-    val showCellularWarning: Boolean = false,
-    val showWifiOnlyBlocked: Boolean = false,
-    val clusteredLabels: List<com.nofar.core.visibility.ClusteredLabel> = emptyList(),
-    val arLabels: List<com.nofar.core.designsystem.component.ArLabel> = emptyList(),
-    val expandedBucketIndex: Int? = null,
-    val expandedCluster: com.nofar.core.visibility.ClusteredLabel? = null,
-    val showRegionExitBanner: Boolean = false,
-    val regionExitGraceSecondsRemaining: Int = 0,
-    val showGraceExpiredDialog: Boolean = false,
-    val showNoVisibleEntitiesHint: Boolean = false,
-    val cameraFov: CameraFieldOfView = CameraFieldOfView.fallback(),
-    val screenWidthPx: Float = 0f,
-    val screenHeightPx: Float = 0f,
-    val debugRawAzimuthDeg: Float? = null,
-    val debugSmoothedAzimuthDeg: Float? = null,
-    val useRawSensorOverlay: Boolean = false,
-    val visibleEntityCount: Int = 0
-)
 
 @HiltViewModel
 class ExploreViewModel
@@ -97,6 +57,7 @@ constructor(
     private val calibrationMonitor: CompassCalibrationMonitor,
     private val declinationCorrector: DeclinationCorrector,
     private val visibilityPassScheduler: VisibilityPassScheduler,
+    private val displayAltitudeResolver: DisplayAltitudeResolver,
     private val regionRepository: RegionRepository,
     private val regionCoverageRepairUseCase: RegionCoverageRepairUseCase,
     private val userPreferencesRepository: UserPreferencesRepository,
@@ -111,12 +72,28 @@ constructor(
         savedStateHandle.get<String>("regionId")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
 
     private val regionBoundaryController = ExploreRegionBoundaryController()
+    private val altitudeController =
+        ExploreAltitudeController(
+            scope = viewModelScope,
+            displayAltitudeResolver = displayAltitudeResolver,
+            uiState = _uiState,
+            activeRegion = { _uiState.value.activeRegion }
+        )
+    private val downloadController =
+        ExploreDownloadController(
+            scope = viewModelScope,
+            regionRepository = regionRepository,
+            quickRegionDownloadUseCase = quickRegionDownloadUseCase,
+            downloadScheduler = downloadScheduler,
+            uiState = _uiState,
+            onDownloadComplete = { region -> applyActiveRegion(region) },
+            onRefreshGate = { refreshGate() }
+        )
     private var cachedVisibleEntities: List<VisibleEntity> = emptyList()
     private var currentOrientation: DeviceOrientation? = null
     private var currentRawOrientation: DeviceOrientation? = null
     private var hasReceivedOrientation: Boolean = false
-    private var downloadObservationJob: Job? = null
-    private var pendingCellularProposal: QuickRegionProposal? = null
+    private var lastCompassBearingDeg: Float = 0f
 
     init {
         locationController.acquire(EXPLORE_LOCATION_TOKEN)
@@ -143,10 +120,15 @@ constructor(
                 accessState == LocationAccessState.GRANTED &&
                     locationRepository.lastLocation == null
             state.copy(
-                altitudeM = if (accessState == LocationAccessState.GRANTED) state.altitudeM else null,
+                altitude = if (accessState == LocationAccessState.GRANTED) state.altitude else null,
                 locationAccessState = if (waiting) LocationAccessState.WAITING_FOR_FIX else accessState,
                 waitingForGpsFix = waiting
             )
+        }
+        if (accessState == LocationAccessState.GRANTED) {
+            locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it) }
+        } else {
+            altitudeController.clearAltitude()
         }
         refreshGate()
     }
@@ -205,23 +187,23 @@ constructor(
                     }
                 }
                 DownloadPolicy.GateResult.CellularWarning -> {
-                    pendingCellularProposal = proposal
+                    downloadController.pendingCellularProposal = proposal
                     _uiState.update { it.copy(showCellularWarning = true) }
                 }
-                DownloadPolicy.GateResult.Proceed -> startDownload(proposal)
+                DownloadPolicy.GateResult.Proceed -> downloadController.startDownload(proposal)
             }
         }
     }
 
     fun confirmCellularDownload() {
-        val proposal = pendingCellularProposal ?: _uiState.value.downloadPrompt ?: return
-        pendingCellularProposal = null
+        val proposal = downloadController.pendingCellularProposal ?: _uiState.value.downloadPrompt ?: return
+        downloadController.pendingCellularProposal = null
         _uiState.update { it.copy(showCellularWarning = false) }
-        viewModelScope.launch { startDownload(proposal) }
+        viewModelScope.launch { downloadController.startDownload(proposal) }
     }
 
     fun dismissCellularWarning() {
-        pendingCellularProposal = null
+        downloadController.pendingCellularProposal = null
         _uiState.update { it.copy(showCellularWarning = false) }
     }
 
@@ -240,7 +222,7 @@ constructor(
     }
 
     override fun onCleared() {
-        downloadObservationJob?.cancel()
+        downloadController.onCleared()
         regionBoundaryController.stopGraceTicker()
         visibilityPassScheduler.stop()
         locationController.release(EXPLORE_LOCATION_TOKEN)
@@ -261,11 +243,13 @@ constructor(
         if (requestedRegionId != null) {
             val region = regionRepository.getRegion(requestedRegionId)
             applyActiveRegion(region)
+            locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it, region) }
             return
         }
         val location = locationRepository.lastLocation
         if (location != null) {
             applyRegionResolution(location)
+            altitudeController.scheduleResolve(location, _uiState.value.activeRegion)
         }
     }
 
@@ -284,7 +268,7 @@ constructor(
                 )
             when (resolution) {
                 is ExploreRegionResolution.Active -> {
-                    stopDownloadObservation()
+                    downloadController.stopObservation()
                     applyActiveRegion(resolution.region)
                     _uiState.update {
                         it.copy(
@@ -305,7 +289,7 @@ constructor(
                             downloadPromptDismissed = false
                         )
                     }
-                    observeDownloadProgress(resolution.region.id)
+                    downloadController.observeProgress(resolution.region.id)
                 }
                 is ExploreRegionResolution.NeedsDownload -> {
                     applyActiveRegion(null)
@@ -317,7 +301,7 @@ constructor(
                             downloadUiMessage = null
                         )
                     }
-                    stopDownloadObservation()
+                    downloadController.stopObservation()
                 }
             }
         } else {
@@ -334,149 +318,28 @@ constructor(
         .maxByOrNull { it.updatedAt }
 
     private fun applyActiveRegion(region: Region?) {
+        visibilityPassScheduler.setActiveRegion(region)
+        _uiState.update {
+            it.copy(
+                activeRegion = region,
+                activeRegionName = region?.name,
+                partialRegionWarning = region?.downloadStatus == DownloadStatus.PARTIAL
+            )
+        }
+        locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it, region) }
         viewModelScope.launch(Dispatchers.IO) {
             region?.let { active ->
                 runCatching { regionCoverageRepairUseCase.repairIfNeeded(active) }
-            }
-            visibilityPassScheduler.setActiveRegion(region)
-            _uiState.update {
-                it.copy(
-                    activeRegion = region,
-                    activeRegionName = region?.name,
-                    partialRegionWarning = region?.downloadStatus == DownloadStatus.PARTIAL
-                )
             }
             refreshGate()
         }
     }
 
-    private suspend fun startDownload(proposal: QuickRegionProposal) {
-        _uiState.update {
-            it.copy(
-                downloadPromptDismissed = false,
-                downloadUiMessage = null,
-                downloadProgressPct = 0
-            )
-        }
-        val result =
-            quickRegionDownloadUseCase.createAndEnqueueAtLocation(
-                centerLat = proposal.centerLat,
-                centerLon = proposal.centerLon,
-                radiusM = proposal.radiusM,
-                name = proposal.name,
-                existingRegionId = proposal.existingRegionId
-            )
-        result
-            .onSuccess { regionId ->
-                val region = regionRepository.getRegion(regionId)
-                if (region != null) {
-                    _uiState.update {
-                        it.copy(
-                            regionResolution = ExploreRegionResolution.Downloading(region),
-                            downloadPrompt = null
-                        )
-                    }
-                    observeDownloadProgress(regionId)
-                }
-                refreshGate()
-            }.onFailure { error ->
-                _uiState.update {
-                    it.copy(downloadUiMessage = error.message ?: "Download failed. Try again.")
-                }
-            }
-    }
-
-    private fun observeDownloadProgress(regionId: UUID) {
-        downloadObservationJob?.cancel()
-        downloadObservationJob =
-            viewModelScope.launch {
-                launch { pollDownloadProgress(regionId) }
-                downloadScheduler.observeWorkState(regionId).collect { workState ->
-                    handleDownloadWorkState(regionId, workState)
-                }
-            }
-    }
-
-    private suspend fun pollDownloadProgress(regionId: UUID) {
-        var keepPolling = true
-        while (keepPolling) {
-            val region = regionRepository.getRegion(regionId)
-            if (region == null) {
-                delay(DOWNLOAD_POLL_INTERVAL_MS)
-                continue
-            }
-            _uiState.update {
-                it.copy(
-                    downloadProgressPct = region.downloadProgressPct,
-                    regionResolution = ExploreRegionResolution.Downloading(region)
-                )
-            }
-            keepPolling =
-                when (region.downloadStatus) {
-                    DownloadStatus.READY, DownloadStatus.PARTIAL -> {
-                        completeDownload(region)
-                        false
-                    }
-                    DownloadStatus.DOWNLOADING -> {
-                        delay(DOWNLOAD_POLL_INTERVAL_MS)
-                        true
-                    }
-                    else -> {
-                        failDownload()
-                        false
-                    }
-                }
-        }
-    }
-
-    private suspend fun handleDownloadWorkState(regionId: UUID, workState: PrepareWorkState?) {
-        when (workState) {
-            PrepareWorkState.SUCCEEDED -> {
-                val region = regionRepository.getRegion(regionId)
-                if (region != null &&
-                    (
-                        region.downloadStatus == DownloadStatus.READY ||
-                            region.downloadStatus == DownloadStatus.PARTIAL
-                        )
-                ) {
-                    completeDownload(region)
-                }
-            }
-            PrepareWorkState.FAILED, PrepareWorkState.CANCELLED -> failDownload()
-            else -> Unit
-        }
-    }
-
-    private suspend fun completeDownload(region: Region) {
-        applyActiveRegion(region)
-        _uiState.update {
-            it.copy(
-                regionResolution = ExploreRegionResolution.Active(region),
-                downloadPrompt = null,
-                downloadProgressPct = 100,
-                downloadUiMessage = null
-            )
-        }
-        refreshGate()
-    }
-
-    private fun failDownload() {
-        _uiState.update {
-            it.copy(downloadUiMessage = "Download failed. Try again.")
-        }
-        refreshGate()
-    }
-
-    private fun stopDownloadObservation() {
-        downloadObservationJob?.cancel()
-        downloadObservationJob = null
-    }
-
     private fun onOrientation(orientation: DeviceOrientation) {
-        val ribbon = CompassRibbonFormatter.fromAzimuth(orientation.trueAzimuthDeg)
+        val compassBearingDeg = resolveCompassDisplayBearing(orientation)
         _uiState.update {
             it.copy(
-                compassRibbon = ribbon,
+                compassBearingDeg = compassBearingDeg,
                 calibrationState = calibrationMonitor.calibrationState(orientation),
                 debugSmoothedAzimuthDeg = orientation.trueAzimuthDeg
             )
@@ -484,11 +347,22 @@ constructor(
         refreshGate()
     }
 
+    private fun resolveCompassDisplayBearing(orientation: DeviceOrientation): Float {
+        if (abs(orientation.pitchDeg) <= COMPASS_DISPLAY_PITCH_LIMIT_DEG) {
+            lastCompassBearingDeg = normalizeAzimuthDeg(orientation.trueAzimuthDeg)
+        }
+        return lastCompassBearingDeg
+    }
+
+    private fun normalizeAzimuthDeg(azimuthDeg: Float): Float {
+        var normalized = azimuthDeg % 360f
+        if (normalized < 0f) normalized += 360f
+        return normalized
+    }
+
     private fun onLocation(location: UserLocation) {
-        val altitude = location.altitudeMeters?.let { alt -> alt.toInt().toString() }
         _uiState.update {
             it.copy(
-                altitudeM = altitude,
                 waitingForGpsFix = false,
                 locationAccessState =
                 if (it.locationAccessState == LocationAccessState.WAITING_FOR_FIX) {
@@ -500,24 +374,28 @@ constructor(
         }
 
         viewModelScope.launch {
-            if (requestedRegionId != null) {
-                val region = regionRepository.getRegion(requestedRegionId)
-                if (region?.id != _uiState.value.activeRegion?.id) {
-                    applyActiveRegion(region)
+            val activeRegion =
+                if (requestedRegionId != null) {
+                    val region = regionRepository.getRegion(requestedRegionId)
+                    if (region?.id != _uiState.value.activeRegion?.id) {
+                        applyActiveRegion(region)
+                    }
+                    applyRegionBoundary(location, region)
+                    region
+                } else {
+                    val previousResolution = _uiState.value.regionResolution
+                    applyRegionResolution(location)
+                    val region = _uiState.value.activeRegion
+                    if (previousResolution != _uiState.value.regionResolution &&
+                        _uiState.value.regionResolution is ExploreRegionResolution.NeedsDownload
+                    ) {
+                        _uiState.update { it.copy(downloadPromptDismissed = false) }
+                    }
+                    applyRegionBoundary(location, region)
+                    region
                 }
-                applyRegionBoundary(location, region)
-            } else {
-                val previousResolution = _uiState.value.regionResolution
-                applyRegionResolution(location)
-                val region = _uiState.value.activeRegion
-                if (previousResolution != _uiState.value.regionResolution &&
-                    _uiState.value.regionResolution is ExploreRegionResolution.NeedsDownload
-                ) {
-                    _uiState.update { it.copy(downloadPromptDismissed = false) }
-                }
-                applyRegionBoundary(location, region)
-            }
             refreshGate()
+            altitudeController.scheduleResolve(location, activeRegion)
         }
     }
 
@@ -716,6 +594,6 @@ constructor(
     companion object {
         private const val EXPLORE_LOCATION_TOKEN = "explore"
         private const val EXPLORE_ORIENTATION_TOKEN = "explore"
-        private const val DOWNLOAD_POLL_INTERVAL_MS = 500L
+        private const val COMPASS_DISPLAY_PITCH_LIMIT_DEG = 60f
     }
 }

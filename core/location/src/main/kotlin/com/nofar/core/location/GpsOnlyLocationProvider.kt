@@ -107,6 +107,7 @@ constructor(@param:ApplicationContext private val context: Context) :
         longitude = longitude,
         altitudeMeters = if (hasAltitude()) altitude else null,
         accuracyMeters = accuracy,
+        verticalAccuracyMeters = if (hasVerticalAccuracy()) verticalAccuracyMeters else null,
         timestampMillis = time
     )
 }

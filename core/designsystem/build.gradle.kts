@@ -13,5 +13,6 @@ dependencies {
     implementation(project(":core:model"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.compose.material.icons.extended)
+    testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
 }

@@ -5,13 +5,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,16 +23,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.nofar.core.designsystem.theme.NofARColors
+import com.nofar.core.model.AltitudeReading
 
-private val arTextShadow =
+internal val arTextShadow =
     Shadow(
         color = Color.Black,
         offset = Offset(2f, 2f),
@@ -49,49 +48,6 @@ data class ArLabel(
     val hiddenCount: Int = 0,
     val bucketIndex: Int = 0
 )
-
-@Composable
-fun NofARCompassRibbon(headings: List<String>, centerHeading: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier =
-        modifier
-            .fillMaxWidth()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(NofARColors.ArOverlayBackground, Color.Transparent)
-                )
-            )
-            .padding(top = 8.dp, bottom = 16.dp)
-    ) {
-        Row(
-            modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            headings.forEach { heading ->
-                Text(
-                    text = heading,
-                    style = MaterialTheme.typography.labelMedium.copy(shadow = arTextShadow),
-                    color = if (heading == centerHeading) NofARColors.ArAccent else Color.White,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
-        Text(
-            text = "▼",
-            modifier =
-            Modifier
-                .align(Alignment.BottomCenter)
-                .offset(y = 12.dp),
-            color = NofARColors.ArAccent,
-            fontWeight = FontWeight.Bold,
-            fontSize = 16.sp
-        )
-    }
-}
 
 @Composable
 fun NofARArLabel(label: ArLabel, modifier: Modifier = Modifier, onHiddenCountClick: ((Int) -> Unit)? = null) {
@@ -187,46 +143,53 @@ private fun ArLabelAnchorDot() {
 }
 
 @Composable
-fun NofARExploreBottomHud(
-    altitudeM: String,
-    maxRangeKm: Int,
-    simpleMode: Boolean = false,
-    modifier: Modifier = Modifier
-) {
-    if (simpleMode) {
-        Box(
-            modifier =
-            modifier
-                .fillMaxWidth()
-                .background(NofARColors.ArOverlayBackground)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-        ) {
+fun NofARExploreAltitudeReadout(altitude: AltitudeReading?, modifier: Modifier = Modifier) {
+    Row(
+        modifier =
+        modifier
+            .background(NofARColors.ArOverlayBackground)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val prefix = altitude?.takeIf { it.isEstimate }?.let { "~" }.orEmpty()
+        val valueText =
+            altitude?.let { reading -> "ALT $prefix${reading.meters} m" } ?: "ALT — m"
+        Text(
+            text = valueText,
+            style = MaterialTheme.typography.titleMedium.copy(shadow = arTextShadow),
+            color = Color.White,
+            fontWeight = FontWeight.Bold
+        )
+        altitude?.accuracyMeters?.let { accuracy ->
             Text(
-                text = "ALT $altitudeM m",
-                modifier = Modifier.align(Alignment.Center),
-                style = MaterialTheme.typography.labelMedium.copy(shadow = arTextShadow),
-                color = Color.White,
-                fontWeight = FontWeight.Bold
+                text = " ±${accuracy}m",
+                modifier = Modifier.padding(start = 4.dp),
+                style = MaterialTheme.typography.labelSmall.copy(shadow = arTextShadow),
+                color = Color.White
             )
         }
-        return
     }
+}
 
+/** Vertical space occupied by [NofARExploreBottomHud]; use when stacking controls above it. */
+val NofARExploreBottomHudHeight = 48.dp
+
+@Composable
+fun NofARExploreBottomHud(
+    maxRangeKm: Int,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp)
+) {
     Row(
         modifier =
         modifier
             .fillMaxWidth()
+            .height(NofARExploreBottomHudHeight)
             .background(NofARColors.ArOverlayBackground)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(contentPadding),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = "ALT $altitudeM m",
-            style = MaterialTheme.typography.labelMedium.copy(shadow = arTextShadow),
-            color = Color.White,
-            fontWeight = FontWeight.Bold
-        )
         Text(
             text = "◎",
             style = MaterialTheme.typography.titleLarge,

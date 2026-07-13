@@ -1,7 +1,11 @@
 package com.nofar.feature.explore
 
+import android.content.res.Configuration
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -16,12 +20,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nofar.core.designsystem.component.NofARArLabel
 import com.nofar.core.designsystem.component.NofARCompassRibbon
+import com.nofar.core.designsystem.component.NofARExploreAltitudeReadout
+import com.nofar.core.designsystem.component.NofARExploreBottomHudHeight
 import com.nofar.core.designsystem.component.NofARIconActionButton
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.model.LocationAccessState
@@ -56,13 +64,7 @@ fun ExploreScreen(
         onShowDownloadPrompt = viewModel::onShowDownloadPrompt,
         onConfirmCellularDownload = viewModel::confirmCellularDownload,
         onDismissCellularWarning = viewModel::dismissCellularWarning,
-        onDismissWifiOnlyBlocked = viewModel::dismissWifiOnlyBlocked,
-        debugOverlay =
-        if (BuildConfig.DEBUG) {
-            { ExploreDebugOverlay(uiState = uiState) }
-        } else {
-            {}
-        }
+        onDismissWifiOnlyBlocked = viewModel::dismissWifiOnlyBlocked
     )
 }
 
@@ -100,28 +102,71 @@ internal fun BoxScope.ExploreArOverlay(uiState: ExploreUiState, onHiddenCountCli
 
 @Composable
 internal fun BoxScope.ExploreCompassRibbon(uiState: ExploreUiState) {
+    val orientedFov =
+        uiState.cameraFov.orientedForScreen(
+            screenWidthPx = uiState.screenWidthPx,
+            screenHeightPx = uiState.screenHeightPx
+        )
     NofARCompassRibbon(
-        headings = uiState.compassRibbon.headings,
-        centerHeading = uiState.compassRibbon.centerHeading,
+        bearingDeg = uiState.compassBearingDeg,
+        horizontalFovDeg = orientedFov.horizontalDeg,
         modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding()
     )
 }
 
-@Composable
-internal fun BoxScope.ExploreDebugOverlay(uiState: ExploreUiState) {
-    if (uiState.simpleModeEnabled) return
+private val ExploreChromePortraitStartInset = 16.dp
+private val ExploreChromeLandscapeStartInset = 72.dp
 
+@Composable
+internal fun exploreChromeStartInset(): Dp {
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    return if (isLandscape) ExploreChromeLandscapeStartInset else ExploreChromePortraitStartInset
+}
+
+@Composable
+internal fun exploreChromeHorizontalPadding(): PaddingValues {
+    val start = exploreChromeStartInset()
+    return PaddingValues(start = start, end = ExploreChromePortraitStartInset)
+}
+
+@Composable
+internal fun BoxScope.ExploreExpertBottomControls(
+    uiState: ExploreUiState,
+    onNavigateBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier =
+        modifier
+            .align(Alignment.BottomStart)
+            .padding(
+                start = exploreChromeStartInset(),
+                bottom = NofARExploreBottomHudHeight + 8.dp
+            ),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalAlignment = Alignment.Start
+    ) {
+        if (BuildConfig.DEBUG) {
+            ExploreDebugReadout(uiState = uiState)
+        }
+        NofARExploreAltitudeReadout(altitude = uiState.altitude)
+        NofARIconActionButton(onClick = onNavigateBack) {
+            Icon(Icons.Default.Close, contentDescription = "Exit Explore", tint = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun ExploreDebugReadout(uiState: ExploreUiState) {
     val hFov = uiState.cameraFov.horizontalDeg
     val vFov = uiState.cameraFov.verticalDeg
-    Box(modifier = Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 120.dp)) {
-        androidx.compose.foundation.layout.Column {
-            uiState.debugSmoothedAzimuthDeg?.let { azimuth ->
-                Text(text = "Az: ${"%.1f".format(azimuth)}°", color = NofARColors.ArAccent)
-            }
-            Text(text = "FOV: ${"%.1f".format(hFov)}° × ${"%.1f".format(vFov)}°", color = Color.White)
-            if (uiState.visibleEntityCount > 0) {
-                Text(text = "Visible: ${uiState.visibleEntityCount}", color = NofARColors.ArAccent)
-            }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        uiState.debugSmoothedAzimuthDeg?.let { azimuth ->
+            Text(text = "Az: ${"%.1f".format(azimuth)}°", color = NofARColors.ArAccent)
+        }
+        Text(text = "FOV: ${"%.1f".format(hFov)}° × ${"%.1f".format(vFov)}°", color = Color.White)
+        if (uiState.visibleEntityCount > 0) {
+            Text(text = "Visible: ${uiState.visibleEntityCount}", color = NofARColors.ArAccent)
         }
     }
 }
@@ -132,7 +177,7 @@ internal fun BoxScope.ExploreExitButton(onNavigateBack: () -> Unit) {
         modifier =
         Modifier
             .align(Alignment.BottomStart)
-            .padding(start = 16.dp, bottom = 72.dp)
+            .padding(start = exploreChromeStartInset(), bottom = 16.dp)
     ) {
         NofARIconActionButton(onClick = onNavigateBack) {
             Icon(Icons.Default.Close, contentDescription = "Exit Explore", tint = Color.White)

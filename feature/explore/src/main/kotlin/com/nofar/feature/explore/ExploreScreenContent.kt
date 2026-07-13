@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
+import com.nofar.core.designsystem.component.NofARExploreAltitudeReadout
 import com.nofar.core.designsystem.component.NofARExploreBottomHud
 import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
@@ -34,8 +35,7 @@ internal fun ExploreScreenRoot(
     onConfirmCellularDownload: () -> Unit,
     onDismissCellularWarning: () -> Unit,
     onDismissWifiOnlyBlocked: () -> Unit,
-    modifier: Modifier = Modifier,
-    debugOverlay: @Composable BoxScope.() -> Unit = {}
+    modifier: Modifier = Modifier
 ) {
     Box(
         modifier =
@@ -98,8 +98,6 @@ internal fun ExploreScreenRoot(
         if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
             ExploreOsmWatermark(modifier = Modifier.align(Alignment.BottomEnd))
         }
-
-        debugOverlay()
     }
 }
 
@@ -250,18 +248,25 @@ private fun BoxScope.ExploreReadyChrome(
     }
     if (uiState.showNoVisibleEntitiesHint) {
         ExploreNoVisibleEntitiesHint(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 128.dp)
         )
     }
-    NofARExploreBottomHud(
-        altitudeM = uiState.altitudeM ?: "—",
-        maxRangeKm = AppConfig.REGION_RADIUS_MAX_KM.toInt(),
-        simpleMode = uiState.simpleModeEnabled,
-        modifier = Modifier.align(Alignment.BottomCenter)
-    )
     if (uiState.simpleModeEnabled) {
+        NofARExploreAltitudeReadout(
+            altitude = uiState.altitude,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp)
+        )
         ExploreSettingsButton(onNavigateToSettings = onNavigateToSettings)
     } else {
-        ExploreExitButton(onNavigateBack = onNavigateBack)
+        val chromePadding = exploreChromeHorizontalPadding()
+        ExploreExpertBottomControls(
+            uiState = uiState,
+            onNavigateBack = onNavigateBack
+        )
+        NofARExploreBottomHud(
+            maxRangeKm = AppConfig.REGION_RADIUS_MAX_KM.toInt(),
+            contentPadding = chromePadding,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }

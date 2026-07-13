@@ -8,5 +8,6 @@ data class UserLocation(
     val longitude: Double,
     val altitudeMeters: Double?,
     val accuracyMeters: Float,
+    val verticalAccuracyMeters: Float? = null,
     val timestampMillis: Long
 )
