@@ -1,5 +1,6 @@
 package com.nofar.core.designsystem.component
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,24 +13,32 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.model.AltitudeReading
+import kotlin.math.roundToInt
 
 internal val arTextShadow =
     Shadow(
@@ -43,24 +52,48 @@ data class ArLabel(
     val elevationM: Int?,
     val distanceDisplay: String,
     val isPeak: Boolean,
-    val anchorXPx: Float,
-    val anchorYPx: Float,
+    val cardXPx: Float,
+    val cardYPx: Float,
+    val terrainAnchorXPx: Float,
+    val terrainAnchorYPx: Float,
     val hiddenCount: Int = 0,
     val bucketIndex: Int = 0
 )
 
 @Composable
 fun NofARArLabel(label: ArLabel, modifier: Modifier = Modifier, onHiddenCountClick: ((Int) -> Unit)? = null) {
-    Box(
-        modifier = modifier,
-        contentAlignment = Alignment.BottomCenter
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            ArLabelTextBlock(label = label, onHiddenCountClick = onHiddenCountClick)
-            ArLabelLeaderLine()
-            Spacer(modifier = Modifier.height(4.dp))
+    var cardSize by remember(label.name, label.distanceDisplay) { mutableStateOf(IntSize.Zero) }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val cardBottom = Offset(label.cardXPx, label.cardYPx)
+            val terrain = Offset(label.terrainAnchorXPx, label.terrainAnchorYPx)
+            drawLine(
+                color = Color.White,
+                start = cardBottom,
+                end = terrain,
+                strokeWidth = 1.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+            drawCircle(
+                color = Color.White,
+                radius = 4.dp.toPx(),
+                center = terrain
+            )
         }
-        ArLabelAnchorDot()
+        Box(
+            modifier =
+            Modifier
+                .onSizeChanged { cardSize = it }
+                .offset {
+                    IntOffset(
+                        x = (label.cardXPx - cardSize.width / 2f).roundToInt(),
+                        y = (label.cardYPx - cardSize.height).roundToInt()
+                    )
+                }
+        ) {
+            ArLabelTextBlock(label = label, onHiddenCountClick = onHiddenCountClick)
+        }
     }
 }
 
@@ -80,7 +113,7 @@ private fun ArLabelTextBlock(label: ArLabel, onHiddenCountClick: ((Int) -> Unit)
             )
             label.elevationM?.let { elevation ->
                 Text(
-                    text = "${elevation}m",
+                    text = "$elevation m",
                     style = MaterialTheme.typography.bodySmall.copy(shadow = arTextShadow),
                     color = Color.White,
                     fontWeight = FontWeight.Medium
@@ -117,29 +150,6 @@ private fun ArLabelHiddenCountCapsule(count: Int, onClick: () -> Unit) {
             color = NofARColors.ArAccent
         )
     }
-}
-
-@Composable
-private fun ArLabelLeaderLine() {
-    Box(
-        modifier =
-        Modifier
-            .width(1.dp)
-            .height(24.dp)
-            .background(Color.White)
-    )
-}
-
-@Composable
-private fun ArLabelAnchorDot() {
-    Box(
-        modifier =
-        Modifier
-            .defaultMinSize(minWidth = 4.dp, minHeight = 4.dp)
-            .drawBehind {
-                drawCircle(color = Color.White, radius = 4.dp.toPx())
-            }
-    )
 }
 
 @Composable

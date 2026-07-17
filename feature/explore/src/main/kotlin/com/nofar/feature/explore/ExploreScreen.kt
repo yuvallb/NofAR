@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
@@ -22,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,7 +35,6 @@ import com.nofar.core.model.LocationAccessState
 import com.nofar.core.ui.permission.PermissionState
 import com.nofar.core.ui.permission.rememberNofARPermissionState
 import com.nofar.feature.explore.BuildConfig
-import kotlin.math.roundToInt
 
 @Composable
 fun ExploreScreen(
@@ -91,10 +89,7 @@ internal fun BoxScope.ExploreArOverlay(uiState: ExploreUiState, onHiddenCountCli
     uiState.arLabels.forEach { label ->
         NofARArLabel(
             label = label,
-            modifier =
-            Modifier
-                .align(Alignment.TopStart)
-                .offset { IntOffset(label.anchorXPx.roundToInt(), label.anchorYPx.roundToInt()) },
+            modifier = Modifier.fillMaxSize(),
             onHiddenCountClick = onHiddenCountClick
         )
     }

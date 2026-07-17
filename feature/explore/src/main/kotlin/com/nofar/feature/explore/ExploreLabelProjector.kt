@@ -35,8 +35,10 @@ internal object ExploreLabelProjector {
                         elevationM = label.elevationM,
                         distanceDisplay = label.distanceDisplay,
                         isPeak = label.isPeak,
-                        anchorXPx = label.anchorXPx,
-                        anchorYPx = label.anchorYPx,
+                        cardXPx = label.cardXPx,
+                        cardYPx = label.cardYPx,
+                        terrainAnchorXPx = label.terrainAnchorXPx,
+                        terrainAnchorYPx = label.terrainAnchorYPx,
                         hiddenCount = if (label == cluster.labels.last()) cluster.hiddenCount else 0,
                         bucketIndex = cluster.bucketIndex
                     )
