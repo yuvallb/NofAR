@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -53,6 +54,8 @@ import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
+import com.nofar.core.model.LabelLanguage
+import com.nofar.core.ui.LabelLanguageDropdown
 import com.nofar.core.ui.permission.rememberNofARPermissionState
 import kotlin.math.hypot
 import kotlin.math.roundToInt
@@ -154,6 +157,7 @@ fun PrepareScreen(
                     }
                 },
                 onRegionNameChanged = viewModel::onRegionNameChanged,
+                onLabelLanguageChanged = viewModel::onLabelLanguageChanged,
                 onRadiusChanged = viewModel::onRadiusChanged,
                 onDownloadClicked = viewModel::onDownloadClicked,
                 onRetry = viewModel::retryDownload,
@@ -181,6 +185,7 @@ private fun DefineRegionContent(
     onMapTap: (Double, Double) -> Unit,
     onMoveToCurrentLocation: () -> Unit,
     onRegionNameChanged: (String) -> Unit,
+    onLabelLanguageChanged: (LabelLanguage) -> Unit,
     onRadiusChanged: (Double) -> Unit,
     onDownloadClicked: () -> Unit,
     onRetry: () -> Unit,
@@ -231,6 +236,25 @@ private fun DefineRegionContent(
             )
 
             Text(
+                text = stringResource(com.nofar.core.ui.R.string.prepare_label_language),
+                style = MaterialTheme.typography.bodyMedium,
+                color = NofARColors.TextPrimary
+            )
+            LabelLanguageDropdown(
+                selected = uiState.labelLanguage,
+                enabled = !uiState.labelLanguageLocked,
+                onSelected = onLabelLanguageChanged,
+                modifier = Modifier.fillMaxWidth()
+            )
+            if (uiState.labelLanguageLocked) {
+                Text(
+                    text = stringResource(com.nofar.core.ui.R.string.prepare_label_language_locked_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NofARColors.TextSecondary
+                )
+            }
+
+            Text(
                 text = "Radius: ${uiState.radiusKm.roundToInt()} km",
                 style = MaterialTheme.typography.bodyMedium,
                 color = NofARColors.TextPrimary
@@ -273,6 +297,11 @@ private fun DefineRegionContent(
                             else -> "Download complete."
                         },
                         color = NofARColors.TextSecondary
+                    )
+                    NofARPrimaryButton(
+                        text = "RE-DOWNLOAD DATA",
+                        onClick = onDownloadClicked,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
                 else -> {

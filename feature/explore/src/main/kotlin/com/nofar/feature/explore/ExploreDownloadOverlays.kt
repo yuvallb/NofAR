@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -16,6 +17,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -102,10 +105,23 @@ fun ExploreDownloadProgressOverlay(progressPct: Int, modifier: Modifier = Modifi
             verticalArrangement = Arrangement.spacedBy(16.dp),
             modifier = Modifier.padding(24.dp)
         ) {
-            CircularProgressIndicator(
-                progress = { progressPct / 100f },
-                color = NofARColors.ArAccent
-            )
+            Box(contentAlignment = Alignment.Center) {
+                CircularProgressIndicator(
+                    progress = { progressPct / 100f },
+                    color = NofARColors.ArAccent,
+                    trackColor = NofARColors.ArAccent.copy(alpha = 0.25f),
+                    strokeWidth = 4.dp,
+                    strokeCap = StrokeCap.Round,
+                    modifier = Modifier.size(48.dp)
+                )
+                CircularProgressIndicator(
+                    color = NofARColors.ArAccent.copy(alpha = 0.55f),
+                    trackColor = Color.Transparent,
+                    strokeWidth = 2.dp,
+                    strokeCap = StrokeCap.Round,
+                    modifier = Modifier.size(56.dp)
+                )
+            }
             Text(
                 text = stringResource(R.string.explore_download_in_progress),
                 style = MaterialTheme.typography.bodyLarge,

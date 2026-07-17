@@ -19,7 +19,8 @@ data class Region(
     val downloadProgressPct: Int,
     val osmDatasetVersion: Instant?,
     val estimatedSizeBytes: Long,
-    val entityCount: Int
+    val entityCount: Int,
+    val labelLanguage: LabelLanguage = LabelLanguage.DEFAULT
 )
 
 data class GeoEntity(
@@ -47,6 +48,6 @@ data class DemTile(
     val lastAccessedAt: Instant
 )
 
-data class RegionEntityCoverage(val regionId: UUID, val entityId: String)
+data class RegionEntityCoverage(val regionId: UUID, val entityId: String, val displayName: String)
 
 data class TileCoverage(val regionId: UUID, val tileId: String)

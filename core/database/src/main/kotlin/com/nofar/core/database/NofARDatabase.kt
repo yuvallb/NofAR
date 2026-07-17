@@ -22,7 +22,7 @@ import com.nofar.core.database.model.TileCoverageEntity
         DemTileEntity::class,
         TileCoverageEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = true
 )
 abstract class NofARDatabase : RoomDatabase() {

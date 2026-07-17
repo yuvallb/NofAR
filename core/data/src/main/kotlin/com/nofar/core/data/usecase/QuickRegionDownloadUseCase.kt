@@ -1,5 +1,6 @@
 package com.nofar.core.data.usecase
 
+import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.prepare.PrepareDownloadScheduler
 import com.nofar.core.data.prepare.PrepareEstimator
 import com.nofar.core.data.prepare.RegionNamePolicy
@@ -12,13 +13,15 @@ import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.flow.first
 
 @Singleton
 class QuickRegionDownloadUseCase
 @Inject
 constructor(
     private val regionRepository: RegionRepository,
-    private val downloadScheduler: PrepareDownloadScheduler
+    private val downloadScheduler: PrepareDownloadScheduler,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) {
     suspend fun syncAndEnqueue(region: Region): Result<UUID> = runCatching {
         val existing = regionRepository.getRegion(region.id)
@@ -43,6 +46,7 @@ constructor(
         val bbox = RegionBounds.boundingBox(centerLat, centerLon, radiusM)
         val estimate = PrepareEstimator.estimate(centerLat, centerLon, radiusM)
         val existing = regionRepository.getRegion(regionId)
+        val labelLanguage = userPreferencesRepository.preferredLabelLanguage.first()
         val region =
             Region(
                 id = regionId,
@@ -60,7 +64,8 @@ constructor(
                 downloadProgressPct = existing?.downloadProgressPct ?: 0,
                 osmDatasetVersion = existing?.osmDatasetVersion,
                 estimatedSizeBytes = estimate.totalEstimateBytes,
-                entityCount = existing?.entityCount ?: 0
+                entityCount = existing?.entityCount ?: 0,
+                labelLanguage = labelLanguage
             )
         return syncAndEnqueue(region)
     }

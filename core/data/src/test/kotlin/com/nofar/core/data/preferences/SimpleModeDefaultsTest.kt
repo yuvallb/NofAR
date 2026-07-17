@@ -2,6 +2,7 @@ package com.nofar.core.data.preferences
 
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.model.DownloadStatus
+import com.nofar.core.model.LabelLanguage
 import com.nofar.core.model.Region
 import java.time.Instant
 import java.util.UUID
@@ -74,6 +75,7 @@ class SimpleModeDefaultsTest {
         override val keepRawGeoTiff: Flow<Boolean> = MutableStateFlow(false)
         override val simpleModeEnabled: Flow<Boolean> = simpleMode
         override val simpleModeDefaultsApplied: Flow<Boolean> = defaultsApplied
+        override val preferredLabelLanguage: Flow<LabelLanguage> = MutableStateFlow(LabelLanguage.DEFAULT)
 
         override suspend fun setWifiOnlyDownloads(enabled: Boolean) = Unit
 
@@ -90,6 +92,8 @@ class SimpleModeDefaultsTest {
         override suspend fun markSimpleModeDefaultsApplied() {
             defaultsApplied.value = true
         }
+
+        override suspend fun setPreferredLabelLanguage(language: LabelLanguage) = Unit
     }
 
     private class FakeRegionRepository(private val regions: List<Region>) : RegionRepository {

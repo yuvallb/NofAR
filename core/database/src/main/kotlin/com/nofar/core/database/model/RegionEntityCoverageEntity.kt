@@ -26,5 +26,6 @@ import androidx.room.Index
 )
 data class RegionEntityCoverageEntity(
     @ColumnInfo(name = "region_id") val regionId: String,
-    @ColumnInfo(name = "entity_id") val entityId: String
+    @ColumnInfo(name = "entity_id") val entityId: String,
+    @ColumnInfo(name = "display_name") val displayName: String
 )

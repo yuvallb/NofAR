@@ -190,7 +190,11 @@ class GeoEntityDaoTest {
             )
         )
         fixtures.coverageDao.insert(
-            RegionEntityCoverageEntity(regionId = regionId, entityId = "node/coverage-fallback")
+            RegionEntityCoverageEntity(
+                regionId = regionId,
+                entityId = "node/coverage-fallback",
+                displayName = "Coverage Fallback"
+            )
         )
         fixtures.database.geoEntitySpatialDao().executeStatement(
             androidx.sqlite.db.SimpleSQLiteQuery("DELETE FROM geo_entity_rtree")
@@ -212,14 +216,55 @@ class GeoEntityDaoTest {
     }
 
     @Test
+    fun regionQuery_overlaysCoverageDisplayName() = runTest {
+        val regionId = UUID.randomUUID().toString()
+        fixtures.geoEntityUpserter.upsert(
+            sampleEntity(
+                id = "node/localized",
+                lat = 32.01,
+                lon = 35.01,
+                type = GeoEntityType.PEAK.name
+            )
+        )
+        fixtures.coverageDao.insert(
+            RegionEntityCoverageEntity(
+                regionId = regionId,
+                entityId = "node/localized",
+                displayName = "פסגה מקומית"
+            )
+        )
+
+        val results =
+            fixtures.spatialQuery.queryWithinRadiusForRegion(
+                regionId = regionId,
+                regionCenterLat = 32.0,
+                regionCenterLon = 35.0,
+                regionRadiusM = 10_000.0,
+                lat = 32.0,
+                lon = 35.0,
+                radiusM = 10_000.0,
+                resolutionLevel = ResolutionLevel.Medium
+            )
+
+        val entity = results.single { it.id == "node/localized" }
+        assertThat(entity.name).isEqualTo("פסגה מקומית")
+    }
+
+    @Test
     fun deleteEntitiesExclusiveToRegion_keepsSharedEntities() = runTest {
         val regionA = UUID.randomUUID().toString()
         val regionB = UUID.randomUUID().toString()
         fixtures.geoEntityUpserter.upsert(sampleEntity(id = "node/shared"))
         fixtures.geoEntityUpserter.upsert(sampleEntity(id = "node/only-a"))
-        fixtures.coverageDao.insert(RegionEntityCoverageEntity(regionA, "node/shared"))
-        fixtures.coverageDao.insert(RegionEntityCoverageEntity(regionA, "node/only-a"))
-        fixtures.coverageDao.insert(RegionEntityCoverageEntity(regionB, "node/shared"))
+        fixtures.coverageDao.insert(
+            RegionEntityCoverageEntity(regionA, "node/shared", displayName = "Shared")
+        )
+        fixtures.coverageDao.insert(
+            RegionEntityCoverageEntity(regionA, "node/only-a", displayName = "Only A")
+        )
+        fixtures.coverageDao.insert(
+            RegionEntityCoverageEntity(regionB, "node/shared", displayName = "Shared")
+        )
 
         fixtures.geoEntityDao.deleteEntitiesExclusiveToRegion(regionA)
         fixtures.coverageDao.deleteForRegion(regionA)

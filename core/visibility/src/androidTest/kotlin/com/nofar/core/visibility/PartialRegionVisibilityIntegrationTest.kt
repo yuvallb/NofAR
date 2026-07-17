@@ -109,7 +109,11 @@ class PartialRegionVisibilityIntegrationTest {
             )
         )
         database.regionEntityCoverageDao().insert(
-            RegionEntityCoverageEntity(regionId = regionId.toString(), entityId = entityId)
+            RegionEntityCoverageEntity(
+                regionId = regionId.toString(),
+                entityId = entityId,
+                displayName = "Test Peak"
+            )
         )
         database.tileCoverageDao().insert(
             TileCoverageEntity(
@@ -174,7 +178,11 @@ class PartialRegionVisibilityIntegrationTest {
             )
         )
         database.regionEntityCoverageDao().insert(
-            RegionEntityCoverageEntity(regionId = regionId.toString(), entityId = entityId)
+            RegionEntityCoverageEntity(
+                regionId = regionId.toString(),
+                entityId = entityId,
+                displayName = "Test Peak"
+            )
         )
         database.tileCoverageDao().insert(TileCoverageEntity(regionId = regionId.toString(), tileId = tileId))
 

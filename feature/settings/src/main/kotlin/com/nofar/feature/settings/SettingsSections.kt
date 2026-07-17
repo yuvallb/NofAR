@@ -30,7 +30,9 @@ import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.AppMetadata
+import com.nofar.core.model.LabelLanguage
 import com.nofar.core.network.OverpassConfig
+import com.nofar.core.ui.LabelLanguageDropdown
 
 internal const val OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright"
 internal const val APACHE_LICENSE_URL = "https://www.apache.org/licenses/LICENSE-2.0"
@@ -40,6 +42,7 @@ internal fun SettingsContent(
     uiState: SettingsUiState,
     onWifiOnlyChanged: (Boolean) -> Unit,
     onSimpleModeChanged: (Boolean) -> Unit,
+    onPreferredLabelLanguageChanged: (LabelLanguage) -> Unit,
     onEvictionThresholdChanged: (Float) -> Unit,
     onShowPurgeConfirm: () -> Unit,
     onShowRawSensorChanged: (Boolean) -> Unit,
@@ -56,8 +59,10 @@ internal fun SettingsContent(
         SettingsGeneralSection(
             simpleModeEnabled = uiState.simpleModeEnabled,
             wifiOnlyDownloads = uiState.wifiOnlyDownloads,
+            preferredLabelLanguage = uiState.preferredLabelLanguage,
             onSimpleModeChanged = onSimpleModeChanged,
-            onWifiOnlyChanged = onWifiOnlyChanged
+            onWifiOnlyChanged = onWifiOnlyChanged,
+            onPreferredLabelLanguageChanged = onPreferredLabelLanguageChanged
         )
         SettingsSectionDivider()
         SettingsStorageSection(
@@ -103,8 +108,10 @@ internal fun SettingsSectionTitle(title: String) {
 private fun SettingsGeneralSection(
     simpleModeEnabled: Boolean,
     wifiOnlyDownloads: Boolean,
+    preferredLabelLanguage: LabelLanguage,
     onSimpleModeChanged: (Boolean) -> Unit,
-    onWifiOnlyChanged: (Boolean) -> Unit
+    onWifiOnlyChanged: (Boolean) -> Unit,
+    onPreferredLabelLanguageChanged: (LabelLanguage) -> Unit
 ) {
     SettingsSectionTitle("GENERAL")
     SettingsToggleRow(
@@ -121,6 +128,26 @@ private fun SettingsGeneralSection(
         checked = wifiOnlyDownloads,
         onCheckedChange = onWifiOnlyChanged,
         testTag = "wifi_only_toggle"
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = stringResource(com.nofar.core.ui.R.string.settings_label_language_title),
+        style = MaterialTheme.typography.bodyLarge,
+        color = NofARColors.TextPrimary
+    )
+    Text(
+        text = stringResource(com.nofar.core.ui.R.string.settings_label_language_subtitle),
+        style = MaterialTheme.typography.bodySmall,
+        color = NofARColors.TextSecondary
+    )
+    Spacer(modifier = Modifier.height(4.dp))
+    LabelLanguageDropdown(
+        selected = preferredLabelLanguage,
+        enabled = true,
+        onSelected = onPreferredLabelLanguageChanged,
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("label_language_dropdown")
     )
     Spacer(modifier = Modifier.height(8.dp))
     val cellularMb = AppConfig.CELLULAR_DOWNLOAD_WARNING_BYTES / (1024 * 1024)

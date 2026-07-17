@@ -87,14 +87,38 @@ object AppConfig {
     /** Effective Earth radius including refraction: R / (1 − k). */
     const val EFFECTIVE_EARTH_RADIUS_METERS: Double = 7_322_988.505747126
 
-    /** Horizontal bucket width for screen-space label clustering (pixels). */
+    /** Horizontal bucket width for Explore label group ids (pixels). */
     const val EXPLORE_CLUSTER_BUCKET_WIDTH_PX: Int = 50
 
-    /** Maximum labels shown per cluster bucket before collapsing remainder. */
-    const val EXPLORE_MAX_LABELS_PER_BUCKET: Int = 2
+    /** Number of vertical shelves for the 1D label collision resolver. */
+    const val EXPLORE_LABEL_SHELF_COUNT: Int = 5
 
-    /** Vertical offset between stacked labels within a bucket (pixels). */
-    const val EXPLORE_LABEL_STACK_OFFSET_PX: Int = 72
+    /** Vertical pitch between successive label shelves (pixels). Must exceed card height + pads. */
+    const val EXPLORE_LABEL_SHELF_PITCH_PX: Int = 128
+
+    /** Minimum gap from card bottom to terrain anchor (pixels). */
+    const val EXPLORE_LABEL_LEADER_GAP_PX: Int = 28
+
+    /** Estimated average character width for label card AABB (pixels). */
+    const val EXPLORE_LABEL_CHAR_WIDTH_PX: Int = 12
+
+    /** Horizontal padding included in estimated label card width (pixels). */
+    const val EXPLORE_LABEL_HORIZONTAL_PADDING_PX: Int = 32
+
+    /** Minimum estimated label card width (pixels). */
+    const val EXPLORE_LABEL_MIN_WIDTH_PX: Int = 96
+
+    /** Maximum estimated label card width (pixels). */
+    const val EXPLORE_LABEL_MAX_WIDTH_PX: Int = 280
+
+    /** Extra horizontal padding when testing card AABB overlap (pixels). */
+    const val EXPLORE_LABEL_COLLISION_PAD_PX: Int = 12
+
+    /** Extra vertical gap reserved between stacked card AABBs (pixels). */
+    const val EXPLORE_LABEL_VERTICAL_GAP_PX: Int = 8
+
+    /** Estimated label card height for AABB collision and on-screen clamping (pixels). */
+    const val EXPLORE_LABEL_ESTIMATED_HEIGHT_PX: Int = 100
 
     /** Fallback horizontal FOV when camera characteristics are unavailable (degrees). */
     const val CAMERA_HORIZONTAL_FOV_FALLBACK_DEG: Float = 60f

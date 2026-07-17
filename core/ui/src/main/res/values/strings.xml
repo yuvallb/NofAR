@@ -38,4 +38,13 @@
     <string name="settings_simple_mode_title">Simple mode</string>
     <string name="settings_simple_mode_subtitle">Explore-first experience with on-demand map downloads</string>
     <string name="settings_wifi_only_subtitle">Block map downloads on cellular data</string>
+    <string name="settings_label_language_title">Label language</string>
+    <string name="settings_label_language_subtitle">Default language for place and peak names in new downloads</string>
+    <string name="label_language_default">Default (OSM name)</string>
+    <string name="label_language_hebrew">Hebrew</string>
+    <string name="label_language_arabic">Arabic</string>
+    <string name="label_language_english">English</string>
+    <string name="label_language_russian">Russian</string>
+    <string name="prepare_label_language">Label language</string>
+    <string name="prepare_label_language_locked_hint">Language cannot be changed while a download is in progress.</string>
 </resources>

@@ -6,8 +6,10 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.nofar.core.model.AppConfig
+import com.nofar.core.model.LabelLanguage
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,6 +33,8 @@ interface UserPreferencesRepository {
 
     val simpleModeDefaultsApplied: Flow<Boolean>
 
+    val preferredLabelLanguage: Flow<LabelLanguage>
+
     suspend fun setWifiOnlyDownloads(enabled: Boolean)
 
     suspend fun setDemCacheLimitBytes(bytes: Long)
@@ -42,6 +46,8 @@ interface UserPreferencesRepository {
     suspend fun setSimpleModeEnabled(enabled: Boolean)
 
     suspend fun markSimpleModeDefaultsApplied()
+
+    suspend fun setPreferredLabelLanguage(language: LabelLanguage)
 }
 
 @Singleton
@@ -81,6 +87,11 @@ constructor(@ApplicationContext context: Context) :
             prefs[SIMPLE_MODE_DEFAULTS_APPLIED_KEY] ?: false
         }
 
+    override val preferredLabelLanguage: Flow<LabelLanguage> =
+        dataStore.data.map { prefs ->
+            LabelLanguage.fromStoredName(prefs[PREFERRED_LABEL_LANGUAGE_KEY] ?: LabelLanguage.DEFAULT.name)
+        }
+
     override suspend fun setWifiOnlyDownloads(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[WIFI_ONLY_KEY] = enabled
@@ -117,6 +128,12 @@ constructor(@ApplicationContext context: Context) :
         }
     }
 
+    override suspend fun setPreferredLabelLanguage(language: LabelLanguage) {
+        dataStore.edit { prefs ->
+            prefs[PREFERRED_LABEL_LANGUAGE_KEY] = language.name
+        }
+    }
+
     companion object {
         private val WIFI_ONLY_KEY = booleanPreferencesKey("wifi_only_downloads")
         private val DEM_CACHE_LIMIT_KEY = longPreferencesKey("dem_cache_limit_bytes")
@@ -124,5 +141,6 @@ constructor(@ApplicationContext context: Context) :
         private val KEEP_RAW_GEOTIFF_KEY = booleanPreferencesKey("keep_raw_geotiff")
         private val SIMPLE_MODE_ENABLED_KEY = booleanPreferencesKey("simple_mode_enabled")
         private val SIMPLE_MODE_DEFAULTS_APPLIED_KEY = booleanPreferencesKey("simple_mode_defaults_applied")
+        private val PREFERRED_LABEL_LANGUAGE_KEY = stringPreferencesKey("preferred_label_language")
     }
 }

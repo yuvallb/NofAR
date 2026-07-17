@@ -5,6 +5,7 @@ package com.nofar.core.data.osm
 import com.nofar.core.model.ElevationSource
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.GeoEntityType
+import com.nofar.core.model.LabelLanguage
 import com.nofar.core.model.OsmType
 import com.squareup.moshi.JsonReader
 import java.io.InputStream
@@ -16,6 +17,7 @@ data class ParsedOsmElement(
     val osmType: OsmType,
     val osmId: Long,
     val name: String,
+    val canonicalName: String,
     val type: GeoEntityType,
     val lat: Double,
     val lon: Double,
@@ -26,7 +28,10 @@ data class ParsedOsmElement(
  * Streams Overpass JSON elements one-by-one without loading the full response into memory.
  */
 class OverpassStreamParser {
-    fun parse(input: InputStream, onElement: (ParsedOsmElement) -> Unit): Int {
+    fun parse(input: InputStream, onElement: (ParsedOsmElement) -> Unit): Int =
+        parse(input, LabelLanguage.DEFAULT, onElement)
+
+    fun parse(input: InputStream, labelLanguage: LabelLanguage, onElement: (ParsedOsmElement) -> Unit): Int {
         val reader = input.source().buffer().let { JsonReader.of(it) }
         var count = 0
         reader.beginObject()
@@ -35,7 +40,7 @@ class OverpassStreamParser {
                 "elements" -> {
                     reader.beginArray()
                     while (reader.hasNext()) {
-                        parseElement(reader)?.let { element ->
+                        parseElement(reader, labelLanguage)?.let { element ->
                             onElement(element)
                             count++
                         }
@@ -49,7 +54,7 @@ class OverpassStreamParser {
         return count
     }
 
-    private fun parseElement(reader: JsonReader): ParsedOsmElement? {
+    private fun parseElement(reader: JsonReader, labelLanguage: LabelLanguage): ParsedOsmElement? {
         var osmType: OsmType? = null
         var osmId = 0L
         var lat: Double? = null
@@ -65,24 +70,11 @@ class OverpassStreamParser {
                 "id" -> osmId = reader.nextLong()
                 "lat" -> lat = reader.nextDouble()
                 "lon" -> lon = reader.nextDouble()
-                "center" -> {
-                    reader.beginObject()
-                    while (reader.hasNext()) {
-                        when (reader.nextName()) {
-                            "lat" -> centerLat = reader.nextDouble()
-                            "lon" -> centerLon = reader.nextDouble()
-                            else -> reader.skipValue()
-                        }
-                    }
-                    reader.endObject()
+                "center" -> parseCenter(reader)?.let { (cLat, cLon) ->
+                    centerLat = cLat
+                    centerLon = cLon
                 }
-                "tags" -> {
-                    reader.beginObject()
-                    while (reader.hasNext()) {
-                        tags[reader.nextName()] = reader.nextString()
-                    }
-                    reader.endObject()
-                }
+                "tags" -> parseTags(reader, tags)
                 else -> reader.skipValue()
             }
         }
@@ -90,7 +82,8 @@ class OverpassStreamParser {
 
         val resolvedType = osmType ?: return null
         val entityType = resolveEntityType(tags) ?: return null
-        val name = tags["name"]?.takeIf { it.isNotBlank() } ?: return null
+        val displayName = OsmNameResolver.resolveDisplayName(tags, labelLanguage) ?: return null
+        val canonicalName = OsmNameResolver.resolveCanonicalName(tags) ?: displayName
         val resolvedLat = lat ?: centerLat ?: return null
         val resolvedLon = lon ?: centerLon ?: return null
         val elevation = tags["ele"]?.toDoubleOrNull()
@@ -98,12 +91,45 @@ class OverpassStreamParser {
         return ParsedOsmElement(
             osmType = resolvedType,
             osmId = osmId,
-            name = name,
+            name = displayName,
+            canonicalName = canonicalName,
             type = entityType,
             lat = resolvedLat,
             lon = resolvedLon,
             elevation = elevation
         )
+    }
+
+    private fun parseCenter(reader: JsonReader): Pair<Double, Double>? {
+        var centerLat: Double? = null
+        var centerLon: Double? = null
+        reader.beginObject()
+        while (reader.hasNext()) {
+            when (reader.nextName()) {
+                "lat" -> centerLat = reader.nextDouble()
+                "lon" -> centerLon = reader.nextDouble()
+                else -> reader.skipValue()
+            }
+        }
+        reader.endObject()
+        val lat = centerLat ?: return null
+        val lon = centerLon ?: return null
+        return lat to lon
+    }
+
+    private fun parseTags(reader: JsonReader, tags: MutableMap<String, String>) {
+        reader.beginObject()
+        while (reader.hasNext()) {
+            val tagName = reader.nextName()
+            when (reader.peek()) {
+                JsonReader.Token.STRING -> tags[tagName] = reader.nextString()
+                JsonReader.Token.NUMBER -> tags[tagName] = reader.nextDouble().toString()
+                JsonReader.Token.BOOLEAN -> tags[tagName] = reader.nextBoolean().toString()
+                JsonReader.Token.NULL -> reader.nextNull()
+                else -> reader.skipValue()
+            }
+        }
+        reader.endObject()
     }
 
     private fun resolveEntityType(tags: Map<String, String>): GeoEntityType? {
@@ -119,6 +145,8 @@ class OverpassStreamParser {
     fun toGeoEntity(element: ParsedOsmElement, seenAt: Instant = Instant.now()): GeoEntity = GeoEntity(
         id = "${element.osmType.name.lowercase()}/${element.osmId}",
         osmType = element.osmType,
+        // Persist the resolved display label so Explore shows the download-time language even
+        // if region_entity_coverage overlay is missing for any reason.
         name = element.name,
         type = element.type,
         lat = element.lat,

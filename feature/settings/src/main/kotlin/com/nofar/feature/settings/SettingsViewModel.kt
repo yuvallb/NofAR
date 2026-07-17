@@ -12,6 +12,7 @@ import com.nofar.core.data.usecase.ForceLruEvictionUseCase
 import com.nofar.core.data.usecase.LruEvictionUseCase
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
+import com.nofar.core.model.LabelLanguage
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +30,7 @@ data class SettingsUiState(
     val evictionThresholdMb: Float = AppConfig.DEM_CACHE_DEFAULT_LIMIT_BYTES / (1024f * 1024f),
     val wifiOnlyDownloads: Boolean = false,
     val simpleModeEnabled: Boolean = false,
+    val preferredLabelLanguage: LabelLanguage = LabelLanguage.DEFAULT,
     val showRawSensorOverlay: Boolean = false,
     val keepRawGeoTiff: Boolean = false,
     val prepareDownloadActive: Boolean = false,
@@ -83,6 +85,11 @@ constructor(
                         keepRawGeoTiff = snapshot.keepTif
                     )
                 }
+            }
+        }
+        viewModelScope.launch {
+            userPreferencesRepository.preferredLabelLanguage.collect { language ->
+                _uiState.update { it.copy(preferredLabelLanguage = language) }
             }
         }
     }
@@ -143,6 +150,12 @@ constructor(
     fun onKeepRawGeoTiffChanged(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setKeepRawGeoTiff(enabled)
+        }
+    }
+
+    fun onPreferredLabelLanguageChanged(language: LabelLanguage) {
+        viewModelScope.launch {
+            userPreferencesRepository.setPreferredLabelLanguage(language)
         }
     }
 
