@@ -141,7 +141,9 @@ class RegionDeletionUseCaseTest {
                 lastSeenAt = 0
             )
         )
-        database.regionEntityCoverageDao().insert(RegionEntityCoverageEntity(regionId.toString(), "node/1"))
+        database.regionEntityCoverageDao().insert(
+            RegionEntityCoverageEntity(regionId.toString(), "node/1", displayName = "Entity")
+        )
         database.demTileDao().upsert(
             DemTileEntity(
                 tileId = tileId,

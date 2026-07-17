@@ -41,8 +41,16 @@ constructor(
     private val tileCoverageDao: TileCoverageDao
 ) {
     @Transaction
-    suspend fun linkEntities(regionId: String, entityIds: List<String>) {
-        regionEntityCoverageDao.insertAll(entityIds.map { RegionEntityCoverageEntity(regionId, it) })
+    suspend fun linkEntities(regionId: String, entities: List<Pair<String, String>>) {
+        regionEntityCoverageDao.insertAll(
+            entities.map { (entityId, displayName) ->
+                RegionEntityCoverageEntity(
+                    regionId = regionId,
+                    entityId = entityId,
+                    displayName = displayName
+                )
+            }
+        )
     }
 
     @Transaction

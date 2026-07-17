@@ -27,6 +27,14 @@ interface RegionEntityCoverageDao {
 
     @Query(
         """
+        SELECT entity_id, display_name FROM region_entity_coverage
+        WHERE region_id = :regionId
+        """
+    )
+    suspend fun getDisplayNamesForRegion(regionId: String): List<RegionEntityDisplayName>
+
+    @Query(
+        """
         SELECT entity_id FROM region_entity_coverage
         WHERE entity_id = :entityId
         """

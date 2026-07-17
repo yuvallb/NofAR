@@ -25,5 +25,6 @@ data class RegionEntity(
     @ColumnInfo(name = "download_progress_pct") val downloadProgressPct: Int,
     @ColumnInfo(name = "osm_dataset_version") val osmDatasetVersion: Long?,
     @ColumnInfo(name = "estimated_size_bytes") val estimatedSizeBytes: Long,
-    @ColumnInfo(name = "entity_count") val entityCount: Int
+    @ColumnInfo(name = "entity_count") val entityCount: Int,
+    @ColumnInfo(name = "label_language") val labelLanguage: String = "DEFAULT"
 )

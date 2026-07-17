@@ -96,7 +96,9 @@ class HomeDeleteRegionInstrumentedTest {
                 lastSeenAt = 0
             )
         )
-        database.regionEntityCoverageDao().insert(RegionEntityCoverageEntity(regionId.toString(), "node/42"))
+        database.regionEntityCoverageDao().insert(
+            RegionEntityCoverageEntity(regionId.toString(), "node/42", displayName = "Peak")
+        )
         database.demTileDao().upsert(
             DemTileEntity(
                 tileId = tileId,

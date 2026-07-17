@@ -142,9 +142,9 @@ constructor(
             osmDatasetVersion = overpassResponse.datasetVersion
             overpassResponse.body.use { stream ->
                 val parsedEntities = mutableListOf<com.nofar.core.data.osm.ParsedOsmElement>()
-                val linkedEntityIds = mutableListOf<String>()
+                val linkedEntities = mutableListOf<Pair<String, String>>()
                 entityCount =
-                    overpassStreamParser.parse(stream) { element ->
+                    overpassStreamParser.parse(stream, region.labelLanguage) { element ->
                         checkCancelled()
                         parsedEntities.add(element)
                     }
@@ -157,7 +157,7 @@ constructor(
                     checkCancelled()
                     val geoEntity = overpassStreamParser.toGeoEntity(element)
                     geoEntityRepository.upsert(geoEntity)
-                    linkedEntityIds.add(geoEntity.id)
+                    linkedEntities.add(geoEntity.id to element.name)
                     if ((index + 1) % 50 == 0 || index + 1 == entityCount) {
                         val ingestPct =
                             if (entityCount > 0) {
@@ -172,8 +172,8 @@ constructor(
                         )
                     }
                 }
-                if (linkedEntityIds.isNotEmpty()) {
-                    coverageLinker.linkEntities(regionId.toString(), linkedEntityIds)
+                if (linkedEntities.isNotEmpty()) {
+                    coverageLinker.linkEntities(regionId.toString(), linkedEntities)
                 }
             }
             val coverageCount = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString()).size

@@ -21,6 +21,7 @@ import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
+import com.nofar.core.model.LabelLanguage
 import com.nofar.core.model.LocationAccessState
 import com.nofar.core.model.Region
 import com.nofar.core.model.RegionBounds
@@ -54,6 +55,8 @@ data class PrepareUiState(
     val radiusKm: Double = 10.0,
     val regionId: UUID? = null,
     val existingRegion: Region? = null,
+    val labelLanguage: LabelLanguage = LabelLanguage.DEFAULT,
+    val labelLanguageLocked: Boolean = false,
     val estimateBytes: Long = 0L,
     val demTileCount: Int = 0,
     val progress: PrepareProgress? = null,
@@ -102,6 +105,8 @@ constructor(
         }
         if (!editingExistingRegion) {
             viewModelScope.launch {
+                val preferredLanguage = downloadPreferences.preferredLabelLanguage.first()
+                _uiState.update { it.copy(labelLanguage = preferredLanguage, labelLanguageLocked = false) }
                 locationRepository.lastLocation?.let { location ->
                     setRegionCenter(
                         lat = location.latitude,
@@ -298,6 +303,11 @@ constructor(
         }
     }
 
+    fun onLabelLanguageChanged(language: LabelLanguage) {
+        if (_uiState.value.labelLanguageLocked) return
+        _uiState.update { it.copy(labelLanguage = language) }
+    }
+
     fun refreshEstimate() {
         val state = _uiState.value
         val estimate = PrepareEstimator.estimate(state.centerLat, state.centerLon, state.radiusKm * 1000)
@@ -450,7 +460,8 @@ constructor(
             downloadProgressPct = existing?.downloadProgressPct ?: 0,
             osmDatasetVersion = existing?.osmDatasetVersion,
             estimatedSizeBytes = estimate.totalEstimateBytes,
-            entityCount = existing?.entityCount ?: 0
+            entityCount = existing?.entityCount ?: 0,
+            labelLanguage = state.labelLanguage
         )
     }
 
@@ -466,6 +477,8 @@ constructor(
                     centerLon = region.centerLon,
                     radiusKm = region.radiusM / 1000.0,
                     estimateBytes = region.estimatedSizeBytes,
+                    labelLanguage = region.labelLanguage,
+                    labelLanguageLocked = region.downloadStatus == DownloadStatus.DOWNLOADING,
                     downloadUiState =
                     when (region.downloadStatus) {
                         DownloadStatus.READY -> PrepareDownloadUiState.COMPLETE

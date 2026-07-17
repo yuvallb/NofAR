@@ -2,6 +2,7 @@ package com.nofar.core.data.osm
 
 import com.google.common.truth.Truth.assertThat
 import com.nofar.core.model.GeoEntityType
+import com.nofar.core.model.LabelLanguage
 import com.nofar.core.model.OsmType
 import org.junit.Test
 
@@ -36,12 +37,33 @@ class OverpassStreamParserTest {
     }
 
     @Test
-    fun toGeoEntity_buildsStableId() {
+    fun parse_hebrew_usesLocalizedNameWithFallback() {
+        val json =
+            """
+            {"elements":[
+              {"type":"node","id":1,"lat":32.0,"lon":35.0,"tags":{"natural":"peak","name":"Mount Test","name:he":"הר בדיקה"}},
+              {"type":"node","id":2,"lat":32.1,"lon":35.1,"tags":{"natural":"peak","name":"Only English"}},
+              {"type":"node","id":3,"lat":32.2,"lon":35.2,"tags":{"natural":"peak","name:he":"רק עברית"}}
+            ]}
+            """.trimIndent()
+        val parsed = mutableListOf<ParsedOsmElement>()
+        val count = parser.parse(json.byteInputStream(), LabelLanguage.HEBREW, parsed::add)
+        assertThat(count).isEqualTo(3)
+        assertThat(parsed[0].name).isEqualTo("הר בדיקה")
+        assertThat(parsed[0].canonicalName).isEqualTo("Mount Test")
+        assertThat(parsed[1].name).isEqualTo("Only English")
+        assertThat(parsed[2].name).isEqualTo("רק עברית")
+        assertThat(parsed[2].canonicalName).isEqualTo("רק עברית")
+    }
+
+    @Test
+    fun toGeoEntity_usesCanonicalName() {
         val element =
             ParsedOsmElement(
                 osmType = OsmType.NODE,
                 osmId = 42,
-                name = "Haifa",
+                name = "חיפה",
+                canonicalName = "Haifa",
                 type = GeoEntityType.CITY,
                 lat = 32.8,
                 lon = 34.98,
@@ -49,6 +71,7 @@ class OverpassStreamParserTest {
             )
         val entity = parser.toGeoEntity(element)
         assertThat(entity.id).isEqualTo("node/42")
+        assertThat(entity.name).isEqualTo("Haifa")
         assertThat(entity.type).isEqualTo(GeoEntityType.CITY)
     }
 }

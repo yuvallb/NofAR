@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "23ba36279f1330f7d0278344cd74882c",
+    "identityHash": "75fb97e537cd26adee1b2ef97d0ef68e",
     "entities": [
       {
         "tableName": "region",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `center_lat` REAL NOT NULL, `center_lon` REAL NOT NULL, `radius_m` REAL NOT NULL, `min_lat` REAL NOT NULL, `max_lat` REAL NOT NULL, `min_lon` REAL NOT NULL, `max_lon` REAL NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `download_status` TEXT NOT NULL, `download_progress_pct` INTEGER NOT NULL, `osm_dataset_version` INTEGER, `estimated_size_bytes` INTEGER NOT NULL, `entity_count` INTEGER NOT NULL, PRIMARY KEY(`id`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` TEXT NOT NULL, `name` TEXT NOT NULL, `center_lat` REAL NOT NULL, `center_lon` REAL NOT NULL, `radius_m` REAL NOT NULL, `min_lat` REAL NOT NULL, `max_lat` REAL NOT NULL, `min_lon` REAL NOT NULL, `max_lon` REAL NOT NULL, `created_at` INTEGER NOT NULL, `updated_at` INTEGER NOT NULL, `download_status` TEXT NOT NULL, `download_progress_pct` INTEGER NOT NULL, `osm_dataset_version` INTEGER, `estimated_size_bytes` INTEGER NOT NULL, `entity_count` INTEGER NOT NULL, `label_language` TEXT NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -21,87 +21,92 @@
             "notNull": true
           },
           {
-            "fieldPath": "center_lat",
+            "fieldPath": "centerLat",
             "columnName": "center_lat",
             "affinity": "REAL",
             "notNull": true
           },
           {
-            "fieldPath": "center_lon",
+            "fieldPath": "centerLon",
             "columnName": "center_lon",
             "affinity": "REAL",
             "notNull": true
           },
           {
-            "fieldPath": "radius_m",
+            "fieldPath": "radiusM",
             "columnName": "radius_m",
             "affinity": "REAL",
             "notNull": true
           },
           {
-            "fieldPath": "min_lat",
+            "fieldPath": "minLat",
             "columnName": "min_lat",
             "affinity": "REAL",
             "notNull": true
           },
           {
-            "fieldPath": "max_lat",
+            "fieldPath": "maxLat",
             "columnName": "max_lat",
             "affinity": "REAL",
             "notNull": true
           },
           {
-            "fieldPath": "min_lon",
+            "fieldPath": "minLon",
             "columnName": "min_lon",
             "affinity": "REAL",
             "notNull": true
           },
           {
-            "fieldPath": "max_lon",
+            "fieldPath": "maxLon",
             "columnName": "max_lon",
             "affinity": "REAL",
             "notNull": true
           },
           {
-            "fieldPath": "created_at",
+            "fieldPath": "createdAt",
             "columnName": "created_at",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "updated_at",
+            "fieldPath": "updatedAt",
             "columnName": "updated_at",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "download_status",
+            "fieldPath": "downloadStatus",
             "columnName": "download_status",
             "affinity": "TEXT",
             "notNull": true
           },
           {
-            "fieldPath": "download_progress_pct",
+            "fieldPath": "downloadProgressPct",
             "columnName": "download_progress_pct",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "osm_dataset_version",
+            "fieldPath": "osmDatasetVersion",
             "columnName": "osm_dataset_version",
-            "affinity": "INTEGER",
-            "notNull": false
+            "affinity": "INTEGER"
           },
           {
-            "fieldPath": "estimated_size_bytes",
+            "fieldPath": "estimatedSizeBytes",
             "columnName": "estimated_size_bytes",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "entity_count",
+            "fieldPath": "entityCount",
             "columnName": "entity_count",
             "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "labelLanguage",
+            "columnName": "label_language",
+            "affinity": "TEXT",
             "notNull": true
           }
         ],
@@ -121,15 +126,14 @@
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_region_updated_at` ON `${TABLE_NAME}` (`updated_at`)"
           }
-        ],
-        "foreignKeys": []
+        ]
       },
       {
         "tableName": "geo_entity",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`row_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `id` TEXT NOT NULL, `osm_type` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `elevation` REAL, `elevation_source` TEXT, `last_seen_at` INTEGER NOT NULL)",
         "fields": [
           {
-            "fieldPath": "row_id",
+            "fieldPath": "rowId",
             "columnName": "row_id",
             "affinity": "INTEGER",
             "notNull": true
@@ -141,7 +145,7 @@
             "notNull": true
           },
           {
-            "fieldPath": "osm_type",
+            "fieldPath": "osmType",
             "columnName": "osm_type",
             "affinity": "TEXT",
             "notNull": true
@@ -173,17 +177,15 @@
           {
             "fieldPath": "elevation",
             "columnName": "elevation",
-            "affinity": "REAL",
-            "notNull": false
+            "affinity": "REAL"
           },
           {
-            "fieldPath": "elevation_source",
+            "fieldPath": "elevationSource",
             "columnName": "elevation_source",
-            "affinity": "TEXT",
-            "notNull": false
+            "affinity": "TEXT"
           },
           {
-            "fieldPath": "last_seen_at",
+            "fieldPath": "lastSeenAt",
             "columnName": "last_seen_at",
             "affinity": "INTEGER",
             "notNull": true
@@ -214,22 +216,27 @@
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_geo_entity_type` ON `${TABLE_NAME}` (`type`)"
           }
-        ],
-        "foreignKeys": []
+        ]
       },
       {
         "tableName": "region_entity_coverage",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`region_id` TEXT NOT NULL, `entity_id` TEXT NOT NULL, PRIMARY KEY(`region_id`, `entity_id`), FOREIGN KEY(`region_id`) REFERENCES `region`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`entity_id`) REFERENCES `geo_entity`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`region_id` TEXT NOT NULL, `entity_id` TEXT NOT NULL, `display_name` TEXT NOT NULL, PRIMARY KEY(`region_id`, `entity_id`), FOREIGN KEY(`region_id`) REFERENCES `region`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`entity_id`) REFERENCES `geo_entity`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
-            "fieldPath": "region_id",
+            "fieldPath": "regionId",
             "columnName": "region_id",
             "affinity": "TEXT",
             "notNull": true
           },
           {
-            "fieldPath": "entity_id",
+            "fieldPath": "entityId",
             "columnName": "entity_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "displayName",
+            "columnName": "display_name",
             "affinity": "TEXT",
             "notNull": true
           }
@@ -282,13 +289,13 @@
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tile_id` TEXT NOT NULL, `file_path` TEXT NOT NULL, `width` INTEGER NOT NULL, `height` INTEGER NOT NULL, `tile_lat` INTEGER NOT NULL, `tile_lon` INTEGER NOT NULL, `no_data_value` REAL NOT NULL, `size_bytes` INTEGER NOT NULL, `ref_count` INTEGER NOT NULL, `last_accessed_at` INTEGER NOT NULL, PRIMARY KEY(`tile_id`))",
         "fields": [
           {
-            "fieldPath": "tile_id",
+            "fieldPath": "tileId",
             "columnName": "tile_id",
             "affinity": "TEXT",
             "notNull": true
           },
           {
-            "fieldPath": "file_path",
+            "fieldPath": "filePath",
             "columnName": "file_path",
             "affinity": "TEXT",
             "notNull": true
@@ -306,37 +313,37 @@
             "notNull": true
           },
           {
-            "fieldPath": "tile_lat",
+            "fieldPath": "tileLat",
             "columnName": "tile_lat",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "tile_lon",
+            "fieldPath": "tileLon",
             "columnName": "tile_lon",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "no_data_value",
+            "fieldPath": "noDataValue",
             "columnName": "no_data_value",
             "affinity": "REAL",
             "notNull": true
           },
           {
-            "fieldPath": "size_bytes",
+            "fieldPath": "sizeBytes",
             "columnName": "size_bytes",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "ref_count",
+            "fieldPath": "refCount",
             "columnName": "ref_count",
             "affinity": "INTEGER",
             "notNull": true
           },
           {
-            "fieldPath": "last_accessed_at",
+            "fieldPath": "lastAccessedAt",
             "columnName": "last_accessed_at",
             "affinity": "INTEGER",
             "notNull": true
@@ -359,21 +366,20 @@
             "orders": [],
             "createSql": "CREATE INDEX IF NOT EXISTS `index_dem_tile_ref_count_last_accessed_at` ON `${TABLE_NAME}` (`ref_count`, `last_accessed_at`)"
           }
-        ],
-        "foreignKeys": []
+        ]
       },
       {
         "tableName": "tile_coverage",
         "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`region_id` TEXT NOT NULL, `tile_id` TEXT NOT NULL, PRIMARY KEY(`region_id`, `tile_id`), FOREIGN KEY(`region_id`) REFERENCES `region`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE , FOREIGN KEY(`tile_id`) REFERENCES `dem_tile`(`tile_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
-            "fieldPath": "region_id",
+            "fieldPath": "regionId",
             "columnName": "region_id",
             "affinity": "TEXT",
             "notNull": true
           },
           {
-            "fieldPath": "tile_id",
+            "fieldPath": "tileId",
             "columnName": "tile_id",
             "affinity": "TEXT",
             "notNull": true
@@ -423,10 +429,9 @@
         ]
       }
     ],
-    "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '23ba36279f1330f7d0278344cd74882c')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '75fb97e537cd26adee1b2ef97d0ef68e')"
     ]
   }
 }

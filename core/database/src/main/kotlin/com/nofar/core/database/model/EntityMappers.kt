@@ -7,6 +7,7 @@ import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.ElevationSource
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.GeoEntityType
+import com.nofar.core.model.LabelLanguage
 import com.nofar.core.model.ModelJson
 import com.nofar.core.model.OsmType
 import com.nofar.core.model.Region
@@ -31,7 +32,8 @@ fun RegionEntity.asExternalModel(): Region = Region(
     downloadProgressPct = downloadProgressPct,
     osmDatasetVersion = osmDatasetVersion?.let(Instant::ofEpochMilli),
     estimatedSizeBytes = estimatedSizeBytes,
-    entityCount = entityCount
+    entityCount = entityCount,
+    labelLanguage = LabelLanguage.fromStoredName(labelLanguage)
 )
 
 fun Region.asEntity(): RegionEntity = RegionEntity(
@@ -50,7 +52,8 @@ fun Region.asEntity(): RegionEntity = RegionEntity(
     downloadProgressPct = downloadProgressPct,
     osmDatasetVersion = osmDatasetVersion?.toEpochMilli(),
     estimatedSizeBytes = estimatedSizeBytes,
-    entityCount = entityCount
+    entityCount = entityCount,
+    labelLanguage = labelLanguage.name
 )
 
 fun GeoEntityEntity.asExternalModel(): GeoEntity = GeoEntity(
@@ -105,12 +108,14 @@ fun DemTile.asEntity(): DemTileEntity = DemTileEntity(
 
 fun RegionEntityCoverageEntity.asExternalModel(): RegionEntityCoverage = RegionEntityCoverage(
     regionId = UUID.fromString(regionId),
-    entityId = entityId
+    entityId = entityId,
+    displayName = displayName
 )
 
 fun RegionEntityCoverage.asEntity(): RegionEntityCoverageEntity = RegionEntityCoverageEntity(
     regionId = regionId.toString(),
-    entityId = entityId
+    entityId = entityId,
+    displayName = displayName
 )
 
 fun TileCoverageEntity.asExternalModel(): TileCoverage = TileCoverage(

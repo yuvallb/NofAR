@@ -61,7 +61,11 @@ class GeoEntitySpatialQuery(
         radiusM: Double,
         resolutionLevel: ResolutionLevel
     ): List<GeoEntityEntity> {
-        val regionEntityIds = regionId?.let { regionEntityCoverageDao.getEntityIdsForRegion(it).toSet() }
+        val coverageRows =
+            regionId?.let { regionEntityCoverageDao.getDisplayNamesForRegion(it) }
+        val regionEntityIds = coverageRows?.map { it.entityId }?.toSet()
+        val displayNamesByEntityId =
+            coverageRows?.associate { it.entityId to it.displayName }.orEmpty()
         if (regionId != null && regionEntityIds.isNullOrEmpty()) {
             return queryWithoutCoverageFallback(
                 regionCenterLat = regionCenterLat,
@@ -76,10 +80,18 @@ class GeoEntitySpatialQuery(
 
         val box = RegionBounds.boundingBox(lat, lon, radiusM)
         val entities = loadEntitiesInBoundingBox(box, regionEntityIds)
-        return entities.filter { entity ->
-            RegionBounds.haversineDistanceM(lat, lon, entity.lat, entity.lon) <= radiusM &&
-                GeoEntityType.fromStoredName(entity.type)?.matchesResolution(resolutionLevel) == true
-        }
+        return entities
+            .filter { entity ->
+                RegionBounds.haversineDistanceM(lat, lon, entity.lat, entity.lon) <= radiusM &&
+                    GeoEntityType.fromStoredName(entity.type)?.matchesResolution(resolutionLevel) == true
+            }.map { entity ->
+                val displayName = displayNamesByEntityId[entity.id]
+                if (!displayName.isNullOrBlank()) {
+                    entity.copy(name = displayName)
+                } else {
+                    entity
+                }
+            }
     }
 
     private suspend fun loadEntitiesInBoundingBox(

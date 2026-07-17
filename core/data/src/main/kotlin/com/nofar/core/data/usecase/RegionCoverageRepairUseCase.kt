@@ -50,7 +50,7 @@ constructor(
                 resolutionLevel = ResolutionLevel.Full
             )
         if (entities.isNotEmpty()) {
-            coverageLinker.linkEntities(regionId, entities.map { it.id })
+            coverageLinker.linkEntities(regionId, entities.map { it.id to it.name })
         }
     }
 

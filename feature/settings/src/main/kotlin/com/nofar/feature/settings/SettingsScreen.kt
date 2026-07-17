@@ -74,6 +74,7 @@ fun SettingsScreen(
                 onSimpleModeChanged = { enabled ->
                     viewModel.onSimpleModeChanged(enabled, onSimpleModeChanged)
                 },
+                onPreferredLabelLanguageChanged = viewModel::onPreferredLabelLanguageChanged,
                 onEvictionThresholdChanged = viewModel::onEvictionThresholdChanged,
                 onShowPurgeConfirm = viewModel::showPurgeConfirm,
                 onShowRawSensorChanged = viewModel::onShowRawSensorOverlayChanged,
