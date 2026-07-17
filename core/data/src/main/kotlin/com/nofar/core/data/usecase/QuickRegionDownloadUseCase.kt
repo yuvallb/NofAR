@@ -46,8 +46,7 @@ constructor(
         val bbox = RegionBounds.boundingBox(centerLat, centerLon, radiusM)
         val estimate = PrepareEstimator.estimate(centerLat, centerLon, radiusM)
         val existing = regionRepository.getRegion(regionId)
-        val labelLanguage =
-            existing?.labelLanguage ?: userPreferencesRepository.preferredLabelLanguage.first()
+        val labelLanguage = userPreferencesRepository.preferredLabelLanguage.first()
         val region =
             Region(
                 id = regionId,

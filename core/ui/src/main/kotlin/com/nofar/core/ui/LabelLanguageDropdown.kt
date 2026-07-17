@@ -1,25 +1,21 @@
 package com.nofar.core.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.model.LabelLanguage
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LabelLanguageDropdown(
     selected: LabelLanguage,
@@ -27,43 +23,29 @@ fun LabelLanguageDropdown(
     onSelected: (LabelLanguage) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = expanded && enabled,
-        onExpandedChange = { if (enabled) expanded = it },
-        modifier = modifier
-    ) {
-        OutlinedTextField(
-            value = stringResource(selected.labelStringRes()),
-            onValueChange = {},
-            readOnly = true,
-            enabled = enabled,
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded && enabled) },
-            modifier =
-            Modifier
-                .menuAnchor(MenuAnchorType.PrimaryNotEditable, enabled = enabled)
-                .fillMaxWidth(),
-            colors =
-            OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = NofARColors.PrimaryYellow,
-                unfocusedBorderColor = NofARColors.SurfaceVariant,
-                focusedTextColor = NofARColors.TextPrimary,
-                unfocusedTextColor = NofARColors.TextPrimary,
-                disabledTextColor = NofARColors.TextSecondary,
-                disabledBorderColor = NofARColors.SurfaceVariant
-            )
-        )
-        ExposedDropdownMenu(
-            expanded = expanded && enabled,
-            onDismissRequest = { expanded = false }
+    Column(modifier = modifier.fillMaxWidth()) {
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
             LabelLanguage.entries.forEach { language ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(language.labelStringRes())) },
-                    onClick = {
-                        onSelected(language)
-                        expanded = false
-                    }
+                val isSelected = language == selected
+                FilterChip(
+                    selected = isSelected,
+                    onClick = { if (enabled) onSelected(language) },
+                    enabled = enabled,
+                    label = { Text(stringResource(language.labelStringRes())) },
+                    colors =
+                    FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = NofARColors.PrimaryYellow,
+                        selectedLabelColor = NofARColors.TextPrimary,
+                        containerColor = NofARColors.SurfaceVariant,
+                        labelColor = NofARColors.TextPrimary,
+                        disabledContainerColor = NofARColors.SurfaceVariant,
+                        disabledLabelColor = NofARColors.TextSecondary,
+                        disabledSelectedContainerColor = NofARColors.PrimaryYellow.copy(alpha = 0.4f)
+                    )
                 )
             }
         }

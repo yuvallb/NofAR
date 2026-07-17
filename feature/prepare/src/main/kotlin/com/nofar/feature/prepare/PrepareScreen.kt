@@ -298,6 +298,11 @@ private fun DefineRegionContent(
                         },
                         color = NofARColors.TextSecondary
                     )
+                    NofARPrimaryButton(
+                        text = "RE-DOWNLOAD DATA",
+                        onClick = onDownloadClicked,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
                 else -> {
                     val label =

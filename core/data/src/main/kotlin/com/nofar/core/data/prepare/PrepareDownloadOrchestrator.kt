@@ -140,11 +140,17 @@ constructor(
                         )
                 }
             osmDatasetVersion = overpassResponse.datasetVersion
+            // Prefer the live Settings/Prepare preference at download time so a re-download
+            // never keeps a stale region.labelLanguage from an earlier parse.
+            val labelLanguage = userPreferencesRepository.preferredLabelLanguage.first()
+            if (region.labelLanguage != labelLanguage) {
+                regionRepository.updateRegion(region.copy(labelLanguage = labelLanguage))
+            }
             overpassResponse.body.use { stream ->
                 val parsedEntities = mutableListOf<com.nofar.core.data.osm.ParsedOsmElement>()
                 val linkedEntities = mutableListOf<Pair<String, String>>()
                 entityCount =
-                    overpassStreamParser.parse(stream, region.labelLanguage) { element ->
+                    overpassStreamParser.parse(stream, labelLanguage) { element ->
                         checkCancelled()
                         parsedEntities.add(element)
                     }

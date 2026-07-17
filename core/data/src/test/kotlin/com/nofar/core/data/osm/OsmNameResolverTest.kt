@@ -56,6 +56,15 @@ class OsmNameResolverTest {
     }
 
     @Test
+    fun resolveDisplayName_nonDefault_usesIntNameBeforeDefaultName() {
+        val tags = mapOf("name" to "הר תבור", "int_name" to "Mount Tabor")
+        assertThat(OsmNameResolver.resolveDisplayName(tags, LabelLanguage.ENGLISH))
+            .isEqualTo("Mount Tabor")
+        assertThat(OsmNameResolver.resolveDisplayName(tags, LabelLanguage.DEFAULT))
+            .isEqualTo("הר תבור")
+    }
+
+    @Test
     fun resolveCanonicalName_readsNameTag() {
         val tags = mapOf("name" to "Haifa", "name:he" to "חיפה")
         assertThat(OsmNameResolver.resolveCanonicalName(tags)).isEqualTo("Haifa")

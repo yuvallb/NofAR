@@ -57,7 +57,22 @@ class OverpassStreamParserTest {
     }
 
     @Test
-    fun toGeoEntity_usesCanonicalName() {
+    fun parse_english_prefersNameEnOverHebrewPrimaryName() {
+        val json =
+            """
+            {"elements":[
+              {"type":"node","id":1,"lat":32.0,"lon":35.0,"tags":{"natural":"peak","name":"הר חרמון","name:he":"הר חרמון","name:en":"Mount Hermon"}}
+            ]}
+            """.trimIndent()
+        val parsed = mutableListOf<ParsedOsmElement>()
+        parser.parse(json.byteInputStream(), LabelLanguage.ENGLISH, parsed::add)
+        assertThat(parsed.single().name).isEqualTo("Mount Hermon")
+        assertThat(parsed.single().canonicalName).isEqualTo("הר חרמון")
+        assertThat(parser.toGeoEntity(parsed.single()).name).isEqualTo("Mount Hermon")
+    }
+
+    @Test
+    fun toGeoEntity_usesDisplayName() {
         val element =
             ParsedOsmElement(
                 osmType = OsmType.NODE,
@@ -71,7 +86,7 @@ class OverpassStreamParserTest {
             )
         val entity = parser.toGeoEntity(element)
         assertThat(entity.id).isEqualTo("node/42")
-        assertThat(entity.name).isEqualTo("Haifa")
+        assertThat(entity.name).isEqualTo("חיפה")
         assertThat(entity.type).isEqualTo(GeoEntityType.CITY)
     }
 }

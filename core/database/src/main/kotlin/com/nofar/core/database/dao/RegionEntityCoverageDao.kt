@@ -8,10 +8,10 @@ import com.nofar.core.database.model.RegionEntityCoverageEntity
 
 @Dao
 interface RegionEntityCoverageDao {
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(coverage: RegionEntityCoverageEntity): Long
 
-    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(coverage: List<RegionEntityCoverageEntity>): List<Long>
 
     @Query("DELETE FROM region_entity_coverage WHERE region_id = :regionId")

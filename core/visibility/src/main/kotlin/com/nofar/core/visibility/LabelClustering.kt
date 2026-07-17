@@ -17,7 +17,8 @@ data class ProjectedLabel(
     val cardXPx: Float,
     val cardYPx: Float,
     val bucketIndex: Int,
-    val estimatedWidthPx: Float = 0f
+    val estimatedWidthPx: Float = 0f,
+    val estimatedHeightPx: Float = 0f
 )
 
 data class ClusteredLabel(
@@ -39,11 +40,30 @@ object ExploreDistanceFormatter {
 /**
  * Screen-space clustering for Explore labels (Requirements §3.3.2).
  *
- * Places labels on vertical shelves with horizontal AABB collision checks so nearby
- * azimuths do not stack on the same track. Overflow collapses into "+N more" on the
- * nearest placed label.
+ * Places labels on vertical shelves with full 2D AABB collision against already-placed
+ * cards (not just same-shelf X spans). Overflow collapses into "+N more" on the nearest
+ * placed label.
  */
 object LabelClustering {
+    /**
+     * When OSM contains duplicate place names, keep the label with the lowest [ProjectedLabel.entityId]
+     * so shelf placement does not waste space on redundant cards.
+     */
+    fun deduplicateByName(projected: List<ProjectedLabel>): List<ProjectedLabel> {
+        val skipEntityIds = mutableSetOf<String>()
+        projected
+            .groupBy { it.name }
+            .filter { it.value.size > 1 }
+            .forEach { (_, group) ->
+                val keep = group.minBy { it.entityId }
+                group
+                    .asSequence()
+                    .filter { it.entityId != keep.entityId }
+                    .forEach { skipEntityIds.add(it.entityId) }
+            }
+        return projected.filter { it.entityId !in skipEntityIds }
+    }
+
     fun cluster(
         projected: List<ProjectedLabel>,
         screenWidthPx: Float,
@@ -55,11 +75,13 @@ object LabelClustering {
     ): List<ClusteredLabel> {
         if (projected.isEmpty()) return emptyList()
 
+        val deduplicated = deduplicateByName(projected)
+
         val prepared =
-            projected.map { label ->
-                val width = estimateCardWidthPx(label.name)
+            deduplicated.map { label ->
                 label.copy(
-                    estimatedWidthPx = width,
+                    estimatedWidthPx = estimateCardWidthPx(label.name),
+                    estimatedHeightPx = estimateCardHeightPx(hasElevation = label.elevationM != null),
                     bucketIndex = bucketIndex(label.terrainAnchorXPx),
                     cardXPx = label.terrainAnchorXPx,
                     cardYPx = label.terrainAnchorYPx
@@ -125,10 +147,15 @@ object LabelClustering {
                 AppConfig.EXPLORE_LABEL_MAX_WIDTH_PX.toFloat()
             )
     }
+
+    fun estimateCardHeightPx(hasElevation: Boolean): Float {
+        val base = AppConfig.EXPLORE_LABEL_ESTIMATED_HEIGHT_PX.toFloat()
+        return if (hasElevation) base else (base - 20f).coerceAtLeast(64f)
+    }
 }
 
 private object LabelShelfLayout {
-    data class ShelfSpan(val leftPx: Float, val rightPx: Float)
+    data class CardRect(val left: Float, val top: Float, val right: Float, val bottom: Float)
 
     data class PlacementPass(
         val placed: List<ProjectedLabel>,
@@ -146,10 +173,14 @@ private object LabelShelfLayout {
         forcePlaceGroupId: Int?
     ): PlacementPass {
         val sorted = prepared.sortedBy { it.distanceM }
-        val expandExtraShelves = if (forcePlaceEntityIds.isNotEmpty()) sorted.size else 0
-        val occupancy =
-            Array(shelfCount + expandExtraShelves) { mutableListOf<ShelfSpan>() }
+        val maxShelves =
+            if (forcePlaceEntityIds.isNotEmpty()) {
+                shelfCount + sorted.size
+            } else {
+                shelfCount
+            }
         val placed = mutableListOf<ProjectedLabel>()
+        val placedRects = mutableListOf<CardRect>()
         val hidden = mutableListOf<ProjectedLabel>()
 
         for (label in sorted) {
@@ -159,16 +190,17 @@ private object LabelShelfLayout {
                     label = label,
                     forcePlace = forcePlace,
                     forcePlaceGroupId = forcePlaceGroupId,
-                    shelfCount = shelfCount,
+                    maxShelves = maxShelves,
                     shelfPitchPx = shelfPitchPx,
                     leaderGapPx = leaderGapPx,
                     screenHeightPx = screenHeightPx,
-                    occupancy = occupancy
+                    placedRects = placedRects
                 )
             if (placedLabel == null) {
                 hidden.add(label)
             } else {
                 placed.add(placedLabel)
+                placedRects.add(cardRect(placedLabel))
             }
         }
 
@@ -225,41 +257,56 @@ private object LabelShelfLayout {
         label: ProjectedLabel,
         forcePlace: Boolean,
         forcePlaceGroupId: Int?,
-        shelfCount: Int,
+        maxShelves: Int,
         shelfPitchPx: Int,
         leaderGapPx: Int,
         screenHeightPx: Float,
-        occupancy: Array<MutableList<ShelfSpan>>
+        placedRects: List<CardRect>
     ): ProjectedLabel? {
-        val maxShelfExclusive = if (forcePlace) occupancy.size else shelfCount
-        val shelf =
-            findShelf(
-                label = label,
-                maxShelfExclusive = maxShelfExclusive,
-                occupancy = occupancy
-            ) ?: return null
-        val cardY =
-            cardYForShelf(
-                terrainYPx = label.terrainAnchorYPx,
-                shelfIndex = shelf,
-                shelfPitchPx = shelfPitchPx,
-                leaderGapPx = leaderGapPx,
-                screenHeightPx = screenHeightPx
-            )
-        val placedLabel =
-            label.copy(
-                cardXPx = label.terrainAnchorXPx,
-                cardYPx = cardY,
-                bucketIndex =
-                if (forcePlace && forcePlaceGroupId != null) {
-                    forcePlaceGroupId
-                } else {
-                    label.bucketIndex
-                }
-            )
-        occupyShelf(occupancy, shelf, placedLabel)
-        return placedLabel
+        for (shelf in 0 until maxShelves) {
+            val cardY =
+                cardYForShelf(
+                    terrainYPx = label.terrainAnchorYPx,
+                    shelfIndex = shelf,
+                    shelfPitchPx = shelfPitchPx,
+                    leaderGapPx = leaderGapPx,
+                    screenHeightPx = screenHeightPx,
+                    cardHeightPx = label.estimatedHeightPx,
+                    allowOffscreenTop = forcePlace
+                ) ?: continue
+            val candidate =
+                label.copy(
+                    cardXPx = label.terrainAnchorXPx,
+                    cardYPx = cardY,
+                    bucketIndex =
+                    if (forcePlace && forcePlaceGroupId != null) {
+                        forcePlaceGroupId
+                    } else {
+                        label.bucketIndex
+                    }
+                )
+            val rect = cardRect(candidate)
+            if (placedRects.none { overlaps(it, rect) }) {
+                return candidate
+            }
+        }
+        return null
     }
+
+    private fun cardRect(label: ProjectedLabel): CardRect {
+        val hPad = AppConfig.EXPLORE_LABEL_COLLISION_PAD_PX
+        val vGap = AppConfig.EXPLORE_LABEL_VERTICAL_GAP_PX / 2f
+        val halfWidth = label.estimatedWidthPx / 2f
+        return CardRect(
+            left = label.cardXPx - halfWidth - hPad,
+            top = label.cardYPx - label.estimatedHeightPx - vGap,
+            right = label.cardXPx + halfWidth + hPad,
+            bottom = label.cardYPx + vGap
+        )
+    }
+
+    private fun overlaps(a: CardRect, b: CardRect): Boolean =
+        a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top
 
     private fun attachHidden(
         hidden: List<ProjectedLabel>,
@@ -281,45 +328,22 @@ private object LabelShelfLayout {
         return hiddenByPrimaryEntityId
     }
 
-    private fun findShelf(
-        label: ProjectedLabel,
-        maxShelfExclusive: Int,
-        occupancy: Array<MutableList<ShelfSpan>>
-    ): Int? {
-        val halfWidth = label.estimatedWidthPx / 2f + AppConfig.EXPLORE_LABEL_COLLISION_PAD_PX
-        val left = label.terrainAnchorXPx - halfWidth
-        val right = label.terrainAnchorXPx + halfWidth
-        for (shelf in 0 until maxShelfExclusive.coerceAtMost(occupancy.size)) {
-            val spans = occupancy[shelf]
-            val overlaps = spans.any { span -> left < span.rightPx && right > span.leftPx }
-            if (!overlaps) {
-                return shelf
-            }
-        }
-        return null
-    }
-
-    private fun occupyShelf(occupancy: Array<MutableList<ShelfSpan>>, shelf: Int, label: ProjectedLabel) {
-        val halfWidth = label.estimatedWidthPx / 2f + AppConfig.EXPLORE_LABEL_COLLISION_PAD_PX
-        occupancy[shelf].add(
-            ShelfSpan(
-                leftPx = label.terrainAnchorXPx - halfWidth,
-                rightPx = label.terrainAnchorXPx + halfWidth
-            )
-        )
-    }
-
     private fun cardYForShelf(
         terrainYPx: Float,
         shelfIndex: Int,
         shelfPitchPx: Int,
         leaderGapPx: Int,
-        screenHeightPx: Float
-    ): Float {
+        screenHeightPx: Float,
+        cardHeightPx: Float,
+        allowOffscreenTop: Boolean
+    ): Float? {
         val raw = terrainYPx - leaderGapPx - shelfIndex * shelfPitchPx
-        val minCardY = AppConfig.EXPLORE_LABEL_ESTIMATED_HEIGHT_PX.toFloat()
-        val maxCardY = (terrainYPx - leaderGapPx).coerceAtLeast(minCardY)
-        return raw.coerceIn(minCardY, maxCardY.coerceAtMost(screenHeightPx))
+        val minCardY = if (allowOffscreenTop) -cardHeightPx else cardHeightPx
+        return when {
+            raw < minCardY -> null
+            raw > screenHeightPx -> screenHeightPx
+            else -> raw
+        }
     }
 
     private fun findAttachTarget(

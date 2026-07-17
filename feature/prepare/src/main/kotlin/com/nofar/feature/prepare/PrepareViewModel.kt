@@ -306,6 +306,9 @@ constructor(
     fun onLabelLanguageChanged(language: LabelLanguage) {
         if (_uiState.value.labelLanguageLocked) return
         _uiState.update { it.copy(labelLanguage = language) }
+        viewModelScope.launch {
+            downloadPreferences.setPreferredLabelLanguage(language)
+        }
     }
 
     fun refreshEstimate() {
@@ -422,11 +425,15 @@ constructor(
                 state.regionId ?: UUID.randomUUID().also { id ->
                     _uiState.update { it.copy(regionId = id) }
                 }
+            // Ensure the worker reads the language selected in Prepare, not a stale Settings value.
+            downloadPreferences.setPreferredLabelLanguage(state.labelLanguage)
             val region = buildRegionRecord(regionId)
             quickRegionDownloadUseCase.syncAndEnqueue(region).getOrThrow()
+            // Keep UI language in sync with what was persisted for this download.
             _uiState.update {
                 it.copy(
                     regionId = regionId,
+                    existingRegion = region.copy(downloadStatus = DownloadStatus.DOWNLOADING),
                     downloadUiState = PrepareDownloadUiState.DOWNLOADING
                 )
             }
@@ -468,6 +475,9 @@ constructor(
     private fun loadExistingRegion(regionId: UUID) {
         viewModelScope.launch {
             val region = regionRepository.getRegion(regionId) ?: return@launch
+            // Prefer Settings default for the next download; Explore keeps the stored language
+            // until this region is re-downloaded.
+            val preferredLanguage = downloadPreferences.preferredLabelLanguage.first()
             _uiState.update {
                 it.copy(
                     regionId = region.id,
@@ -477,7 +487,7 @@ constructor(
                     centerLon = region.centerLon,
                     radiusKm = region.radiusM / 1000.0,
                     estimateBytes = region.estimatedSizeBytes,
-                    labelLanguage = region.labelLanguage,
+                    labelLanguage = preferredLanguage,
                     labelLanguageLocked = region.downloadStatus == DownloadStatus.DOWNLOADING,
                     downloadUiState =
                     when (region.downloadStatus) {
