@@ -20,17 +20,22 @@ internal class ExploreAltitudeController(
     private var resolveJob: Job? = null
 
     fun scheduleResolve(location: UserLocation, region: Region? = null) {
+        scheduleResolve(location, listOfNotNull(region))
+    }
+
+    fun scheduleResolve(location: UserLocation, regions: List<Region>) {
         if (location.altitudeMeters != null) {
             lastKnownGpsAltitudeM = location.altitudeMeters
         }
         resolveJob?.cancel()
         resolveJob =
             scope.launch(Dispatchers.IO) {
+                val regionsToTry = regions.ifEmpty { listOfNotNull(activeRegion()) }
                 val reading =
                     displayAltitudeResolver.resolve(
                         location = location,
                         lastKnownGpsAltitudeM = lastKnownGpsAltitudeM,
-                        region = region ?: activeRegion()
+                        regions = regionsToTry
                     )
                 uiState.update { it.copy(altitude = reading) }
             }

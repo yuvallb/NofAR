@@ -111,8 +111,10 @@ constructor(
 
         regionRepository.updateDownloadStatus(regionId, DownloadStatus.DOWNLOADING, progressPct = 0)
         resetRegionCoverage(regionId)
-        val bbox = OverpassQueryBuilder.boundingBoxFromCircle(region.centerLat, region.centerLon, region.radiusM)
-        val estimate = PrepareEstimator.estimate(region.centerLat, region.centerLon, region.radiusM)
+        val collectionRadiusM = RegionBounds.dataCollectionRadiusM(region)
+        val bbox =
+            OverpassQueryBuilder.boundingBoxFromCircle(region.centerLat, region.centerLon, collectionRadiusM)
+        val estimate = PrepareEstimator.estimate(region.centerLat, region.centerLon, collectionRadiusM)
         var osmDatasetVersion = Instant.now()
         var entityCount = 0
         var demFailures = 0
@@ -197,7 +199,7 @@ constructor(
 
             // DEM phase (40–90%)
             val tiles = DemTileId.intersectingTiles(
-                RegionBounds.boundingBox(region.centerLat, region.centerLon, region.radiusM)
+                RegionBounds.boundingBox(region.centerLat, region.centerLon, collectionRadiusM)
             )
             val linkedTileIds = mutableListOf<String>()
             tiles.forEachIndexed { index, (tileLat, tileLon) ->

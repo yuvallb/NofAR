@@ -20,6 +20,7 @@ data class ExploreUiState(
     val exploreGate: ExploreGate = ExploreGate.WAITING_GPS,
     val simpleModeEnabled: Boolean = false,
     val activeRegion: Region? = null,
+    val activeRegions: List<Region> = emptyList(),
     val activeRegionName: String? = null,
     val partialRegionWarning: Boolean = false,
     val regionResolution: ExploreRegionResolution? = null,

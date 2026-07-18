@@ -14,8 +14,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -24,10 +22,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -237,18 +232,6 @@ private fun HomeScreenDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
             onDismiss = viewModel::dismissDeleteRegion
         )
     }
-    uiState.overlappingRegionsDialog?.let { regions ->
-        OverlappingRegionsDialog(
-            regions = regions,
-            initialSelectionId =
-            HomeRegionLogic.defaultOverlapSelection(
-                regions,
-                uiState.lastSelectedOverlapRegionId
-            ),
-            onSelect = viewModel::onOverlappingRegionSelected,
-            onDismiss = { viewModel.onExploreUiAction(ExploreUiAction.DismissOverlap) }
-        )
-    }
 }
 
 @Composable
@@ -264,49 +247,6 @@ private fun DeleteRegionDialog(region: Region, onConfirm: () -> Unit, onDismiss:
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text("DELETE", color = NofARColors.ErrorDestructive)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("CANCEL")
-            }
-        }
-    )
-}
-
-@Composable
-private fun OverlappingRegionsDialog(
-    regions: List<Region>,
-    initialSelectionId: UUID,
-    onSelect: (UUID) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var selectedId by remember(regions, initialSelectionId) { mutableStateOf(initialSelectionId) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Multiple regions cover this area") },
-        text = {
-            Column {
-                Text("Which data context would you like to use?")
-                Spacer(modifier = Modifier.height(8.dp))
-                regions.forEach { region ->
-                    androidx.compose.foundation.layout.Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RadioButton(
-                            selected = selectedId == region.id,
-                            onClick = { selectedId = region.id },
-                            colors = RadioButtonDefaults.colors(selectedColor = NofARColors.PrimaryYellow)
-                        )
-                        Text(text = region.name)
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onSelect(selectedId) }) {
-                Text("CONFIRM")
             }
         },
         dismissButton = {

@@ -5,6 +5,7 @@ import com.nofar.core.data.prepare.RegionNamePolicy
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.Region
+import com.nofar.core.model.RegionBounds
 
 sealed interface ExploreRegionResolution {
     data class Active(val region: Region) : ExploreRegionResolution
@@ -48,7 +49,8 @@ object ExploreRegionResolver {
 
     private fun proposalAtLocation(lat: Double, lon: Double): QuickRegionProposal {
         val radiusM = AppConfig.SIMPLE_MODE_DEFAULT_RADIUS_M
-        val estimate = PrepareEstimator.estimate(lat, lon, radiusM)
+        val estimate =
+            PrepareEstimator.estimate(lat, lon, RegionBounds.dataCollectionRadiusM(radiusM))
         return QuickRegionProposal(
             centerLat = lat,
             centerLon = lon,
@@ -66,7 +68,11 @@ object ExploreRegionResolver {
         name = region.name,
         estimateBytes = region.estimatedSizeBytes,
         demTileCount =
-        PrepareEstimator.estimate(region.centerLat, region.centerLon, region.radiusM).demTileCount,
+        PrepareEstimator.estimate(
+            region.centerLat,
+            region.centerLon,
+            RegionBounds.dataCollectionRadiusM(region)
+        ).demTileCount,
         existingRegionId = region.id
     )
 }

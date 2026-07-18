@@ -41,4 +41,10 @@ class RegionBoundsTest {
             RegionBounds.haversineDistanceM(32.0, 35.0, 32.05, 35.05)
         assertThat(centerDistance).isLessThan(10_000.0)
     }
+
+    @Test
+    fun dataCollectionRadiusM_addsConfiguredPadding() {
+        assertThat(RegionBounds.dataCollectionRadiusM(10_000.0))
+            .isEqualTo(10_000.0 + AppConfig.DATA_COLLECTION_RADIUS_PADDING_M)
+    }
 }

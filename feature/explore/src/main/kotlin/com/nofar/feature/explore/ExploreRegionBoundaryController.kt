@@ -27,21 +27,20 @@ internal class ExploreRegionBoundaryController {
     val isOutsideGraceActive: Boolean
         get() = regionExitStartedAtMillis != null
 
-    fun onLocation(location: UserLocation, region: Region?): RegionBoundaryUiState {
-        if (region == null) {
+    fun onLocation(location: UserLocation, region: Region?): RegionBoundaryUiState =
+        onLocation(location, listOfNotNull(region))
+
+    fun onLocation(location: UserLocation, regions: List<Region>): RegionBoundaryUiState {
+        if (regions.isEmpty()) {
             insideActiveRegion = false
             regionExitStartedAtMillis = null
             return RegionBoundaryUiState(insideActiveRegion = false)
         }
 
-        val distanceFromCenter =
-            RegionBounds.haversineDistanceM(
-                region.centerLat,
-                region.centerLon,
-                location.latitude,
-                location.longitude
-            )
-        insideActiveRegion = distanceFromCenter <= region.radiusM
+        insideActiveRegion =
+            regions.any { region ->
+                RegionBounds.containsPoint(region, location.latitude, location.longitude)
+            }
 
         return if (insideActiveRegion) {
             regionExitStartedAtMillis = null

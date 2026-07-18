@@ -2,7 +2,6 @@ package com.nofar.feature.home
 
 import android.content.Context
 import android.os.StatFs
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nofar.core.data.repository.HomeRegionMetadataRepository
@@ -40,8 +39,6 @@ data class HomeUiState(
     val entitiesDbBytes: Long = 0L,
     val freeSpaceBytes: Long = 0L,
     val deleteConfirmRegion: Region? = null,
-    val overlappingRegionsDialog: List<Region>? = null,
-    val lastSelectedOverlapRegionId: UUID? = null,
     val navigateToExploreRegionId: UUID? = null,
     val snackbarMessage: String? = null,
     val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED,
@@ -54,7 +51,6 @@ class HomeViewModel
 @Inject
 constructor(
     @ApplicationContext private val context: Context,
-    private val savedStateHandle: SavedStateHandle,
     private val regionRepository: RegionRepository,
     private val storageRepository: StorageRepository,
     private val regionDeletionUseCase: RegionDeletionUseCase,
@@ -72,10 +68,6 @@ constructor(
     private val exploreNavigation = HomeExploreNavigation(_uiState)
 
     init {
-        savedStateHandle.get<String>(LAST_SELECTED_REGION_KEY)?.let(UUID::fromString)?.let { restored ->
-            _uiState.update { it.copy(lastSelectedOverlapRegionId = restored) }
-        }
-
         seedCachedLocation()
         locationController.acquire(HOME_LOCATION_TOKEN)
         viewModelScope.launch {
@@ -178,13 +170,8 @@ constructor(
         exploreNavigation.onGlobalEnterExplore(insideExploreRegions.value)
     }
 
-    fun onOverlappingRegionSelected(regionId: UUID) {
-        exploreNavigation.onOverlappingRegionSelected(regionId, savedStateHandle)
-    }
-
     fun onExploreUiAction(action: ExploreUiAction) {
         when (action) {
-            ExploreUiAction.DismissOverlap -> exploreNavigation.dismissOverlappingRegionsDialog()
             ExploreUiAction.NavigationHandled -> exploreNavigation.onExploreNavigationHandled()
         }
     }
@@ -222,7 +209,6 @@ constructor(
     }
 
     companion object {
-        internal const val LAST_SELECTED_REGION_KEY = "lastSelectedExploreRegionId"
         private const val HOME_LOCATION_TOKEN = "home"
         private const val INSIDE_REGION_THROTTLE_MS = 1_000L
     }

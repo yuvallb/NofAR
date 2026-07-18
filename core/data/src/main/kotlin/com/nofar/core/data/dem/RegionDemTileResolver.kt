@@ -19,7 +19,11 @@ object RegionDemTileResolver {
                 fromCoverage
             } else {
                 DemTileId.intersectingTiles(
-                    RegionBounds.boundingBox(region.centerLat, region.centerLon, region.radiusM)
+                    RegionBounds.boundingBox(
+                        region.centerLat,
+                        region.centerLon,
+                        RegionBounds.dataCollectionRadiusM(region)
+                    )
                 ).map { (tileLat, tileLon) -> DemTileId.fromCoordinates(tileLat, tileLon) }
             }
         return candidates.filter { candidateId ->

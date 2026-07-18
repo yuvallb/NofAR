@@ -25,17 +25,26 @@ constructor(
     private val visibilityEngine: VisibilityEngine,
     private val observerElevationResolver: ObserverElevationResolver
 ) : RegionVisibilityComputer {
-    override suspend fun computeForRegion(region: Region, location: UserLocation): VisibilityResult =
-        computeForRegion(region, location, AppConfig.defaultResolutionLevel)
+    override suspend fun computeForRegions(regions: List<Region>, location: UserLocation): VisibilityResult =
+        computeForRegions(regions, location, AppConfig.defaultResolutionLevel)
 
     suspend fun computeForRegion(
         region: Region,
         location: UserLocation,
+        resolutionLevel: ResolutionLevel = AppConfig.defaultResolutionLevel
+    ): VisibilityResult = computeForRegions(listOf(region), location, resolutionLevel)
+
+    suspend fun computeForRegions(
+        regions: List<Region>,
+        location: UserLocation,
         resolutionLevel: ResolutionLevel
     ): VisibilityResult {
-        val warnings = mutableSetOf<VisibilityWarning>()
+        if (regions.isEmpty()) {
+            return VisibilityResult(entities = emptyList(), computationTimeMs = 0L)
+        }
 
-        val demReaders = openDemReaders(region, warnings)
+        val warnings = mutableSetOf<VisibilityWarning>()
+        val demReaders = openDemReaders(regions, warnings)
         val sampler = DemElevationSampler(demReaders)
         val observerElevation =
             observerElevationResolver.resolve(
@@ -44,15 +53,16 @@ constructor(
             )
         observerElevation.warning?.let { warnings += it }
 
-        val candidates = queryCandidates(region, location, resolutionLevel, warnings)
+        val candidates = queryCandidates(regions, location, resolutionLevel, warnings)
+        val collectionRadiusM = regions.maxOf { RegionBounds.dataCollectionRadiusM(it) }
         val request =
             VisibilityRequest(
                 observerLat = location.latitude,
                 observerLon = location.longitude,
                 observerElevationM = observerElevation.elevationM,
                 eyeHeightM = AppConfig.EYE_HEIGHT_METERS,
-                regionId = region.id,
-                radiusM = region.radiusM,
+                regionId = regions.first().id,
+                radiusM = collectionRadiusM,
                 resolutionLevel = resolutionLevel,
                 demReaders = demReaders,
                 candidates = candidates,
@@ -70,36 +80,45 @@ constructor(
     }
 
     private suspend fun queryCandidates(
-        region: Region,
+        regions: List<Region>,
         location: UserLocation,
         resolutionLevel: ResolutionLevel,
         warnings: MutableSet<VisibilityWarning>
     ): List<VisibilityCandidate> {
-        val entities =
-            geoEntityRepository.queryWithinRadiusForRegion(
-                regionId = region.id,
-                regionCenterLat = region.centerLat,
-                regionCenterLon = region.centerLon,
-                regionRadiusM = region.radiusM,
-                lat = region.centerLat,
-                lon = region.centerLon,
-                radiusM = region.radiusM,
-                resolutionLevel = resolutionLevel
-            )
+        val entitiesById = LinkedHashMap<String, GeoEntity>()
+        for (region in regions) {
+            val collectionRadiusM = RegionBounds.dataCollectionRadiusM(region)
+            val entities =
+                geoEntityRepository.queryWithinRadiusForRegion(
+                    regionId = region.id,
+                    regionCenterLat = region.centerLat,
+                    regionCenterLon = region.centerLon,
+                    regionRadiusM = collectionRadiusM,
+                    lat = region.centerLat,
+                    lon = region.centerLon,
+                    radiusM = collectionRadiusM,
+                    resolutionLevel = resolutionLevel
+                )
+            entities.forEach { entity -> entitiesById.putIfAbsent(entity.id, entity) }
+        }
 
-        if (entities.isEmpty()) {
+        if (entitiesById.isEmpty()) {
             Log.w(
                 TAG,
-                "No visibility candidates for region ${region.id} at ${location.latitude},${location.longitude}"
+                "No visibility candidates for ${regions.size} region(s) at " +
+                    "${location.latitude},${location.longitude}"
             )
         }
 
-        if (entities.size > AppConfig.VISIBILITY_MAX_CANDIDATES) {
-            Log.w(TAG, "R-Tree returned ${entities.size} candidates; capping at ${AppConfig.VISIBILITY_MAX_CANDIDATES}")
+        if (entitiesById.size > AppConfig.VISIBILITY_MAX_CANDIDATES) {
+            Log.w(
+                TAG,
+                "R-Tree returned ${entitiesById.size} candidates; capping at ${AppConfig.VISIBILITY_MAX_CANDIDATES}"
+            )
             warnings += VisibilityWarning.CANDIDATE_CAP_EXCEEDED
         }
 
-        return entities
+        return entitiesById.values
             .sortedBy { entity ->
                 RegionBounds.haversineDistanceM(
                     location.latitude,
@@ -113,22 +132,25 @@ constructor(
     }
 
     private suspend fun openDemReaders(
-        region: Region,
+        regions: List<Region>,
         warnings: MutableSet<VisibilityWarning>
     ): Map<String, DemTileReader> {
-        val tileIds =
-            RegionDemTileResolver.resolveTileIds(
-                region = region,
-                tileCoverageDao = tileCoverageDao,
-                demTileDao = demTileDao,
-                tileReadable = demTileRepository::isBinReadable
-            )
+        val tileIds = LinkedHashSet<String>()
+        for (region in regions) {
+            tileIds +=
+                RegionDemTileResolver.resolveTileIds(
+                    region = region,
+                    tileCoverageDao = tileCoverageDao,
+                    demTileDao = demTileDao,
+                    tileReadable = demTileRepository::isBinReadable
+                )
+        }
         val readers = LinkedHashMap<String, DemTileReader>()
         for (tileId in tileIds) {
             demTileRepository.ensureRegisteredFromBin(tileId)
             val reader = demTileRepository.openReader(tileId)
             if (reader == null) {
-                Log.w(TAG, "Skipping unreadable DEM tile $tileId for region ${region.id}")
+                Log.w(TAG, "Skipping unreadable DEM tile $tileId")
                 continue
             }
             readers[tileId] = reader

@@ -4,5 +4,5 @@ import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
 
 fun interface RegionVisibilityComputer {
-    suspend fun computeForRegion(region: Region, location: UserLocation): VisibilityResult
+    suspend fun computeForRegions(regions: List<Region>, location: UserLocation): VisibilityResult
 }

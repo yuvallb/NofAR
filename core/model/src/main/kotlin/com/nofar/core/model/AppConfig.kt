@@ -28,6 +28,12 @@ object AppConfig {
     /** Default circular region radius for Simple Mode auto-download (meters). */
     const val SIMPLE_MODE_DEFAULT_RADIUS_M: Double = 10_000.0
 
+    /**
+     * Extra radius beyond [Region.radiusM] used for OSM/DEM download and Explore visibility.
+     * Membership / "inside region" checks stay on [Region.radiusM].
+     */
+    const val DATA_COLLECTION_RADIUS_PADDING_M: Double = 5_000.0
+
     /** Warn before cellular download when estimated size exceeds this (bytes). */
     const val CELLULAR_DOWNLOAD_WARNING_BYTES: Long = 50L * 1024 * 1024
 

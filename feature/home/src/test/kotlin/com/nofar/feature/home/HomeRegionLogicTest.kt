@@ -148,19 +148,15 @@ class HomeRegionLogicTest {
     }
 
     @Test
-    fun resolveExploreNavigation_multipleRegions_showsOverlapPicker() {
-        val first = sampleRegion()
-        val second = sampleRegion(id = UUID.randomUUID())
-        val decision = HomeRegionLogic.resolveExploreNavigation(listOf(first, second))
-        assertEquals(ExploreNavigationDecision.OverlapPicker(listOf(first, second)), decision)
-    }
-
-    @Test
-    fun defaultOverlapSelection_usesLastSelectedWhenAvailable() {
-        val first = sampleRegion()
-        val second = sampleRegion(id = UUID.randomUUID())
-        assertEquals(second.id, HomeRegionLogic.defaultOverlapSelection(listOf(first, second), second.id))
-        assertEquals(first.id, HomeRegionLogic.defaultOverlapSelection(listOf(first, second), null))
+    fun resolveExploreNavigation_multipleRegions_navigatesToNewest() {
+        val older = sampleRegion(updatedAt = Instant.parse("2024-01-01T00:00:00Z"))
+        val newer =
+            sampleRegion(
+                id = UUID.randomUUID(),
+                updatedAt = Instant.parse("2024-06-01T00:00:00Z")
+            )
+        val decision = HomeRegionLogic.resolveExploreNavigation(listOf(older, newer))
+        assertEquals(ExploreNavigationDecision.Direct(newer.id), decision)
     }
 
     private fun sampleRegion(

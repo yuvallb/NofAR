@@ -86,7 +86,7 @@ constructor(
             quickRegionDownloadUseCase = quickRegionDownloadUseCase,
             downloadScheduler = downloadScheduler,
             uiState = _uiState,
-            onDownloadComplete = { region -> applyActiveRegion(region) },
+            onDownloadComplete = { region -> applyActiveRegions(listOf(region)) },
             onRefreshGate = { refreshGate() }
         )
     private var cachedVisibleEntities: List<VisibleEntity> = emptyList()
@@ -113,7 +113,7 @@ constructor(
         } else {
             locationRepository.onPermissionRevoked()
             declinationCorrector.clearSeedLocation()
-            visibilityPassScheduler.setActiveRegion(null)
+            visibilityPassScheduler.setActiveRegions(emptyList())
         }
         _uiState.update { state ->
             val waiting =
@@ -126,7 +126,9 @@ constructor(
             )
         }
         if (accessState == LocationAccessState.GRANTED) {
-            locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it) }
+            locationRepository.lastLocation?.let { location ->
+                altitudeController.scheduleResolve(location, _uiState.value.activeRegions)
+            }
         } else {
             altitudeController.clearAltitude()
         }
@@ -240,16 +242,15 @@ constructor(
     }
 
     private suspend fun resolveInitialRegion() {
-        if (requestedRegionId != null) {
-            val region = regionRepository.getRegion(requestedRegionId)
-            applyActiveRegion(region)
-            locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it, region) }
-            return
-        }
         val location = locationRepository.lastLocation
         if (location != null) {
             applyRegionResolution(location)
-            altitudeController.scheduleResolve(location, _uiState.value.activeRegion)
+            altitudeController.scheduleResolve(location, _uiState.value.activeRegions)
+            return
+        }
+        if (requestedRegionId != null) {
+            val region = regionRepository.getRegion(requestedRegionId)
+            applyActiveRegions(listOfNotNull(region))
         }
     }
 
@@ -269,7 +270,7 @@ constructor(
             when (resolution) {
                 is ExploreRegionResolution.Active -> {
                     downloadController.stopObservation()
-                    applyActiveRegion(resolution.region)
+                    applyActiveRegions(selectRegionsForLocation(location))
                     _uiState.update {
                         it.copy(
                             regionResolution = resolution,
@@ -280,7 +281,7 @@ constructor(
                     }
                 }
                 is ExploreRegionResolution.Downloading -> {
-                    applyActiveRegion(null)
+                    applyActiveRegions(emptyList())
                     _uiState.update {
                         it.copy(
                             regionResolution = resolution,
@@ -292,7 +293,7 @@ constructor(
                     downloadController.observeProgress(resolution.region.id)
                 }
                 is ExploreRegionResolution.NeedsDownload -> {
-                    applyActiveRegion(null)
+                    applyActiveRegions(emptyList())
                     _uiState.update {
                         it.copy(
                             regionResolution = resolution,
@@ -305,34 +306,43 @@ constructor(
                 }
             }
         } else {
-            val region = selectRegionForLocation(location)
-            applyActiveRegion(region)
+            applyActiveRegions(selectRegionsForLocation(location))
             _uiState.update { it.copy(regionResolution = null, downloadPrompt = null) }
         }
         refreshGate()
     }
 
-    private suspend fun selectRegionForLocation(location: UserLocation): Region? = regionRepository
+    private suspend fun selectRegionsForLocation(location: UserLocation): List<Region> = regionRepository
         .regionsContainingPoint(location.latitude, location.longitude)
         .filter { it.downloadStatus == DownloadStatus.READY || it.downloadStatus == DownloadStatus.PARTIAL }
-        .maxByOrNull { it.updatedAt }
+        .sortedByDescending { it.updatedAt }
 
-    private fun applyActiveRegion(region: Region?) {
-        visibilityPassScheduler.setActiveRegion(region)
+    private fun applyActiveRegions(regions: List<Region>) {
+        val primary =
+            regions.firstOrNull { it.id == requestedRegionId }
+                ?: regions.maxByOrNull { it.updatedAt }
+        visibilityPassScheduler.setActiveRegions(regions)
         _uiState.update {
             it.copy(
-                activeRegion = region,
-                activeRegionName = region?.name,
-                partialRegionWarning = region?.downloadStatus == DownloadStatus.PARTIAL
+                activeRegion = primary,
+                activeRegions = regions,
+                activeRegionName = formatActiveRegionName(regions, primary),
+                partialRegionWarning = regions.any { region -> region.downloadStatus == DownloadStatus.PARTIAL }
             )
         }
-        locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it, region) }
+        locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it, regions) }
         viewModelScope.launch(Dispatchers.IO) {
-            region?.let { active ->
+            regions.forEach { active ->
                 runCatching { regionCoverageRepairUseCase.repairIfNeeded(active) }
             }
             refreshGate()
         }
+    }
+
+    private fun formatActiveRegionName(regions: List<Region>, primary: Region?): String? = when {
+        regions.isEmpty() -> null
+        regions.size == 1 -> regions.single().name
+        else -> regions.joinToString(" · ") { it.name }.ifBlank { primary?.name }
     }
 
     private fun onOrientation(orientation: DeviceOrientation) {
@@ -374,33 +384,22 @@ constructor(
         }
 
         viewModelScope.launch {
-            val activeRegion =
-                if (requestedRegionId != null) {
-                    val region = regionRepository.getRegion(requestedRegionId)
-                    if (region?.id != _uiState.value.activeRegion?.id) {
-                        applyActiveRegion(region)
-                    }
-                    applyRegionBoundary(location, region)
-                    region
-                } else {
-                    val previousResolution = _uiState.value.regionResolution
-                    applyRegionResolution(location)
-                    val region = _uiState.value.activeRegion
-                    if (previousResolution != _uiState.value.regionResolution &&
-                        _uiState.value.regionResolution is ExploreRegionResolution.NeedsDownload
-                    ) {
-                        _uiState.update { it.copy(downloadPromptDismissed = false) }
-                    }
-                    applyRegionBoundary(location, region)
-                    region
-                }
+            val previousResolution = _uiState.value.regionResolution
+            applyRegionResolution(location)
+            val regions = _uiState.value.activeRegions
+            if (previousResolution != _uiState.value.regionResolution &&
+                _uiState.value.regionResolution is ExploreRegionResolution.NeedsDownload
+            ) {
+                _uiState.update { it.copy(downloadPromptDismissed = false) }
+            }
+            applyRegionBoundary(location, regions)
             refreshGate()
-            altitudeController.scheduleResolve(location, activeRegion)
+            altitudeController.scheduleResolve(location, regions)
         }
     }
 
-    private fun applyRegionBoundary(location: UserLocation, region: Region?) {
-        val boundaryState = regionBoundaryController.onLocation(location, region)
+    private fun applyRegionBoundary(location: UserLocation, regions: List<Region>) {
+        val boundaryState = regionBoundaryController.onLocation(location, regions)
         if (boundaryState.insideActiveRegion) {
             regionBoundaryController.stopGraceTicker()
             _uiState.update {
@@ -423,7 +422,7 @@ constructor(
                     showRegionExitBanner = graceState.showRegionExitBanner,
                     showGraceExpiredDialog = graceState.showGraceExpiredDialog,
                     regionExitGraceSecondsRemaining = graceState.regionExitGraceSecondsRemaining,
-                    activeRegionName = region?.name ?: it.activeRegionName
+                    activeRegionName = formatActiveRegionName(regions, it.activeRegion) ?: it.activeRegionName
                 )
             }
             refreshGate()
@@ -432,10 +431,11 @@ constructor(
 
     private fun handleGraceExpiredSimpleMode(location: UserLocation) {
         regionBoundaryController.stopGraceTicker()
-        visibilityPassScheduler.setActiveRegion(null)
+        visibilityPassScheduler.setActiveRegions(emptyList())
         _uiState.update {
             it.copy(
                 activeRegion = null,
+                activeRegions = emptyList(),
                 activeRegionName = null,
                 showRegionExitBanner = false,
                 showGraceExpiredDialog = false,
@@ -508,7 +508,8 @@ constructor(
     }
 
     private fun updatePartialWarning(warnings: Set<VisibilityWarning>) {
-        val regionPartial = _uiState.value.activeRegion?.downloadStatus == DownloadStatus.PARTIAL
+        val regionPartial =
+            _uiState.value.activeRegions.any { it.downloadStatus == DownloadStatus.PARTIAL }
         _uiState.update {
             it.copy(partialRegionWarning = regionPartial || VisibilityWarning.DEM_TILE_MISSING in warnings)
         }

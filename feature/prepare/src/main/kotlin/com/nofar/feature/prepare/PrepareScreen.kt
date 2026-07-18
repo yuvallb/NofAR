@@ -4,6 +4,7 @@ package com.nofar.feature.prepare
 
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.view.MotionEvent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,10 +56,13 @@ import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.LabelLanguage
+import com.nofar.core.model.Region
 import com.nofar.core.ui.LabelLanguageDropdown
+import com.nofar.core.ui.PrepareOverlayDarkText
+import com.nofar.core.ui.PrepareOverlayDarkTextSecondary
 import com.nofar.core.ui.permission.rememberNofARPermissionState
+import java.util.UUID
 import kotlin.math.hypot
-import kotlin.math.roundToInt
 import org.osmdroid.config.Configuration
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
@@ -196,6 +200,8 @@ private fun DefineRegionContent(
             centerLat = uiState.centerLat,
             centerLon = uiState.centerLon,
             radiusKm = uiState.radiusKm,
+            downloadedRegions = uiState.downloadedRegions,
+            excludeRegionId = uiState.regionId ?: uiState.existingRegion?.id,
             mapRecenterNonce = uiState.mapRecenterNonce,
             onMapTap = onMapTap,
             modifier = Modifier.fillMaxSize()
@@ -232,33 +238,29 @@ private fun DefineRegionContent(
                 supportingText = uiState.nameError?.let { { Text(it) } },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
-                colors = outlinedFieldColors()
+                colors = outlinedFieldColors(darkForeground = true)
             )
 
             Text(
                 text = stringResource(com.nofar.core.ui.R.string.prepare_label_language),
                 style = MaterialTheme.typography.bodyMedium,
-                color = NofARColors.TextPrimary
+                color = PrepareOverlayDarkText
             )
             LabelLanguageDropdown(
                 selected = uiState.labelLanguage,
                 enabled = !uiState.labelLanguageLocked,
                 onSelected = onLabelLanguageChanged,
+                darkForeground = true,
                 modifier = Modifier.fillMaxWidth()
             )
             if (uiState.labelLanguageLocked) {
                 Text(
                     text = stringResource(com.nofar.core.ui.R.string.prepare_label_language_locked_hint),
                     style = MaterialTheme.typography.bodySmall,
-                    color = NofARColors.TextSecondary
+                    color = PrepareOverlayDarkTextSecondary
                 )
             }
 
-            Text(
-                text = "Radius: ${uiState.radiusKm.roundToInt()} km",
-                style = MaterialTheme.typography.bodyMedium,
-                color = NofARColors.TextPrimary
-            )
             Slider(
                 value = uiState.radiusKm.toFloat(),
                 onValueChange = { onRadiusChanged(it.toDouble()) },
@@ -400,13 +402,16 @@ private fun CellularWarningDialog(
 }
 
 @Composable
-private fun outlinedFieldColors() = OutlinedTextFieldDefaults.colors(
+private fun outlinedFieldColors(darkForeground: Boolean = false) = OutlinedTextFieldDefaults.colors(
     focusedBorderColor = NofARColors.PrimaryYellow,
-    unfocusedBorderColor = NofARColors.TextCaption,
+    unfocusedBorderColor = if (darkForeground) PrepareOverlayDarkTextSecondary else NofARColors.TextCaption,
     focusedLabelColor = NofARColors.PrimaryYellow,
+    unfocusedLabelColor = if (darkForeground) PrepareOverlayDarkTextSecondary else NofARColors.TextSecondary,
     cursorColor = NofARColors.PrimaryYellow,
-    focusedTextColor = NofARColors.TextPrimary,
-    unfocusedTextColor = NofARColors.TextPrimary
+    focusedTextColor = if (darkForeground) PrepareOverlayDarkText else NofARColors.TextPrimary,
+    unfocusedTextColor = if (darkForeground) PrepareOverlayDarkText else NofARColors.TextPrimary,
+    errorSupportingTextColor = NofARColors.ErrorDestructive,
+    errorLabelColor = NofARColors.ErrorDestructive
 )
 
 @Composable
@@ -414,6 +419,8 @@ private fun PrepareMap(
     centerLat: Double,
     centerLon: Double,
     radiusKm: Double,
+    downloadedRegions: List<Region>,
+    excludeRegionId: UUID?,
     mapRecenterNonce: Long,
     onMapTap: (Double, Double) -> Unit,
     modifier: Modifier = Modifier
@@ -427,6 +434,7 @@ private fun PrepareMap(
                 setMultiTouchControls(true)
                 controller.setZoom(10.0)
                 controller.setCenter(GeoPoint(centerLat, centerLon))
+                val downloadedOverlay = DownloadedRegionsOverlay()
                 val circleOverlay = RadiusCircleOverlay(centerLat, centerLon, radiusKm * 1000)
                 val marker =
                     Marker(this).apply {
@@ -438,6 +446,7 @@ private fun PrepareMap(
                         onMapTap(lat, lon)
                         true
                     }
+                overlays.add(downloadedOverlay)
                 overlays.add(circleOverlay)
                 overlays.add(marker)
                 overlays.add(tapOverlay)
@@ -454,6 +463,7 @@ private fun PrepareMap(
                         }
                     }
                 )
+                mapHolder.downloadedOverlay = downloadedOverlay
                 mapHolder.circleOverlay = circleOverlay
                 mapHolder.marker = marker
                 mapHolder.mapView = this
@@ -465,6 +475,9 @@ private fun PrepareMap(
                 this.centerLat = centerLat
                 this.centerLon = centerLon
                 this.radiusM = radiusKm * 1000
+            }
+            mapHolder.downloadedOverlay?.apply {
+                regions = downloadedRegions.filter { it.id != excludeRegionId }
             }
             if (mapRecenterNonce != lastRecenterNonce) {
                 mapView.controller.animateTo(GeoPoint(centerLat, centerLon))
@@ -479,6 +492,79 @@ private class PrepareMapHolder {
     var mapView: MapView? = null
     var marker: Marker? = null
     var circleOverlay: RadiusCircleOverlay? = null
+    var downloadedOverlay: DownloadedRegionsOverlay? = null
+}
+
+private class DownloadedRegionsOverlay : Overlay() {
+    var regions: List<Region> = emptyList()
+
+    private val fillPaint =
+        Paint().apply {
+            color = 0x334CAF50
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+    private val outlinePaint =
+        Paint().apply {
+            color = 0xFF2E7D32.toInt()
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+            isAntiAlias = true
+        }
+    private val labelPaint =
+        Paint().apply {
+            color = 0xFF1A1A1A.toInt()
+            textSize = 28f
+            typeface = Typeface.DEFAULT_BOLD
+            isAntiAlias = true
+            textAlign = Paint.Align.CENTER
+        }
+    private val labelBgPaint =
+        Paint().apply {
+            color = 0xCCFFFFFF.toInt()
+            style = Paint.Style.FILL
+            isAntiAlias = true
+        }
+
+    override fun draw(canvas: Canvas, mapView: MapView, shadow: Boolean) {
+        if (shadow) return
+        regions.forEach { region ->
+            drawRegionCircle(canvas, mapView, region.centerLat, region.centerLon, region.radiusM)
+            drawRegionLabel(canvas, mapView, region.centerLat, region.centerLon, region.name)
+        }
+    }
+
+    private fun drawRegionCircle(
+        canvas: Canvas,
+        mapView: MapView,
+        centerLat: Double,
+        centerLon: Double,
+        radiusM: Double
+    ) {
+        val projection = mapView.projection
+        val centerPoint = projection.toPixels(GeoPoint(centerLat, centerLon), null)
+        val radiusPx = circleRadiusPx(mapView, centerLat, centerLon, radiusM, centerPoint.x, centerPoint.y)
+        canvas.drawCircle(centerPoint.x.toFloat(), centerPoint.y.toFloat(), radiusPx.toFloat(), fillPaint)
+        canvas.drawCircle(centerPoint.x.toFloat(), centerPoint.y.toFloat(), radiusPx.toFloat(), outlinePaint)
+    }
+
+    private fun drawRegionLabel(canvas: Canvas, mapView: MapView, centerLat: Double, centerLon: Double, name: String) {
+        if (name.isBlank()) return
+        val projection = mapView.projection
+        val centerPoint = projection.toPixels(GeoPoint(centerLat, centerLon), null)
+        val label = if (name.length > 24) name.take(23) + "..." else name
+        val textWidth = labelPaint.measureText(label)
+        val pad = 8f
+        val baseline = centerPoint.y.toFloat()
+        canvas.drawRect(
+            centerPoint.x - textWidth / 2 - pad,
+            baseline - labelPaint.textSize - pad / 2,
+            centerPoint.x + textWidth / 2 + pad,
+            baseline + pad,
+            labelBgPaint
+        )
+        canvas.drawText(label, centerPoint.x.toFloat(), baseline, labelPaint)
+    }
 }
 
 private class RadiusCircleOverlay(var centerLat: Double, var centerLon: Double, var radiusM: Double) : Overlay() {
@@ -500,21 +586,7 @@ private class RadiusCircleOverlay(var centerLat: Double, var centerLon: Double, 
         if (shadow) return
         val projection = mapView.projection
         val centerPoint = projection.toPixels(GeoPoint(centerLat, centerLon), null)
-        val northPoint = destinationPoint(centerLat, centerLon, radiusM, 0.0)
-        val northPixels = projection.toPixels(GeoPoint(northPoint.first, northPoint.second), null)
-        val eastPoint = destinationPoint(centerLat, centerLon, radiusM, 90.0)
-        val eastPixels = projection.toPixels(GeoPoint(eastPoint.first, eastPoint.second), null)
-        val radiusPx =
-            (
-                hypot(
-                    (northPixels.x - centerPoint.x).toDouble(),
-                    (northPixels.y - centerPoint.y).toDouble()
-                ) +
-                    hypot(
-                        (eastPixels.x - centerPoint.x).toDouble(),
-                        (eastPixels.y - centerPoint.y).toDouble()
-                    )
-                ) / 2.0
+        val radiusPx = circleRadiusPx(mapView, centerLat, centerLon, radiusM, centerPoint.x, centerPoint.y)
         canvas.drawCircle(
             centerPoint.x.toFloat(),
             centerPoint.y.toFloat(),
@@ -528,6 +600,25 @@ private class RadiusCircleOverlay(var centerLat: Double, var centerLon: Double, 
             outlinePaint
         )
     }
+}
+
+private fun circleRadiusPx(
+    mapView: MapView,
+    centerLat: Double,
+    centerLon: Double,
+    radiusM: Double,
+    centerX: Int,
+    centerY: Int
+): Double {
+    val projection = mapView.projection
+    val northPoint = destinationPoint(centerLat, centerLon, radiusM, 0.0)
+    val northPixels = projection.toPixels(GeoPoint(northPoint.first, northPoint.second), null)
+    val eastPoint = destinationPoint(centerLat, centerLon, radiusM, 90.0)
+    val eastPixels = projection.toPixels(GeoPoint(eastPoint.first, eastPoint.second), null)
+    return (
+        hypot((northPixels.x - centerX).toDouble(), (northPixels.y - centerY).toDouble()) +
+            hypot((eastPixels.x - centerX).toDouble(), (eastPixels.y - centerY).toDouble())
+        ) / 2.0
 }
 
 private fun destinationPoint(lat: Double, lon: Double, distanceM: Double, bearingDeg: Double): Pair<Double, Double> {

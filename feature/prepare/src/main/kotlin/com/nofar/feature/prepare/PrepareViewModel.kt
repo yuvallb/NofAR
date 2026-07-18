@@ -55,6 +55,8 @@ data class PrepareUiState(
     val radiusKm: Double = 10.0,
     val regionId: UUID? = null,
     val existingRegion: Region? = null,
+    /** READY/PARTIAL regions drawn on the map (excludes the region being edited). */
+    val downloadedRegions: List<Region> = emptyList(),
     val labelLanguage: LabelLanguage = LabelLanguage.DEFAULT,
     val labelLanguageLocked: Boolean = false,
     val estimateBytes: Long = 0L,
@@ -99,6 +101,7 @@ constructor(
 
     init {
         locationController.acquire(PREPARE_LOCATION_TOKEN)
+        observeDownloadedRegions()
         savedStateHandle.get<String>("regionId")?.takeIf { it.isNotBlank() }?.let { id ->
             loadExistingRegion(UUID.fromString(id))
             hasSetInitialLocation = true
@@ -153,6 +156,19 @@ constructor(
             while (true) {
                 delay(500)
                 pollDownloadProgressFromDb()
+            }
+        }
+    }
+
+    private fun observeDownloadedRegions() {
+        viewModelScope.launch {
+            regionRepository.observeAllRegions().collect { regions ->
+                val downloaded =
+                    regions.filter { region ->
+                        region.downloadStatus == DownloadStatus.READY ||
+                            region.downloadStatus == DownloadStatus.PARTIAL
+                    }
+                _uiState.update { it.copy(downloadedRegions = downloaded) }
             }
         }
     }
@@ -313,7 +329,12 @@ constructor(
 
     fun refreshEstimate() {
         val state = _uiState.value
-        val estimate = PrepareEstimator.estimate(state.centerLat, state.centerLon, state.radiusKm * 1000)
+        val estimate =
+            PrepareEstimator.estimate(
+                state.centerLat,
+                state.centerLon,
+                RegionBounds.dataCollectionRadiusM(state.radiusKm * 1000)
+            )
         _uiState.update {
             it.copy(
                 estimateBytes = estimate.totalEstimateBytes,
@@ -449,7 +470,12 @@ constructor(
         val now = Instant.now()
         val radiusM = state.radiusKm * 1000
         val bbox = RegionBounds.boundingBox(state.centerLat, state.centerLon, radiusM)
-        val estimate = PrepareEstimator.estimate(state.centerLat, state.centerLon, radiusM)
+        val estimate =
+            PrepareEstimator.estimate(
+                state.centerLat,
+                state.centerLon,
+                RegionBounds.dataCollectionRadiusM(radiusM)
+            )
         val existing = regionRepository.getRegion(regionId)
         return Region(
             id = regionId,

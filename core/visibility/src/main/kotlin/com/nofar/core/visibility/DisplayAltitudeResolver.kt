@@ -19,11 +19,17 @@ class DisplayAltitudeResolver
 @Inject
 constructor(private val pointDemElevationLookup: DemPointElevationSource) {
     suspend fun resolve(location: UserLocation, lastKnownGpsAltitudeM: Double?, region: Region?): AltitudeReading? =
-        when {
-            location.altitudeMeters != null -> gpsReading(location)
-            lastKnownGpsAltitudeM != null -> cachedGpsReading(location, lastKnownGpsAltitudeM)
-            else -> demReading(location, region)
-        }
+        resolve(location, lastKnownGpsAltitudeM, listOfNotNull(region))
+
+    suspend fun resolve(
+        location: UserLocation,
+        lastKnownGpsAltitudeM: Double?,
+        regions: List<Region>
+    ): AltitudeReading? = when {
+        location.altitudeMeters != null -> gpsReading(location)
+        lastKnownGpsAltitudeM != null -> cachedGpsReading(location, lastKnownGpsAltitudeM)
+        else -> regions.firstNotNullOfOrNull { demReading(location, it) }
+    }
 
     private fun gpsReading(location: UserLocation): AltitudeReading = AltitudeReading(
         meters = location.altitudeMeters!!.roundToInt(),

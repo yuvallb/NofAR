@@ -34,4 +34,9 @@ object RegionBounds {
 
     fun containsPoint(region: Region, lat: Double, lon: Double): Boolean =
         haversineDistanceM(region.centerLat, region.centerLon, lat, lon) <= region.radiusM
+
+    /** Radius used for data download and Explore visibility (location radius + padding). */
+    fun dataCollectionRadiusM(radiusM: Double): Double = radiusM + AppConfig.DATA_COLLECTION_RADIUS_PADDING_M
+
+    fun dataCollectionRadiusM(region: Region): Double = dataCollectionRadiusM(region.radiusM)
 }

@@ -31,7 +31,7 @@ constructor(
     private val _warnings = MutableStateFlow<Set<VisibilityWarning>>(emptySet())
     val warnings: StateFlow<Set<VisibilityWarning>> = _warnings.asStateFlow()
 
-    private var activeRegion: Region? = null
+    private var activeRegions: List<Region> = emptyList()
     private var lastPassAtMillis: Long = VisibilityPassPolicy.NO_PASS_YET
     private var lastPassLocation: UserLocation? = null
     private var sequenceNumber: Long = 0L
@@ -39,12 +39,12 @@ constructor(
     private var collectorJob: Job? = null
     private var scope: CoroutineScope? = null
 
-    fun setActiveRegion(region: Region?) {
-        activeRegion = region
+    fun setActiveRegions(regions: List<Region>) {
+        activeRegions = regions
         lastPassAtMillis = VisibilityPassPolicy.NO_PASS_YET
         lastPassLocation = null
         locationRepository.lastLocation?.let { location ->
-            triggerPass(force = true, location = location, region = region)
+            triggerPass(force = true, location = location, regions = regions)
         }
     }
 
@@ -67,27 +67,27 @@ constructor(
         scope = null
         _visibleEntities.value = emptyList()
         _warnings.value = emptySet()
-        activeRegion = null
+        activeRegions = emptyList()
         lastPassAtMillis = VisibilityPassPolicy.NO_PASS_YET
         lastPassLocation = null
     }
 
     private fun onLocationUpdate(location: UserLocation) {
-        if (activeRegion == null) return
+        if (activeRegions.isEmpty()) return
         if (shouldSchedulePass(location, force = false)) {
-            triggerPass(force = false, location = location, region = activeRegion)
+            triggerPass(force = false, location = location, regions = activeRegions)
         }
     }
 
     private fun triggerPass(
         force: Boolean,
         location: UserLocation? = locationRepository.lastLocation,
-        region: Region? = activeRegion
+        regions: List<Region> = activeRegions
     ) {
-        val currentRegion = region
+        val currentRegions = regions
         val currentLocation = location
         val launchScope = scope
-        if (currentRegion == null || currentLocation == null || launchScope == null) {
+        if (currentRegions.isEmpty() || currentLocation == null || launchScope == null) {
             return
         }
         if (!force && !shouldSchedulePass(currentLocation, force = false)) {
@@ -101,13 +101,17 @@ constructor(
                 val result =
                     runCatching {
                         mutex.withLock {
-                            visibilityUseCase.computeForRegion(
-                                region = currentRegion,
+                            visibilityUseCase.computeForRegions(
+                                regions = currentRegions,
                                 location = currentLocation
                             )
                         }
                     }.getOrElse { error ->
-                        Log.e(TAG, "Visibility pass failed for region ${currentRegion.id}", error)
+                        Log.e(
+                            TAG,
+                            "Visibility pass failed for ${currentRegions.size} region(s)",
+                            error
+                        )
                         VisibilityResult(
                             entities = emptyList(),
                             computationTimeMs = 0L,

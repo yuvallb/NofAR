@@ -44,7 +44,8 @@ constructor(
         val regionId = existingRegionId ?: UUID.randomUUID()
         val now = Instant.now()
         val bbox = RegionBounds.boundingBox(centerLat, centerLon, radiusM)
-        val estimate = PrepareEstimator.estimate(centerLat, centerLon, radiusM)
+        val estimate =
+            PrepareEstimator.estimate(centerLat, centerLon, RegionBounds.dataCollectionRadiusM(radiusM))
         val existing = regionRepository.getRegion(regionId)
         val labelLanguage = userPreferencesRepository.preferredLabelLanguage.first()
         val region =

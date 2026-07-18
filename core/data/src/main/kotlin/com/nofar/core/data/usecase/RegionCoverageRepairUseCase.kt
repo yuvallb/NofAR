@@ -46,7 +46,7 @@ constructor(
             spatialQuery.queryWithinRadius(
                 lat = region.centerLat,
                 lon = region.centerLon,
-                radiusM = region.radiusM,
+                radiusM = RegionBounds.dataCollectionRadiusM(region),
                 resolutionLevel = ResolutionLevel.Full
             )
         if (entities.isNotEmpty()) {
@@ -77,7 +77,11 @@ constructor(
 
     private suspend fun registerIntersectingBins(region: Region) {
         DemTileId.intersectingTiles(
-            RegionBounds.boundingBox(region.centerLat, region.centerLon, region.radiusM)
+            RegionBounds.boundingBox(
+                region.centerLat,
+                region.centerLon,
+                RegionBounds.dataCollectionRadiusM(region)
+            )
         ).map { (tileLat, tileLon) -> DemTileId.fromCoordinates(tileLat, tileLon) }
             .forEach { tileId -> demTileRepository.ensureRegisteredFromBin(tileId) }
     }
