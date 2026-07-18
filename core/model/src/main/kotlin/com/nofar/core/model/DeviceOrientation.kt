@@ -7,6 +7,8 @@ data class DeviceOrientation(
     val trueAzimuthDeg: Float,
     val pitchDeg: Float,
     val rollDeg: Float,
+    /** Back-camera elevation above the horizontal plane, in degrees. */
+    val cameraElevationDeg: Float,
     /** [android.hardware.SensorManager] accuracy constant for the rotation vector sensor. */
     val accuracy: Int,
     val timestampNanos: Long

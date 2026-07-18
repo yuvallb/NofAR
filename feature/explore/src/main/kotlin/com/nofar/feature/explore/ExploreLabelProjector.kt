@@ -20,7 +20,7 @@ internal object ExploreLabelProjector {
             ExploreLabelRenderer.projectAndCluster(
                 entities = entities,
                 trueAzimuthDeg = orientation.trueAzimuthDeg,
-                pitchDeg = orientation.pitchDeg,
+                cameraElevationDeg = orientation.cameraElevationDeg,
                 fov = fov,
                 screenWidthPx = screenWidthPx,
                 screenHeightPx = screenHeightPx,

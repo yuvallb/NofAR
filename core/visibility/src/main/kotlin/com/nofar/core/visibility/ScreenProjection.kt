@@ -39,7 +39,7 @@ object ScreenProjector {
         bearingDeg: Double,
         elevationAngleDeg: Double,
         trueAzimuthDeg: Float,
-        pitchDeg: Float,
+        cameraElevationDeg: Float,
         horizontalFovDeg: Float,
         verticalFovDeg: Float,
         screenWidthPx: Float,
@@ -50,7 +50,7 @@ object ScreenProjector {
         val headingDelta = normalizeHeadingDelta(bearingDeg, trueAzimuthDeg)
         val halfHorizontalFov = horizontalFovDeg / 2f
         val halfVerticalFov = verticalFovDeg / 2f
-        val relativeElevation = elevationAngleDeg - pitchDeg.toDouble()
+        val relativeElevation = elevationAngleDeg - cameraElevationDeg.toDouble()
         val inView =
             abs(headingDelta) <= halfHorizontalFov &&
                 abs(relativeElevation) <= halfVerticalFov

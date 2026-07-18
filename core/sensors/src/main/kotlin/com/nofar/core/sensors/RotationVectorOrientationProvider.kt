@@ -70,10 +70,11 @@ constructor(
     private fun SensorEvent.toDeviceOrientation(accuracy: Int): DeviceOrientation? {
         val rotationMatrix = FloatArray(9)
         SensorManager.getRotationMatrixFromVector(rotationMatrix, values)
+        val displayRotation = displayRotationReader.currentRotationOrDefault()
         val orientationAngles =
             OrientationCoordinateRemapper.orientationAngles(
                 rotationMatrix = rotationMatrix,
-                displayRotation = displayRotationReader.currentRotationOrDefault()
+                displayRotation = displayRotation
             )
 
         val azimuthRad = orientationAngles[0]
@@ -88,6 +89,10 @@ constructor(
             trueAzimuthDeg = normalizedAzimuth,
             pitchDeg = Math.toDegrees(pitchRad.toDouble()).toFloat(),
             rollDeg = Math.toDegrees(rollRad.toDouble()).toFloat(),
+            cameraElevationDeg =
+            OrientationCoordinateRemapper.backCameraElevationDeg(
+                rotationMatrix = rotationMatrix
+            ),
             accuracy = accuracy,
             timestampNanos = timestamp
         )

@@ -373,7 +373,7 @@ object ExploreLabelRenderer {
     fun projectAndCluster(
         entities: List<VisibleEntity>,
         trueAzimuthDeg: Float,
-        pitchDeg: Float,
+        cameraElevationDeg: Float,
         fov: CameraFieldOfView,
         screenWidthPx: Float,
         screenHeightPx: Float,
@@ -387,7 +387,7 @@ object ExploreLabelRenderer {
                         bearingDeg = entity.bearingDeg,
                         elevationAngleDeg = entity.elevationAngleDeg,
                         trueAzimuthDeg = trueAzimuthDeg,
-                        pitchDeg = pitchDeg,
+                        cameraElevationDeg = cameraElevationDeg,
                         horizontalFovDeg = orientedFov.horizontalDeg,
                         verticalFovDeg = orientedFov.verticalDeg,
                         screenWidthPx = screenWidthPx,

@@ -2,6 +2,8 @@ package com.nofar.core.sensors
 
 import android.hardware.SensorManager
 import android.view.Surface
+import kotlin.math.atan2
+import kotlin.math.hypot
 
 /**
  * Remaps the rotation vector matrix for the current display rotation so azimuth and pitch
@@ -50,5 +52,19 @@ internal object OrientationCoordinateRemapper {
         val angles = FloatArray(3)
         SensorManager.getOrientation(remapped, angles)
         return angles
+    }
+
+    /**
+     * Elevation of the back-camera look direction above the horizontal plane.
+     * Device +Z points toward the user; the back camera looks along device -Z.
+     *
+     * Uses the raw [SensorManager.getRotationMatrixFromVector] output — display remapping
+     * is for compass azimuth only and must not be applied here.
+     */
+    fun backCameraElevationDeg(rotationMatrix: FloatArray): Float {
+        val lookX = -rotationMatrix[2].toDouble()
+        val lookY = -rotationMatrix[5].toDouble()
+        val lookZ = -rotationMatrix[8].toDouble()
+        return Math.toDegrees(atan2(lookZ, hypot(lookX, lookY))).toFloat()
     }
 }
