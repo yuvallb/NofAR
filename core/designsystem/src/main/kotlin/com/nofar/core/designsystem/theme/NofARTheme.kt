@@ -3,7 +3,10 @@ package com.nofar.core.designsystem.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.LayoutDirection
 
 private val NofARColorScheme =
     darkColorScheme(
@@ -25,9 +28,12 @@ private val NofARColorScheme =
 
 @Composable
 fun NofARTheme(content: @Composable () -> Unit) {
-    MaterialTheme(
-        colorScheme = NofARColorScheme,
-        typography = NofARTypography,
-        content = content
-    )
+    // Explore AR overlays use absolute screen coordinates; keep UI LTR regardless of locale.
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        MaterialTheme(
+            colorScheme = NofARColorScheme,
+            typography = NofARTypography,
+            content = content
+        )
+    }
 }
