@@ -29,6 +29,12 @@ class SmoothedOrientationProvider(private val delegate: OrientationProvider) : O
             beta = AppConfig.ONE_EURO_BETA_ROLL,
             dCutoff = AppConfig.ONE_EURO_D_CUTOFF
         )
+    private val cameraElevationFilter =
+        OneEuroFilter(
+            minCutoff = AppConfig.ONE_EURO_MIN_CUTOFF_PITCH,
+            beta = AppConfig.ONE_EURO_BETA_PITCH,
+            dCutoff = AppConfig.ONE_EURO_D_CUTOFF
+        )
 
     override val orientationFlow: Flow<DeviceOrientation> =
         delegate.orientationFlow.map { raw ->
@@ -49,6 +55,11 @@ class SmoothedOrientationProvider(private val delegate: OrientationProvider) : O
                     raw.rollDeg.toDouble(),
                     timestampSeconds
                 ).toFloat(),
+                cameraElevationDeg =
+                cameraElevationFilter.filter(
+                    raw.cameraElevationDeg.toDouble(),
+                    timestampSeconds
+                ).toFloat(),
                 accuracy = raw.accuracy,
                 timestampNanos = raw.timestampNanos
             )
@@ -61,5 +72,6 @@ class SmoothedOrientationProvider(private val delegate: OrientationProvider) : O
         azimuthFilter.reset()
         pitchFilter.reset()
         rollFilter.reset()
+        cameraElevationFilter.reset()
     }
 }

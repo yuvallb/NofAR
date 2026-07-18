@@ -27,7 +27,7 @@ class ScreenProjectionTest {
                 bearingDeg = 0.0,
                 elevationAngleDeg = 0.0,
                 trueAzimuthDeg = 0f,
-                pitchDeg = 0f,
+                cameraElevationDeg = 0f,
                 horizontalFovDeg = 60f,
                 verticalFovDeg = 45f,
                 screenWidthPx = 1080f,
@@ -46,7 +46,7 @@ class ScreenProjectionTest {
                 bearingDeg = 90.0,
                 elevationAngleDeg = 0.0,
                 trueAzimuthDeg = 0f,
-                pitchDeg = 0f,
+                cameraElevationDeg = 0f,
                 horizontalFovDeg = 60f,
                 verticalFovDeg = 45f,
                 screenWidthPx = 1080f,
@@ -54,6 +54,37 @@ class ScreenProjectionTest {
             )
 
         assertThat(projection).isNull()
+    }
+
+    @Test
+    fun tiltingCameraUp_movesLabelDownOnScreen() {
+        val level =
+            ScreenProjector.projectEntityToScreen(
+                bearingDeg = 0.0,
+                elevationAngleDeg = 10.0,
+                trueAzimuthDeg = 0f,
+                cameraElevationDeg = 0f,
+                horizontalFovDeg = 60f,
+                verticalFovDeg = 45f,
+                screenWidthPx = 1080f,
+                screenHeightPx = 1920f
+            )
+        val tiltedUp =
+            ScreenProjector.projectEntityToScreen(
+                bearingDeg = 0.0,
+                elevationAngleDeg = 10.0,
+                trueAzimuthDeg = 0f,
+                cameraElevationDeg = 10f,
+                horizontalFovDeg = 60f,
+                verticalFovDeg = 45f,
+                screenWidthPx = 1080f,
+                screenHeightPx = 1920f
+            )
+
+        assertThat(level).isNotNull()
+        assertThat(tiltedUp).isNotNull()
+        assertThat(tiltedUp!!.anchorYPx).isGreaterThan(level!!.anchorYPx)
+        assertThat(tiltedUp.anchorXPx).isWithin(0.1f).of(level.anchorXPx)
     }
 
     @Test
