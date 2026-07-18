@@ -18,7 +18,7 @@ private val kotlinCompilerArgs =
 
 internal fun Project.configureKotlinAndroid(extension: ApplicationExtension) {
     extension.apply {
-        compileSdk = 35
+        compileSdk = 36
         defaultConfig {
             minSdk = 26
         }
@@ -32,7 +32,7 @@ internal fun Project.configureKotlinAndroid(extension: ApplicationExtension) {
 
 internal fun Project.configureKotlinAndroid(extension: LibraryExtension) {
     extension.apply {
-        compileSdk = 35
+        compileSdk = 36
         defaultConfig {
             minSdk = 26
         }
