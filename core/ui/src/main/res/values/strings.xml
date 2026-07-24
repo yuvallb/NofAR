@@ -18,6 +18,7 @@
     <string name="explore_exit_to_home">Exit to Home</string>
     <string name="explore_region_data_missing">Region data is missing or corrupted. Return to Home and re-download this region.</string>
     <string name="explore_partial_region_warning">Partial region — elevation data incomplete; occlusion accuracy may be reduced.</string>
+    <string name="explore_location_accuracy_degraded">Improving GPS accuracy (±%1$dm) — labels hidden until within %2$dm.</string>
     <string name="explore_outside_region_title">Outside active region boundary</string>
     <string name="explore_outside_region_message">Leaving data coverage zone for %1$s. Explore mode will suspend in %2$d seconds.</string>
     <string name="explore_grace_expired_title">Explore mode suspended</string>

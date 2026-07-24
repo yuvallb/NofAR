@@ -81,6 +81,9 @@ object AppConfig {
     /** GPS altitude is used when vertical accuracy is at or below this threshold (meters). */
     const val GPS_ALTITUDE_ACCURACY_THRESHOLD_METERS: Float = 50f
 
+    /** AR labels are hidden when horizontal GPS accuracy exceeds this (meters). */
+    const val EXPLORE_LOCATION_ACCURACY_THRESHOLD_METERS: Float = 30f
+
     /** Mean Earth radius for haversine and curvature correction (meters). */
     const val EARTH_RADIUS_METERS: Double = 6_371_000.0
 

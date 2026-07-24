@@ -35,5 +35,6 @@ class AppConfigTest {
         assertEquals(2.minutes, AppConfig.exploreRegionExitGracePeriod)
         assertEquals(1_000L, AppConfig.GPS_UPDATE_INTERVAL_MS)
         assertEquals(1_000.0, AppConfig.DECLINATION_UPDATE_DISTANCE_METERS, 0.001)
+        assertEquals(30f, AppConfig.EXPLORE_LOCATION_ACCURACY_THRESHOLD_METERS, 0.001f)
     }
 }

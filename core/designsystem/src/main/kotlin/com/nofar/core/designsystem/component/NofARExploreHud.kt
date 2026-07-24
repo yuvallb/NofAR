@@ -181,6 +181,25 @@ fun NofARExploreAltitudeReadout(altitude: AltitudeReading?, modifier: Modifier =
     }
 }
 
+@Composable
+fun NofARLocationAccuracyBadge(accuracyMeters: Float?, isDegraded: Boolean, modifier: Modifier = Modifier) {
+    if (accuracyMeters == null) return
+    Row(
+        modifier =
+        modifier
+            .background(NofARColors.ArOverlayBackground)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "GPS ±${accuracyMeters.roundToInt()}m",
+            style = MaterialTheme.typography.labelSmall.copy(shadow = arTextShadow),
+            color = if (isDegraded) NofARColors.WarningBanner else Color.White,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
 /** Vertical space occupied by [NofARExploreBottomHud]; use when stacking controls above it. */
 val NofARExploreBottomHudHeight = 48.dp
 

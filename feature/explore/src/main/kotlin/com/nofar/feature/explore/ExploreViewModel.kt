@@ -371,9 +371,12 @@ constructor(
     }
 
     private fun onLocation(location: UserLocation) {
+        val accuracyDegraded = ExploreLocationAccuracy.isDegraded(location.accuracyMeters)
         _uiState.update {
             it.copy(
                 waitingForGpsFix = false,
+                locationAccuracyMeters = location.accuracyMeters,
+                locationAccuracyDegraded = accuracyDegraded,
                 locationAccessState =
                 if (it.locationAccessState == LocationAccessState.WAITING_FOR_FIX) {
                     LocationAccessState.GRANTED
@@ -382,6 +385,7 @@ constructor(
                 }
             )
         }
+        reprojectLabels()
 
         viewModelScope.launch {
             val previousResolution = _uiState.value.regionResolution
@@ -556,7 +560,8 @@ constructor(
             orientation != null &&
                 state.screenWidthPx > 0f &&
                 state.screenHeightPx > 0f &&
-                state.exploreGate == ExploreGate.READY
+                state.exploreGate == ExploreGate.READY &&
+                !state.locationAccuracyDegraded
 
         if (!canProject) {
             _uiState.update { it.copy(clusteredLabels = emptyList(), arLabels = emptyList()) }

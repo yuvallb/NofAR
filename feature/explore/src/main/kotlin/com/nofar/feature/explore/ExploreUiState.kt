@@ -16,6 +16,8 @@ data class ExploreUiState(
     val calibrationState: CompassCalibrationState = CompassCalibrationState.UNAVAILABLE,
     val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED,
     val waitingForGpsFix: Boolean = false,
+    val locationAccuracyMeters: Float? = null,
+    val locationAccuracyDegraded: Boolean = false,
     val cameraGranted: Boolean = false,
     val exploreGate: ExploreGate = ExploreGate.WAITING_GPS,
     val simpleModeEnabled: Boolean = false,

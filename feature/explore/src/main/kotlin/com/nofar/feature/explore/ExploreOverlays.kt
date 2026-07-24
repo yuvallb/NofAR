@@ -173,6 +173,28 @@ fun ExplorePartialRegionBanner(modifier: Modifier = Modifier) {
 }
 
 @Composable
+fun ExploreLocationAccuracyBanner(accuracyMeters: Int, thresholdMeters: Int, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = NofARColors.WarningBanner.copy(alpha = 0.92f)
+    ) {
+        Text(
+            text =
+            stringResource(
+                R.string.explore_location_accuracy_degraded,
+                accuracyMeters,
+                thresholdMeters
+            ),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            style = MaterialTheme.typography.bodyMedium,
+            color = NofARColors.TextPrimary,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
 fun ExploreRegionExitBanner(regionName: String, graceSecondsRemaining: Int, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),

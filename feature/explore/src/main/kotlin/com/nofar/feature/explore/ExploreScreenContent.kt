@@ -1,7 +1,9 @@
 package com.nofar.feature.explore
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -12,12 +14,14 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import com.nofar.core.designsystem.component.NofARExploreAltitudeReadout
 import com.nofar.core.designsystem.component.NofARExploreBottomHud
+import com.nofar.core.designsystem.component.NofARLocationAccuracyBadge
 import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
 import com.nofar.core.ui.compass.CompassCalibrationHint
 import com.nofar.core.ui.location.LocationPermissionBanner
 import com.nofar.core.ui.permission.PermissionState
 import com.nofar.core.visibility.CameraFieldOfView
+import kotlin.math.roundToInt
 
 @Composable
 internal fun ExploreScreenRoot(
@@ -239,6 +243,13 @@ private fun BoxScope.ExploreReadyChrome(
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp)
         )
     }
+    if (uiState.locationAccuracyDegraded) {
+        ExploreLocationAccuracyBanner(
+            accuracyMeters = uiState.locationAccuracyMeters?.roundToInt() ?: 0,
+            thresholdMeters = AppConfig.EXPLORE_LOCATION_ACCURACY_THRESHOLD_METERS.roundToInt(),
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 168.dp)
+        )
+    }
     if (uiState.showRegionExitBanner) {
         ExploreRegionExitBanner(
             regionName = uiState.activeRegionName.orEmpty(),
@@ -252,10 +263,17 @@ private fun BoxScope.ExploreReadyChrome(
         )
     }
     if (uiState.simpleModeEnabled) {
-        NofARExploreAltitudeReadout(
-            altitude = uiState.altitude,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp)
-        )
+        Row(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            NofARExploreAltitudeReadout(altitude = uiState.altitude)
+            NofARLocationAccuracyBadge(
+                accuracyMeters = uiState.locationAccuracyMeters,
+                isDegraded = uiState.locationAccuracyDegraded
+            )
+        }
         ExploreSettingsButton(onNavigateToSettings = onNavigateToSettings)
     } else {
         val chromePadding = exploreChromeHorizontalPadding()

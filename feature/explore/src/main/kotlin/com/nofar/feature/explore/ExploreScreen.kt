@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -30,6 +31,7 @@ import com.nofar.core.designsystem.component.NofARCompassRibbon
 import com.nofar.core.designsystem.component.NofARExploreAltitudeReadout
 import com.nofar.core.designsystem.component.NofARExploreBottomHudHeight
 import com.nofar.core.designsystem.component.NofARIconActionButton
+import com.nofar.core.designsystem.component.NofARLocationAccuracyBadge
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.model.LocationAccessState
 import com.nofar.core.ui.permission.PermissionState
@@ -144,7 +146,13 @@ internal fun BoxScope.ExploreExpertBottomControls(
         if (BuildConfig.DEBUG) {
             ExploreDebugReadout(uiState = uiState)
         }
-        NofARExploreAltitudeReadout(altitude = uiState.altitude)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            NofARExploreAltitudeReadout(altitude = uiState.altitude)
+            NofARLocationAccuracyBadge(
+                accuracyMeters = uiState.locationAccuracyMeters,
+                isDegraded = uiState.locationAccuracyDegraded
+            )
+        }
         NofARIconActionButton(onClick = onNavigateBack) {
             Icon(Icons.Default.Close, contentDescription = "Exit Explore", tint = Color.White)
         }
