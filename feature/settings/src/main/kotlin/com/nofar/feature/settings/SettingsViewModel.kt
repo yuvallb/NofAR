@@ -32,6 +32,7 @@ data class SettingsUiState(
     val simpleModeEnabled: Boolean = false,
     val preferredLabelLanguage: LabelLanguage = LabelLanguage.DEFAULT,
     val showRawSensorOverlay: Boolean = false,
+    val showHorizonOutline: Boolean = true,
     val keepRawGeoTiff: Boolean = false,
     val prepareDownloadActive: Boolean = false,
     val showPurgeConfirm: Boolean = false,
@@ -73,8 +74,11 @@ constructor(
                     simpleMode = simpleMode,
                     cacheLimitMb = cacheLimitBytes / (1024f * 1024f),
                     showRaw = showRaw,
+                    showHorizon = true,
                     keepTif = keepTif
                 )
+            }.combine(userPreferencesRepository.showHorizonOutline) { snapshot, showHorizon ->
+                snapshot.copy(showHorizon = showHorizon)
             }.collect { snapshot ->
                 _uiState.update {
                     it.copy(
@@ -82,6 +86,7 @@ constructor(
                         simpleModeEnabled = snapshot.simpleMode,
                         evictionThresholdMb = snapshot.cacheLimitMb,
                         showRawSensorOverlay = snapshot.showRaw,
+                        showHorizonOutline = snapshot.showHorizon,
                         keepRawGeoTiff = snapshot.keepTif
                     )
                 }
@@ -144,6 +149,12 @@ constructor(
     fun onShowRawSensorOverlayChanged(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setShowRawSensorOverlay(enabled)
+        }
+    }
+
+    fun onShowHorizonOutlineChanged(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setShowHorizonOutline(enabled)
         }
     }
 
@@ -231,6 +242,7 @@ constructor(
         val simpleMode: Boolean,
         val cacheLimitMb: Float,
         val showRaw: Boolean,
+        val showHorizon: Boolean,
         val keepTif: Boolean
     )
 }

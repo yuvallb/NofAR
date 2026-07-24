@@ -31,7 +31,8 @@ data class VisibleEntity(
 data class VisibilityResult(
     val entities: List<VisibleEntity>,
     val computationTimeMs: Long,
-    val warnings: Set<VisibilityWarning> = emptySet()
+    val warnings: Set<VisibilityWarning> = emptySet(),
+    val horizonProfile: HorizonProfile? = null
 )
 
 enum class VisibilityWarning {

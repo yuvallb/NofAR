@@ -28,6 +28,9 @@ constructor(
     private val _visibleEntities = MutableStateFlow<List<VisibleEntity>>(emptyList())
     val visibleEntities: StateFlow<List<VisibleEntity>> = _visibleEntities.asStateFlow()
 
+    private val _horizonProfile = MutableStateFlow<HorizonProfile?>(null)
+    val horizonProfile: StateFlow<HorizonProfile?> = _horizonProfile.asStateFlow()
+
     private val _warnings = MutableStateFlow<Set<VisibilityWarning>>(emptySet())
     val warnings: StateFlow<Set<VisibilityWarning>> = _warnings.asStateFlow()
 
@@ -66,6 +69,7 @@ constructor(
         inFlightJob = null
         scope = null
         _visibleEntities.value = emptyList()
+        _horizonProfile.value = null
         _warnings.value = emptySet()
         activeRegions = emptyList()
         lastPassAtMillis = VisibilityPassPolicy.NO_PASS_YET
@@ -122,6 +126,7 @@ constructor(
                     lastPassAtMillis = currentLocation.timestampMillis
                     lastPassLocation = currentLocation
                     _visibleEntities.value = result.entities
+                    _horizonProfile.value = result.horizonProfile
                     _warnings.value = result.warnings
                 }
             }

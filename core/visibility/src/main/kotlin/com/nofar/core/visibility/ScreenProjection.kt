@@ -60,13 +60,27 @@ object ScreenProjector {
         } else {
             ScreenPoint(
                 anchorXPx =
-                screenWidthPx / 2f +
-                    (headingDelta / halfHorizontalFov).toFloat() * (screenWidthPx / 2f),
+                anchorXPx(
+                    headingDeltaDeg = headingDelta,
+                    halfHorizontalFovDeg = halfHorizontalFov,
+                    screenWidthPx = screenWidthPx
+                ),
                 anchorYPx =
-                screenHeightPx / 2f -
-                    (relativeElevation / halfVerticalFov).toFloat() * (screenHeightPx / 2f),
+                anchorYPx(
+                    relativeElevationDeg = relativeElevation,
+                    halfVerticalFovDeg = halfVerticalFov,
+                    screenHeightPx = screenHeightPx
+                ),
                 headingDeltaDeg = headingDelta
             )
         }
     }
+
+    fun anchorXPx(headingDeltaDeg: Double, halfHorizontalFovDeg: Float, screenWidthPx: Float): Float =
+        screenWidthPx / 2f +
+            (headingDeltaDeg / halfHorizontalFovDeg).toFloat() * (screenWidthPx / 2f)
+
+    fun anchorYPx(relativeElevationDeg: Double, halfVerticalFovDeg: Float, screenHeightPx: Float): Float =
+        screenHeightPx / 2f -
+            (relativeElevationDeg / halfVerticalFovDeg).toFloat() * (screenHeightPx / 2f)
 }

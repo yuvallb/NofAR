@@ -71,7 +71,16 @@ constructor(
             )
 
         return try {
-            visibilityEngine.computeVisibleEntities(request)
+            val visibilityResult = visibilityEngine.computeVisibleEntities(request)
+            val observerEyeM = observerElevation.elevationM + AppConfig.EYE_HEIGHT_METERS
+            val horizonProfile =
+                HorizonProfileComputer().sweep(
+                    observerLat = location.latitude,
+                    observerLon = location.longitude,
+                    observerEyeM = observerEyeM,
+                    sampler = sampler
+                )
+            visibilityResult.copy(horizonProfile = horizonProfile)
         } finally {
             demReaders.values.forEach { reader ->
                 runCatching { reader.close() }

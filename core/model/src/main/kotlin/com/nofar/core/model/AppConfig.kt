@@ -134,4 +134,19 @@ object AppConfig {
 
     /** Fallback vertical FOV when camera characteristics are unavailable (degrees). */
     const val CAMERA_VERTICAL_FOV_FALLBACK_DEG: Float = 45f
+
+    /** Azimuth step for the Explore horizon skyline sweep (degrees). */
+    const val HORIZON_AZIMUTH_STEP_DEG: Float = 2f
+
+    /** Outward sample interval along each horizon azimuth ray (meters). */
+    const val HORIZON_RAY_STEP_M: Double = 150.0
+
+    /** Maximum radius for the horizon skyline sweep (meters). */
+    const val HORIZON_MAX_RADIUS_M: Double = 15_000.0
+
+    /**
+     * Extra azimuth padding beyond the horizontal FOV when reprojecting the cached horizon profile.
+     * Keeps the polyline continuous at screen edges.
+     */
+    const val HORIZON_SCREEN_PADDING_DEG: Float = 4f
 }

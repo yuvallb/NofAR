@@ -76,6 +76,7 @@ class SimpleModeDefaultsTest {
         override val simpleModeEnabled: Flow<Boolean> = simpleMode
         override val simpleModeDefaultsApplied: Flow<Boolean> = defaultsApplied
         override val preferredLabelLanguage: Flow<LabelLanguage> = MutableStateFlow(LabelLanguage.DEFAULT)
+        override val showHorizonOutline: Flow<Boolean> = MutableStateFlow(true)
 
         override suspend fun setWifiOnlyDownloads(enabled: Boolean) = Unit
 
@@ -94,6 +95,8 @@ class SimpleModeDefaultsTest {
         }
 
         override suspend fun setPreferredLabelLanguage(language: LabelLanguage) = Unit
+
+        override suspend fun setShowHorizonOutline(enabled: Boolean) = Unit
     }
 
     private class FakeRegionRepository(private val regions: List<Region>) : RegionRepository {

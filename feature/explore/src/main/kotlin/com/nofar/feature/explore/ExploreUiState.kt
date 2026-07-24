@@ -9,6 +9,7 @@ import com.nofar.core.model.LocationAccessState
 import com.nofar.core.model.Region
 import com.nofar.core.visibility.CameraFieldOfView
 import com.nofar.core.visibility.ClusteredLabel
+import com.nofar.core.visibility.HorizonScreenPoint
 
 data class ExploreUiState(
     val compassBearingDeg: Float = 0f,
@@ -34,6 +35,8 @@ data class ExploreUiState(
     val showWifiOnlyBlocked: Boolean = false,
     val clusteredLabels: List<ClusteredLabel> = emptyList(),
     val arLabels: List<ArLabel> = emptyList(),
+    val horizonLinePoints: List<HorizonScreenPoint> = emptyList(),
+    val showHorizonOutline: Boolean = true,
     val expandedBucketIndex: Int? = null,
     val expandedCluster: ClusteredLabel? = null,
     val showRegionExitBanner: Boolean = false,

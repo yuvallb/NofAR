@@ -29,6 +29,9 @@ import com.nofar.core.sensors.OrientationProvider
 import com.nofar.core.sensors.di.UnsmoothedOrientation
 import com.nofar.core.visibility.CameraFieldOfView
 import com.nofar.core.visibility.DisplayAltitudeResolver
+import com.nofar.core.visibility.HorizonProfile
+import com.nofar.core.visibility.HorizonProjector
+import com.nofar.core.visibility.HorizonScreenPoint
 import com.nofar.core.visibility.VisibilityPassScheduler
 import com.nofar.core.visibility.VisibilityWarning
 import com.nofar.core.visibility.VisibleEntity
@@ -90,6 +93,7 @@ constructor(
             onRefreshGate = { refreshGate() }
         )
     private var cachedVisibleEntities: List<VisibleEntity> = emptyList()
+    private var cachedHorizonProfile: HorizonProfile? = null
     private var currentOrientation: DeviceOrientation? = null
     private var currentRawOrientation: DeviceOrientation? = null
     private var hasReceivedOrientation: Boolean = false
@@ -100,6 +104,7 @@ constructor(
         orientationController.acquire(EXPLORE_ORIENTATION_TOKEN)
         visibilityPassScheduler.start(viewModelScope)
         collectSimpleModePreference()
+        collectHorizonOutlinePreference()
         viewModelScope.launch { resolveInitialRegion() }
         collectOrientation()
         collectLocation()
@@ -143,22 +148,22 @@ constructor(
     fun onScreenSizeChanged(widthPx: Float, heightPx: Float) {
         if (widthPx <= 0f || heightPx <= 0f) return
         _uiState.update { it.copy(screenWidthPx = widthPx, screenHeightPx = heightPx) }
-        reprojectLabels()
+        reprojectOverlay()
     }
 
     fun onCameraFieldOfViewChanged(fov: CameraFieldOfView) {
         _uiState.update { it.copy(cameraFov = fov) }
-        reprojectLabels()
+        reprojectOverlay()
     }
 
     fun onHiddenCountClicked(bucketIndex: Int) {
         _uiState.update { it.copy(expandedBucketIndex = bucketIndex) }
-        reprojectLabels()
+        reprojectOverlay()
     }
 
     fun onDismissExpandedBucket() {
         _uiState.update { it.copy(expandedBucketIndex = null, expandedCluster = null) }
-        reprojectLabels()
+        reprojectOverlay()
     }
 
     fun onDownloadRegionConfirmed() {
@@ -230,6 +235,15 @@ constructor(
         locationController.release(EXPLORE_LOCATION_TOKEN)
         orientationController.release(EXPLORE_ORIENTATION_TOKEN)
         super.onCleared()
+    }
+
+    private fun collectHorizonOutlinePreference() {
+        viewModelScope.launch {
+            userPreferencesRepository.showHorizonOutline.collect { enabled ->
+                _uiState.update { it.copy(showHorizonOutline = enabled) }
+                reprojectOverlay()
+            }
+        }
     }
 
     private fun collectSimpleModePreference() {
@@ -385,7 +399,7 @@ constructor(
                 }
             )
         }
-        reprojectLabels()
+        reprojectOverlay()
 
         viewModelScope.launch {
             val previousResolution = _uiState.value.regionResolution
@@ -459,7 +473,7 @@ constructor(
                 hasReceivedOrientation = true
                 currentOrientation = orientation
                 onOrientation(orientation)
-                reprojectLabels()
+                reprojectOverlay()
             }
         }
         viewModelScope.launch {
@@ -469,7 +483,7 @@ constructor(
                     state.copy(debugRawAzimuthDeg = orientation.trueAzimuthDeg)
                 }
                 if (_uiState.value.useRawSensorOverlay) {
-                    reprojectLabels()
+                    reprojectOverlay()
                 }
             }
         }
@@ -479,7 +493,7 @@ constructor(
         viewModelScope.launch {
             userPreferencesRepository.showRawSensorOverlay.collect { useRaw ->
                 _uiState.update { it.copy(useRawSensorOverlay = useRaw) }
-                reprojectLabels()
+                reprojectOverlay()
             }
         }
     }
@@ -503,7 +517,13 @@ constructor(
                             it.screenWidthPx > 0f
                     )
                 }
-                reprojectLabels()
+                reprojectOverlay()
+            }
+        }
+        viewModelScope.launch {
+            visibilityPassScheduler.horizonProfile.collect { profile ->
+                cachedHorizonProfile = profile
+                reprojectOverlay()
             }
         }
         viewModelScope.launch {
@@ -553,7 +573,7 @@ constructor(
             state
         }
 
-    private fun reprojectLabels() {
+    private fun reprojectOverlay() {
         val state = _uiState.value
         val orientation = currentOrientation
         val canProject =
@@ -564,17 +584,17 @@ constructor(
                 !state.locationAccuracyDegraded
 
         if (!canProject) {
-            _uiState.update { it.copy(clusteredLabels = emptyList(), arLabels = emptyList()) }
+            _uiState.update {
+                it.copy(
+                    clusteredLabels = emptyList(),
+                    arLabels = emptyList(),
+                    horizonLinePoints = emptyList()
+                )
+            }
             return
         }
 
-        val projectedOrientation =
-            if (state.useRawSensorOverlay) {
-                currentRawOrientation ?: orientation
-            } else {
-                orientation
-            }
-
+        val projectedOrientation = resolveProjectedOrientation(state, orientation)
         val (clusters, labels) =
             ExploreLabelProjector.project(
                 entities = cachedVisibleEntities,
@@ -589,12 +609,37 @@ constructor(
             it.copy(
                 clusteredLabels = clusters,
                 arLabels = labels,
+                horizonLinePoints = projectHorizonLinePoints(state, projectedOrientation),
                 expandedCluster =
                 state.expandedBucketIndex?.let { bucket ->
                     clusters.firstOrNull { cluster -> cluster.bucketIndex == bucket }
                 }
             )
         }
+    }
+
+    private fun resolveProjectedOrientation(state: ExploreUiState, orientation: DeviceOrientation): DeviceOrientation =
+        if (state.useRawSensorOverlay) {
+            currentRawOrientation ?: orientation
+        } else {
+            orientation
+        }
+
+    private fun projectHorizonLinePoints(
+        state: ExploreUiState,
+        orientation: DeviceOrientation
+    ): List<HorizonScreenPoint> {
+        if (!state.showHorizonOutline) return emptyList()
+        return cachedHorizonProfile?.let { profile ->
+            HorizonProjector.project(
+                profile = profile,
+                trueAzimuthDeg = orientation.trueAzimuthDeg,
+                cameraElevationDeg = orientation.cameraElevationDeg,
+                fov = state.cameraFov,
+                screenWidthPx = state.screenWidthPx,
+                screenHeightPx = state.screenHeightPx
+            )
+        } ?: emptyList()
     }
 
     companion object {

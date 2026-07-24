@@ -28,8 +28,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -59,6 +61,26 @@ data class ArLabel(
     val hiddenCount: Int = 0,
     val bucketIndex: Int = 0
 )
+
+data class HorizonOutlinePoint(val xPx: Float, val yPx: Float)
+
+@Composable
+fun NofARHorizonOutline(points: List<HorizonOutlinePoint>, modifier: Modifier = Modifier) {
+    if (points.size < 2) return
+
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val path =
+            Path().apply {
+                moveTo(points.first().xPx, points.first().yPx)
+                points.drop(1).forEach { point -> lineTo(point.xPx, point.yPx) }
+            }
+        drawPath(
+            path = path,
+            color = NofARColors.ArAccent.copy(alpha = 0.6f),
+            style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
+        )
+    }
+}
 
 @Composable
 fun NofARArLabel(label: ArLabel, modifier: Modifier = Modifier, onHiddenCountClick: ((Int) -> Unit)? = null) {

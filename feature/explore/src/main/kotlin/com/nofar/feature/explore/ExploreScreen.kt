@@ -26,10 +26,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nofar.core.designsystem.component.HorizonOutlinePoint
 import com.nofar.core.designsystem.component.NofARArLabel
 import com.nofar.core.designsystem.component.NofARCompassRibbon
 import com.nofar.core.designsystem.component.NofARExploreAltitudeReadout
 import com.nofar.core.designsystem.component.NofARExploreBottomHudHeight
+import com.nofar.core.designsystem.component.NofARHorizonOutline
 import com.nofar.core.designsystem.component.NofARIconActionButton
 import com.nofar.core.designsystem.component.NofARLocationAccuracyBadge
 import com.nofar.core.designsystem.theme.NofARColors
@@ -88,6 +90,12 @@ private fun ExplorePermissionEffects(permissionState: PermissionState, viewModel
 
 @Composable
 internal fun BoxScope.ExploreArOverlay(uiState: ExploreUiState, onHiddenCountClick: (Int) -> Unit) {
+    if (uiState.showHorizonOutline && uiState.horizonLinePoints.size >= 2) {
+        NofARHorizonOutline(
+            points = uiState.horizonLinePoints.map { HorizonOutlinePoint(it.xPx, it.yPx) },
+            modifier = Modifier.fillMaxSize()
+        )
+    }
     uiState.arLabels.forEach { label ->
         NofARArLabel(
             label = label,

@@ -42,6 +42,7 @@ internal fun SettingsContent(
     uiState: SettingsUiState,
     onWifiOnlyChanged: (Boolean) -> Unit,
     onSimpleModeChanged: (Boolean) -> Unit,
+    onShowHorizonOutlineChanged: (Boolean) -> Unit,
     onPreferredLabelLanguageChanged: (LabelLanguage) -> Unit,
     onEvictionThresholdChanged: (Float) -> Unit,
     onShowPurgeConfirm: () -> Unit,
@@ -59,9 +60,11 @@ internal fun SettingsContent(
         SettingsGeneralSection(
             simpleModeEnabled = uiState.simpleModeEnabled,
             wifiOnlyDownloads = uiState.wifiOnlyDownloads,
+            showHorizonOutline = uiState.showHorizonOutline,
             preferredLabelLanguage = uiState.preferredLabelLanguage,
             onSimpleModeChanged = onSimpleModeChanged,
             onWifiOnlyChanged = onWifiOnlyChanged,
+            onShowHorizonOutlineChanged = onShowHorizonOutlineChanged,
             onPreferredLabelLanguageChanged = onPreferredLabelLanguageChanged
         )
         SettingsSectionDivider()
@@ -108,9 +111,11 @@ internal fun SettingsSectionTitle(title: String) {
 private fun SettingsGeneralSection(
     simpleModeEnabled: Boolean,
     wifiOnlyDownloads: Boolean,
+    showHorizonOutline: Boolean,
     preferredLabelLanguage: LabelLanguage,
     onSimpleModeChanged: (Boolean) -> Unit,
     onWifiOnlyChanged: (Boolean) -> Unit,
+    onShowHorizonOutlineChanged: (Boolean) -> Unit,
     onPreferredLabelLanguageChanged: (LabelLanguage) -> Unit
 ) {
     SettingsSectionTitle("GENERAL")
@@ -128,6 +133,14 @@ private fun SettingsGeneralSection(
         checked = wifiOnlyDownloads,
         onCheckedChange = onWifiOnlyChanged,
         testTag = "wifi_only_toggle"
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    SettingsToggleRow(
+        title = "Horizon outline",
+        subtitle = "Draw the terrain skyline in Explore",
+        checked = showHorizonOutline,
+        onCheckedChange = onShowHorizonOutlineChanged,
+        testTag = "horizon_outline_toggle"
     )
     Spacer(modifier = Modifier.height(8.dp))
     Text(
