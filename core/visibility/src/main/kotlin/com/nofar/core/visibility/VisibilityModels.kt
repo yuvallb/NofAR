@@ -25,7 +25,8 @@ data class VisibleEntity(
     val bearingDeg: Double,
     val distanceM: Double,
     val elevationAngleDeg: Double,
-    val entity: GeoEntity
+    val entity: GeoEntity,
+    val nearEdgeDistanceM: Double = distanceM
 )
 
 data class VisibilityResult(

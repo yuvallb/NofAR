@@ -32,6 +32,7 @@ object ModelJson {
         entity.elevationSource?.let {
             append(",\"elevationSource\":\"").append(it.name.lowercase()).append('"')
         }
+        entity.footprintRadiusM?.let { append(",\"footprintRadiusM\":").append(it) }
         append('}')
     }
 

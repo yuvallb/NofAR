@@ -2,6 +2,7 @@ package com.nofar.core.visibility
 
 import com.nofar.core.common.DispatcherProvider
 import javax.inject.Inject
+import kotlin.math.max
 import kotlinx.coroutines.withContext
 
 class DemRaycastVisibilityEngine
@@ -34,15 +35,34 @@ constructor(private val dispatchers: DispatcherProvider) :
         observerEyeM: Double,
         sampler: DemElevationSampler
     ): VisibleEntity? {
-        val targetElevationM = resolveTargetElevationM(candidate, sampler)
+        val footprintRadiusM = candidate.entity.footprintRadiusM ?: 0.0
+        val nearEdgeDistanceM =
+            if (footprintRadiusM > 0.0) {
+                max(candidate.distanceM - footprintRadiusM, 0.0)
+            } else {
+                candidate.distanceM
+            }
+        val rayDistanceM = if (footprintRadiusM > 0.0) nearEdgeDistanceM else candidate.distanceM
+        val (targetLat, targetLon) =
+            if (footprintRadiusM > 0.0 && nearEdgeDistanceM < candidate.distanceM) {
+                GeoMath.destinationPoint(
+                    request.observerLat,
+                    request.observerLon,
+                    candidate.bearingDeg,
+                    nearEdgeDistanceM
+                )
+            } else {
+                candidate.entity.lat to candidate.entity.lon
+            }
+        val targetElevationM = resolveTargetElevationM(candidate, sampler, targetLat, targetLon)
         val isVisible =
-            candidate.distanceM <= request.radiusM &&
+            rayDistanceM <= request.radiusM &&
                 rayMarcher.isTargetVisible(
                     observerLat = request.observerLat,
                     observerLon = request.observerLon,
-                    targetLat = candidate.entity.lat,
-                    targetLon = candidate.entity.lon,
-                    totalDistanceM = candidate.distanceM,
+                    targetLat = targetLat,
+                    targetLon = targetLon,
+                    totalDistanceM = rayDistanceM,
                     observerEyeM = observerEyeM,
                     targetElevationM = targetElevationM,
                     rayStepM = request.rayStepM,
@@ -50,6 +70,7 @@ constructor(private val dispatchers: DispatcherProvider) :
                 )
         if (!isVisible) return null
 
+        val horizontalDistanceForElevation = rayDistanceM.coerceAtLeast(0.001)
         return VisibleEntity(
             bearingDeg = candidate.bearingDeg,
             distanceM = candidate.distanceM,
@@ -57,14 +78,24 @@ constructor(private val dispatchers: DispatcherProvider) :
             GeoMath.elevationAngleDeg(
                 observerEyeM = observerEyeM,
                 targetElevationM = targetElevationM,
-                horizontalDistanceM = candidate.distanceM
+                horizontalDistanceM = horizontalDistanceForElevation
             ),
-            entity = candidate.entity
+            entity = candidate.entity,
+            nearEdgeDistanceM = nearEdgeDistanceM
         )
     }
 
-    private fun resolveTargetElevationM(candidate: VisibilityCandidate, sampler: DemElevationSampler): Double {
-        candidate.entity.elevation?.let { return it }
-        return sampler.elevationAt(candidate.entity.lat, candidate.entity.lon)?.toDouble() ?: 0.0
+    private fun resolveTargetElevationM(
+        candidate: VisibilityCandidate,
+        sampler: DemElevationSampler,
+        targetLat: Double,
+        targetLon: Double
+    ): Double {
+        candidate.entity.elevation?.let { elevation ->
+            if (candidate.entity.footprintRadiusM == null) return elevation
+        }
+        return sampler.elevationAt(targetLat, targetLon)?.toDouble()
+            ?: candidate.entity.elevation
+            ?: 0.0
     }
 }

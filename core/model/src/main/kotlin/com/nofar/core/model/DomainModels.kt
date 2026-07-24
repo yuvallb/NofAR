@@ -32,7 +32,9 @@ data class GeoEntity(
     val lon: Double,
     val elevation: Double?,
     val elevationSource: ElevationSource?,
-    val lastSeenAt: Instant
+    val lastSeenAt: Instant,
+    /** Approximate ground footprint radius (meters), derived from OSM boundary geometry at Prepare time. */
+    val footprintRadiusM: Double? = null
 )
 
 data class DemTile(

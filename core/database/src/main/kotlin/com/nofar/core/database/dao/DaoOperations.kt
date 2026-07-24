@@ -26,7 +26,8 @@ constructor(private val geoEntityDao: GeoEntityDao) {
                 lon = entity.lon,
                 elevation = entity.elevation,
                 elevationSource = entity.elevationSource,
-                lastSeenAt = entity.lastSeenAt
+                lastSeenAt = entity.lastSeenAt,
+                footprintRadiusM = entity.footprintRadiusM
             )
             existing.rowId
         }

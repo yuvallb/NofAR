@@ -40,7 +40,9 @@ internal object ExploreLabelProjector {
                         terrainAnchorXPx = label.terrainAnchorXPx,
                         terrainAnchorYPx = label.terrainAnchorYPx,
                         hiddenCount = if (label == cluster.labels.last()) cluster.hiddenCount else 0,
-                        bucketIndex = cluster.bucketIndex
+                        bucketIndex = cluster.bucketIndex,
+                        footprintLeftXPx = label.footprintLeftXPx,
+                        footprintRightXPx = label.footprintRightXPx
                     )
                 }
             }

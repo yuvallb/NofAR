@@ -1,6 +1,8 @@
 package com.nofar.core.visibility
 
 import kotlin.math.abs
+import kotlin.math.asin
+import kotlin.math.min
 
 data class CameraFieldOfView(val horizontalDeg: Float, val verticalDeg: Float, val isFallback: Boolean = false) {
     /**
@@ -22,6 +24,13 @@ data class CameraFieldOfView(val horizontalDeg: Float, val verticalDeg: Float, v
 }
 
 data class ScreenPoint(val anchorXPx: Float, val anchorYPx: Float, val headingDeltaDeg: Double)
+
+data class FootprintScreenSpan(
+    val leftXPx: Float,
+    val rightXPx: Float,
+    val anchorXPx: Float,
+    val angularDiameterDeg: Double
+)
 
 /**
  * Pure screen projection for Explore AR labels (Requirements §3.3.2).
@@ -83,4 +92,61 @@ object ScreenProjector {
     fun anchorYPx(relativeElevationDeg: Double, halfVerticalFovDeg: Float, screenHeightPx: Float): Float =
         screenHeightPx / 2f -
             (relativeElevationDeg / halfVerticalFovDeg).toFloat() * (screenHeightPx / 2f)
+
+    fun projectFootprintSpan(
+        bearingDeg: Double,
+        footprintRadiusM: Double,
+        centerDistanceM: Double,
+        trueAzimuthDeg: Float,
+        horizontalFovDeg: Float,
+        screenWidthPx: Float
+    ): FootprintScreenSpan? {
+        if (screenWidthPx <= 0f || footprintRadiusM <= 0.0) return null
+
+        val halfHorizontalFov = horizontalFovDeg / 2f
+        val angularHalfWidthDeg =
+            if (centerDistanceM <= footprintRadiusM) {
+                90.0
+            } else {
+                val ratio = (footprintRadiusM / centerDistanceM).coerceIn(-1.0, 1.0)
+                Math.toDegrees(asin(ratio))
+            }
+        val headingDelta = normalizeHeadingDelta(bearingDeg, trueAzimuthDeg)
+        val leftDelta = headingDelta - angularHalfWidthDeg
+        val rightDelta = headingDelta + angularHalfWidthDeg
+        val inHorizontalView = rightDelta >= -halfHorizontalFov && leftDelta <= halfHorizontalFov
+        return if (!inHorizontalView) {
+            null
+        } else {
+            val clippedLeft = leftDelta.coerceIn(-halfHorizontalFov.toDouble(), halfHorizontalFov.toDouble())
+            val clippedRight = rightDelta.coerceIn(-halfHorizontalFov.toDouble(), halfHorizontalFov.toDouble())
+            val leftXPx = anchorXPx(clippedLeft, halfHorizontalFov, screenWidthPx)
+            val rightXPx = anchorXPx(clippedRight, halfHorizontalFov, screenWidthPx)
+            val midpointDelta = (clippedLeft + clippedRight) / 2.0
+            val spanAnchorXPx = anchorXPx(midpointDelta, halfHorizontalFov, screenWidthPx)
+            val angularDiameterDeg = min(clippedRight - clippedLeft, angularHalfWidthDeg * 2.0)
+            FootprintScreenSpan(
+                leftXPx = leftXPx,
+                rightXPx = rightXPx,
+                anchorXPx = spanAnchorXPx,
+                angularDiameterDeg = angularDiameterDeg
+            )
+        }
+    }
+
+    fun elevationToScreenY(
+        elevationAngleDeg: Double,
+        cameraElevationDeg: Float,
+        verticalFovDeg: Float,
+        screenHeightPx: Float
+    ): Float? {
+        if (screenHeightPx <= 0f) return null
+        val halfVerticalFov = verticalFovDeg / 2f
+        val relativeElevation = elevationAngleDeg - cameraElevationDeg.toDouble()
+        return if (abs(relativeElevation) > halfVerticalFov) {
+            null
+        } else {
+            anchorYPx(relativeElevation, halfVerticalFov, screenHeightPx)
+        }
+    }
 }

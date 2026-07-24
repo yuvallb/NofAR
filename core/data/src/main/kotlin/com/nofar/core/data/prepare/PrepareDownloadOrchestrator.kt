@@ -151,11 +151,25 @@ constructor(
             overpassResponse.body.use { stream ->
                 val parsedEntities = mutableListOf<com.nofar.core.data.osm.ParsedOsmElement>()
                 val linkedEntities = mutableListOf<Pair<String, String>>()
+                val footprintByEntityId = mutableMapOf<String, Double>()
                 entityCount =
-                    overpassStreamParser.parse(stream, labelLanguage) { element ->
-                        checkCancelled()
-                        parsedEntities.add(element)
-                    }
+                    overpassStreamParser.parse(
+                        input = stream,
+                        labelLanguage = labelLanguage,
+                        onElement = { element ->
+                            checkCancelled()
+                            parsedEntities.add(element)
+                        },
+                        onFootprint = { entityId, radiusM ->
+                            val existing = footprintByEntityId[entityId]
+                            footprintByEntityId[entityId] =
+                                if (existing == null) {
+                                    radiusM
+                                } else {
+                                    minOf(existing, radiusM)
+                                }
+                        }
+                    )
                 updateProgress(
                     PreparePhase.OSM,
                     _progress.value?.overallPercent?.coerceAtLeast(1) ?: 1,
@@ -163,7 +177,10 @@ constructor(
                 )
                 parsedEntities.forEachIndexed { index, element ->
                     checkCancelled()
-                    val geoEntity = overpassStreamParser.toGeoEntity(element)
+                    val geoEntity =
+                        overpassStreamParser.toGeoEntity(element).copy(
+                            footprintRadiusM = footprintByEntityId[element.entityId]
+                        )
                     geoEntityRepository.upsert(geoEntity)
                     linkedEntities.add(geoEntity.id to element.name)
                     if ((index + 1) % 50 == 0 || index + 1 == entityCount) {

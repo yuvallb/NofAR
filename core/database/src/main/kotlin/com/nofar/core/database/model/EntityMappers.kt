@@ -65,7 +65,8 @@ fun GeoEntityEntity.asExternalModel(): GeoEntity = GeoEntity(
     lon = lon,
     elevation = elevation,
     elevationSource = elevationSource?.let(ElevationSource::valueOf),
-    lastSeenAt = Instant.ofEpochMilli(lastSeenAt)
+    lastSeenAt = Instant.ofEpochMilli(lastSeenAt),
+    footprintRadiusM = footprintRadiusM
 )
 
 fun GeoEntity.asEntity(): GeoEntityEntity = GeoEntityEntity(
@@ -77,7 +78,8 @@ fun GeoEntity.asEntity(): GeoEntityEntity = GeoEntityEntity(
     lon = lon,
     elevation = elevation,
     elevationSource = elevationSource?.name,
-    lastSeenAt = lastSeenAt.toEpochMilli()
+    lastSeenAt = lastSeenAt.toEpochMilli(),
+    footprintRadiusM = footprintRadiusM
 )
 
 fun DemTileEntity.asExternalModel(): DemTile = DemTile(

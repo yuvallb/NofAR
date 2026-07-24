@@ -22,7 +22,17 @@ data class ParsedOsmElement(
     val lat: Double,
     val lon: Double,
     val elevation: Double?
-)
+) {
+    val entityId: String get() = "${osmType.name.lowercase()}/$osmId"
+}
+
+private sealed interface ParsedStreamItem {
+    data class PlaceOrPeak(val element: ParsedOsmElement) : ParsedStreamItem
+
+    data class Footprint(val entityId: String, val radiusM: Double) : ParsedStreamItem
+}
+
+private data class BoundaryMember(val osmType: OsmType, val ref: Long, val geometry: List<Pair<Double, Double>>)
 
 /**
  * Streams Overpass JSON elements one-by-one without loading the full response into memory.
@@ -31,30 +41,69 @@ class OverpassStreamParser {
     fun parse(input: InputStream, onElement: (ParsedOsmElement) -> Unit): Int =
         parse(input, LabelLanguage.DEFAULT, onElement)
 
-    fun parse(input: InputStream, labelLanguage: LabelLanguage, onElement: (ParsedOsmElement) -> Unit): Int {
+    fun parse(
+        input: InputStream,
+        labelLanguage: LabelLanguage,
+        onElement: (ParsedOsmElement) -> Unit,
+        onFootprint: (entityId: String, radiusM: Double) -> Unit = { _, _ -> }
+    ): Int {
         val reader = input.source().buffer().let { JsonReader.of(it) }
+        val knownPlaceIds = mutableSetOf<String>()
+        val footprintByEntityId = mutableMapOf<String, Double>()
         var count = 0
         reader.beginObject()
         while (reader.hasNext()) {
             when (reader.nextName()) {
-                "elements" -> {
-                    reader.beginArray()
-                    while (reader.hasNext()) {
-                        parseElement(reader, labelLanguage)?.let { element ->
-                            onElement(element)
-                            count++
-                        }
-                    }
-                    reader.endArray()
-                }
+                "elements" ->
+                    count +=
+                        parseElementsArray(
+                            reader = reader,
+                            labelLanguage = labelLanguage,
+                            knownPlaceIds = knownPlaceIds,
+                            footprintByEntityId = footprintByEntityId,
+                            onElement = onElement
+                        )
                 else -> reader.skipValue()
             }
         }
         reader.endObject()
+        footprintByEntityId.forEach { (entityId, radiusM) -> onFootprint(entityId, radiusM) }
         return count
     }
 
-    private fun parseElement(reader: JsonReader, labelLanguage: LabelLanguage): ParsedOsmElement? {
+    private fun parseElementsArray(
+        reader: JsonReader,
+        labelLanguage: LabelLanguage,
+        knownPlaceIds: MutableSet<String>,
+        footprintByEntityId: MutableMap<String, Double>,
+        onElement: (ParsedOsmElement) -> Unit
+    ): Int {
+        var count = 0
+        reader.beginArray()
+        while (reader.hasNext()) {
+            parseStreamItems(reader, labelLanguage, knownPlaceIds).forEach { item ->
+                when (item) {
+                    is ParsedStreamItem.PlaceOrPeak -> {
+                        onElement(item.element)
+                        count++
+                    }
+                    is ParsedStreamItem.Footprint -> {
+                        val existing = footprintByEntityId[item.entityId]
+                        footprintByEntityId[item.entityId] =
+                            if (existing == null) item.radiusM else minOf(existing, item.radiusM)
+                    }
+                }
+            }
+        }
+        reader.endArray()
+        return count
+    }
+
+    private fun parseStreamItems(
+        reader: JsonReader,
+        labelLanguage: LabelLanguage,
+        knownPlaceIds: MutableSet<String>
+    ): List<ParsedStreamItem> {
         var osmType: OsmType? = null
         var osmId = 0L
         var lat: Double? = null
@@ -62,6 +111,7 @@ class OverpassStreamParser {
         var centerLat: Double? = null
         var centerLon: Double? = null
         val tags = mutableMapOf<String, String>()
+        var members: List<BoundaryMember>? = null
 
         reader.beginObject()
         while (reader.hasNext()) {
@@ -75,29 +125,107 @@ class OverpassStreamParser {
                     centerLon = cLon
                 }
                 "tags" -> parseTags(reader, tags)
+                "members" -> members = parseMembers(reader)
                 else -> reader.skipValue()
             }
         }
         reader.endObject()
 
-        val resolvedType = osmType ?: return null
-        val entityType = resolveEntityType(tags) ?: return null
-        val displayName = OsmNameResolver.resolveDisplayName(tags, labelLanguage) ?: return null
+        val resolvedType = osmType ?: return emptyList()
+
+        if (tags["boundary"].equals("administrative", ignoreCase = true) && members != null) {
+            return parseAdministrativeBoundaryFootprints(members, knownPlaceIds)
+        }
+
+        val entityType = resolveEntityType(tags) ?: return emptyList()
+        val displayName = OsmNameResolver.resolveDisplayName(tags, labelLanguage) ?: return emptyList()
         val canonicalName = OsmNameResolver.resolveCanonicalName(tags) ?: displayName
-        val resolvedLat = lat ?: centerLat ?: return null
-        val resolvedLon = lon ?: centerLon ?: return null
+        val resolvedLat = lat ?: centerLat ?: return emptyList()
+        val resolvedLon = lon ?: centerLon ?: return emptyList()
         val elevation = tags["ele"]?.toDoubleOrNull()
 
-        return ParsedOsmElement(
-            osmType = resolvedType,
-            osmId = osmId,
-            name = displayName,
-            canonicalName = canonicalName,
-            type = entityType,
-            lat = resolvedLat,
-            lon = resolvedLon,
-            elevation = elevation
+        if (entityType != GeoEntityType.PEAK) {
+            knownPlaceIds += "${resolvedType.name.lowercase()}/$osmId"
+        }
+
+        return listOf(
+            ParsedStreamItem.PlaceOrPeak(
+                ParsedOsmElement(
+                    osmType = resolvedType,
+                    osmId = osmId,
+                    name = displayName,
+                    canonicalName = canonicalName,
+                    type = entityType,
+                    lat = resolvedLat,
+                    lon = resolvedLon,
+                    elevation = elevation
+                )
+            )
         )
+    }
+
+    private fun parseAdministrativeBoundaryFootprints(
+        members: List<BoundaryMember>,
+        knownPlaceIds: Set<String>
+    ): List<ParsedStreamItem.Footprint> {
+        val matchedEntityIds =
+            members
+                .asSequence()
+                .map { "${it.osmType.name.lowercase()}/${it.ref}" }
+                .filter { it in knownPlaceIds }
+                .toSet()
+        if (matchedEntityIds.isEmpty()) return emptyList()
+
+        val points = members.flatMap { it.geometry }
+        val radiusM = PlaceFootprintCalculator.computeRadiusM(points) ?: return emptyList()
+        return matchedEntityIds.map { entityId -> ParsedStreamItem.Footprint(entityId = entityId, radiusM = radiusM) }
+    }
+
+    private fun parseMembers(reader: JsonReader): List<BoundaryMember> {
+        val members = mutableListOf<BoundaryMember>()
+        reader.beginArray()
+        while (reader.hasNext()) {
+            var memberType: OsmType? = null
+            var ref = 0L
+            var geometry: List<Pair<Double, Double>> = emptyList()
+            reader.beginObject()
+            while (reader.hasNext()) {
+                when (reader.nextName()) {
+                    "type" -> memberType = OsmType.fromTag(reader.nextString())
+                    "ref" -> ref = reader.nextLong()
+                    "geometry" -> geometry = parseGeometry(reader)
+                    else -> reader.skipValue()
+                }
+            }
+            reader.endObject()
+            val resolvedType = memberType ?: continue
+            members += BoundaryMember(resolvedType, ref, geometry)
+        }
+        reader.endArray()
+        return members
+    }
+
+    private fun parseGeometry(reader: JsonReader): List<Pair<Double, Double>> {
+        val points = mutableListOf<Pair<Double, Double>>()
+        reader.beginArray()
+        while (reader.hasNext()) {
+            var lat: Double? = null
+            var lon: Double? = null
+            reader.beginObject()
+            while (reader.hasNext()) {
+                when (reader.nextName()) {
+                    "lat" -> lat = reader.nextDouble()
+                    "lon" -> lon = reader.nextDouble()
+                    else -> reader.skipValue()
+                }
+            }
+            reader.endObject()
+            if (lat != null && lon != null) {
+                points += lat to lon
+            }
+        }
+        reader.endArray()
+        return points
     }
 
     private fun parseCenter(reader: JsonReader): Pair<Double, Double>? {
@@ -143,7 +271,7 @@ class OverpassStreamParser {
     }
 
     fun toGeoEntity(element: ParsedOsmElement, seenAt: Instant = Instant.now()): GeoEntity = GeoEntity(
-        id = "${element.osmType.name.lowercase()}/${element.osmId}",
+        id = element.entityId,
         osmType = element.osmType,
         // Persist the resolved display label so Explore shows the download-time language even
         // if region_entity_coverage overlay is missing for any reason.

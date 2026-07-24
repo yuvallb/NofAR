@@ -59,7 +59,9 @@ data class ArLabel(
     val terrainAnchorXPx: Float,
     val terrainAnchorYPx: Float,
     val hiddenCount: Int = 0,
-    val bucketIndex: Int = 0
+    val bucketIndex: Int = 0,
+    val footprintLeftXPx: Float? = null,
+    val footprintRightXPx: Float? = null
 )
 
 data class HorizonOutlinePoint(val xPx: Float, val yPx: Float)
@@ -90,17 +92,37 @@ fun NofARArLabel(label: ArLabel, modifier: Modifier = Modifier, onHiddenCountCli
         Canvas(modifier = Modifier.fillMaxSize()) {
             val cardBottom = Offset(label.cardXPx, label.cardYPx)
             val terrain = Offset(label.terrainAnchorXPx, label.terrainAnchorYPx)
+            val footprintLeft = label.footprintLeftXPx
+            val footprintRight = label.footprintRightXPx
+            if (footprintLeft != null && footprintRight != null && footprintRight > footprintLeft) {
+                val bandHeight = 8.dp.toPx()
+                val top = terrain.y - bandHeight / 2f
+                drawRoundRect(
+                    color = Color.White.copy(alpha = 0.35f),
+                    topLeft = Offset(footprintLeft, top),
+                    size = androidx.compose.ui.geometry.Size(footprintRight - footprintLeft, bandHeight),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(bandHeight / 2f, bandHeight / 2f)
+                )
+                drawLine(
+                    color = Color.White.copy(alpha = 0.85f),
+                    start = Offset(footprintLeft, terrain.y),
+                    end = Offset(footprintRight, terrain.y),
+                    strokeWidth = 2.dp.toPx(),
+                    cap = StrokeCap.Round
+                )
+            } else {
+                drawCircle(
+                    color = Color.White,
+                    radius = 4.dp.toPx(),
+                    center = terrain
+                )
+            }
             drawLine(
                 color = Color.White,
                 start = cardBottom,
                 end = terrain,
                 strokeWidth = 1.dp.toPx(),
                 cap = StrokeCap.Round
-            )
-            drawCircle(
-                color = Color.White,
-                radius = 4.dp.toPx(),
-                center = terrain
             )
         }
         Box(

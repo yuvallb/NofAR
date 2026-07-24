@@ -89,4 +89,93 @@ class OverpassStreamParserTest {
         assertThat(entity.name).isEqualTo("חיפה")
         assertThat(entity.type).isEqualTo(GeoEntityType.CITY)
     }
+
+    @Test
+    fun parse_boundaryRelationMatchingPlace_emitsFootprint() {
+        val json =
+            """
+            {"elements":[
+              {"type":"node","id":100,"lat":32.0,"lon":35.0,"tags":{"place":"city","name":"Test City"}},
+              {"type":"relation","id":200,"tags":{"boundary":"administrative","admin_level":"8"},
+               "members":[
+                 {"type":"node","ref":100,"role":"label"},
+                 {"type":"way","ref":300,"role":"outer","geometry":[
+                   {"lat":32.00,"lon":35.00},
+                   {"lat":32.02,"lon":35.00},
+                   {"lat":32.02,"lon":35.02},
+                   {"lat":32.00,"lon":35.02},
+                   {"lat":32.00,"lon":35.00}
+                 ]}
+               ]}
+            ]}
+            """.trimIndent()
+        val footprints = mutableListOf<Pair<String, Double>>()
+        val count =
+            parser.parse(
+                input = json.byteInputStream(),
+                labelLanguage = LabelLanguage.DEFAULT,
+                onElement = {},
+                onFootprint = { entityId, radiusM -> footprints += entityId to radiusM }
+            )
+        assertThat(count).isEqualTo(1)
+        assertThat(footprints).hasSize(1)
+        assertThat(footprints.single().first).isEqualTo("node/100")
+        assertThat(footprints.single().second).isGreaterThan(0.0)
+    }
+
+    @Test
+    fun parse_unmatchedBoundaryRelation_ignored() {
+        val json =
+            """
+            {"elements":[
+              {"type":"relation","id":200,"tags":{"boundary":"administrative"},
+               "members":[
+                 {"type":"way","ref":300,"role":"outer","geometry":[{"lat":32.0,"lon":35.0},{"lat":32.1,"lon":35.1}]}
+               ]}
+            ]}
+            """.trimIndent()
+        val footprints = mutableListOf<Pair<String, Double>>()
+        val count =
+            parser.parse(
+                input = json.byteInputStream(),
+                labelLanguage = LabelLanguage.DEFAULT,
+                onElement = {},
+                onFootprint = { id, r -> footprints += id to r }
+            )
+        assertThat(count).isEqualTo(0)
+        assertThat(footprints).isEmpty()
+    }
+
+    @Test
+    fun parse_twoBoundariesForSamePlace_keepsSmallestRadius() {
+        val json =
+            """
+            {"elements":[
+              {"type":"node","id":100,"lat":32.0,"lon":35.0,"tags":{"place":"city","name":"Test City"}},
+              {"type":"relation","id":201,"tags":{"boundary":"administrative"},
+               "members":[
+                 {"type":"node","ref":100,"role":"label"},
+                 {"type":"way","ref":301,"role":"outer","geometry":[
+                   {"lat":32.00,"lon":35.00},{"lat":32.10,"lon":35.00},{"lat":32.10,"lon":35.10},{"lat":32.00,"lon":35.10}
+                 ]}
+               ]},
+              {"type":"relation","id":202,"tags":{"boundary":"administrative"},
+               "members":[
+                 {"type":"node","ref":100,"role":"label"},
+                 {"type":"way","ref":302,"role":"outer","geometry":[
+                   {"lat":32.00,"lon":35.00},{"lat":32.02,"lon":35.00},{"lat":32.02,"lon":35.02},{"lat":32.00,"lon":35.02}
+                 ]}
+               ]}
+            ]}
+            """.trimIndent()
+        val footprints = mutableMapOf<String, Double>()
+        parser.parse(
+            input = json.byteInputStream(),
+            labelLanguage = LabelLanguage.DEFAULT,
+            onElement = {},
+            onFootprint = { id, r -> footprints[id] = r }
+        )
+        assertThat(footprints).hasSize(1)
+        assertThat(footprints["node/100"]).isNotNull()
+    }
 }

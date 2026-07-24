@@ -23,7 +23,12 @@ class OverpassQueryBuilderTest {
         assertThat(query).contains("node[\"natural\"=\"peak\"]")
         assertThat(query).contains("way[\"place\"~")
         assertThat(query).contains("relation[\"natural\"=\"peak\"]")
-        assertThat(query).contains("out center;")
+        assertThat(query).contains(")->.places;")
+        assertThat(query).contains(")->.peaks;")
+        assertThat(query).contains(".places out center;")
+        assertThat(query).contains(".peaks out center;")
+        assertThat(query).contains("rel(bn.places)[\"boundary\"=\"administrative\"]")
+        assertThat(query).contains(".boundaries out geom;")
         assertThat(query).contains("${bbox.minLat},${bbox.minLon},${bbox.maxLat},${bbox.maxLon}")
     }
 }

@@ -24,5 +24,6 @@ data class GeoEntityEntity(
     val lon: Double,
     val elevation: Double?,
     @ColumnInfo(name = "elevation_source") val elevationSource: String?,
-    @ColumnInfo(name = "last_seen_at") val lastSeenAt: Long
+    @ColumnInfo(name = "last_seen_at") val lastSeenAt: Long,
+    @ColumnInfo(name = "footprint_radius_m") val footprintRadiusM: Double? = null
 )

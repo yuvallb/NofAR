@@ -24,7 +24,8 @@ interface GeoEntityDao {
             lon = :lon,
             elevation = :elevation,
             elevation_source = :elevationSource,
-            last_seen_at = :lastSeenAt
+            last_seen_at = :lastSeenAt,
+            footprint_radius_m = :footprintRadiusM
         WHERE id = :osmId
         """
     )
@@ -37,7 +38,8 @@ interface GeoEntityDao {
         lon: Double,
         elevation: Double?,
         elevationSource: String?,
-        lastSeenAt: Long
+        lastSeenAt: Long,
+        footprintRadiusM: Double?
     ): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

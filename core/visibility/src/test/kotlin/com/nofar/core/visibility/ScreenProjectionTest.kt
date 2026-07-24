@@ -92,4 +92,55 @@ class ScreenProjectionTest {
         assertThat(ScreenProjector.normalizeHeadingDelta(10.0, 350f)).isWithin(0.001).of(20.0)
         assertThat(ScreenProjector.normalizeHeadingDelta(350.0, 10f)).isWithin(0.001).of(-20.0)
     }
+
+    @Test
+    fun projectFootprintSpan_centroidOutsideFov_clipsVisibleSlice() {
+        val span =
+            ScreenProjector.projectFootprintSpan(
+                bearingDeg = 32.0,
+                footprintRadiusM = 600.0,
+                centerDistanceM = 4_000.0,
+                trueAzimuthDeg = 0f,
+                horizontalFovDeg = 60f,
+                screenWidthPx = 1080f
+            )
+
+        assertThat(span).isNotNull()
+        assertThat(span!!.leftXPx).isGreaterThan(540f)
+        assertThat(span.rightXPx).isWithin(0.1f).of(1080f)
+        assertThat(span.anchorXPx).isAtLeast(span.leftXPx)
+        assertThat(span.anchorXPx).isAtMost(span.rightXPx)
+    }
+
+    @Test
+    fun projectFootprintSpan_fullyOutsideFov_returnsNull() {
+        val span =
+            ScreenProjector.projectFootprintSpan(
+                bearingDeg = 120.0,
+                footprintRadiusM = 500.0,
+                centerDistanceM = 1_000.0,
+                trueAzimuthDeg = 0f,
+                horizontalFovDeg = 60f,
+                screenWidthPx = 1080f
+            )
+
+        assertThat(span).isNull()
+    }
+
+    @Test
+    fun projectFootprintSpan_observerInsideFootprint_usesFullHalfPlane() {
+        val span =
+            ScreenProjector.projectFootprintSpan(
+                bearingDeg = 0.0,
+                footprintRadiusM = 2_000.0,
+                centerDistanceM = 500.0,
+                trueAzimuthDeg = 0f,
+                horizontalFovDeg = 60f,
+                screenWidthPx = 1080f
+            )
+
+        assertThat(span).isNotNull()
+        assertThat(span!!.leftXPx).isWithin(0.1f).of(0f)
+        assertThat(span.rightXPx).isWithin(0.1f).of(1080f)
+    }
 }

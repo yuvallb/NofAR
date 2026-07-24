@@ -6,6 +6,7 @@ import com.nofar.core.model.RegionBounds
 object OverpassQueryBuilder {
     private const val PLACE_TAGS = "city|town|village|hamlet|isolated_dwelling|locality"
     private const val BBOX_PADDING_FACTOR = 1.02
+    private const val QUERY_TIMEOUT_SECONDS = 180
 
     fun boundingBoxFromCircle(centerLat: Double, centerLon: Double, radiusM: Double): BoundingBox {
         val base = RegionBounds.boundingBox(centerLat, centerLon, radiusM)
@@ -21,16 +22,25 @@ object OverpassQueryBuilder {
 
     fun buildQuery(bbox: BoundingBox): String =
         """
-        [out:json][timeout:120];
+        [out:json][timeout:$QUERY_TIMEOUT_SECONDS];
         (
           node["place"~"$PLACE_TAGS"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-          node["natural"="peak"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
           way["place"~"$PLACE_TAGS"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-          way["natural"="peak"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
           relation["place"~"$PLACE_TAGS"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+        )->.places;
+        (
+          node["natural"="peak"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
+          way["natural"="peak"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
           relation["natural"="peak"](${bbox.south},${bbox.west},${bbox.north},${bbox.east});
-        );
-        out center;
+        )->.peaks;
+        .places out center;
+        .peaks out center;
+        (
+          rel(bn.places)["boundary"="administrative"];
+          rel(bw.places)["boundary"="administrative"];
+          rel(br.places)["boundary"="administrative"];
+        )->.boundaries;
+        .boundaries out geom;
         """.trimIndent()
 }
 

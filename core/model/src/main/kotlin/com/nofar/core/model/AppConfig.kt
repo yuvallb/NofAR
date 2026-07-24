@@ -149,4 +149,19 @@ object AppConfig {
      * Keeps the polyline continuous at screen edges.
      */
     const val HORIZON_SCREEN_PADDING_DEG: Float = 4f
+
+    /** Multiplier applied to boundary radius-of-gyration when approximating place footprint (Prepare). */
+    const val FOOTPRINT_RADIUS_GYRATION_FACTOR: Double = 1.15
+
+    /** Minimum stored footprint radius for places with boundary geometry (meters). */
+    const val FOOTPRINT_RADIUS_MIN_M: Double = 200.0
+
+    /** Maximum stored footprint radius — caps metro-scale boundaries (meters). */
+    const val FOOTPRINT_RADIUS_MAX_M: Double = 15_000.0
+
+    /** Max boundary vertices sampled when computing footprint radius at Prepare time. */
+    const val FOOTPRINT_BOUNDARY_MAX_POINTS: Int = 2_048
+
+    /** Minimum angular diameter before a place renders as an area instead of a point (degrees). */
+    const val EXPLORE_FOOTPRINT_MIN_ANGULAR_DEG: Double = 4.0
 }
