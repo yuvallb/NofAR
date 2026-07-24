@@ -28,43 +28,55 @@ object HorizonProjector {
         val paddingDeg = AppConfig.HORIZON_SCREEN_PADDING_DEG
         val minAzimuth = trueAzimuthDeg - halfHorizontalFov - paddingDeg
         val maxAzimuth = trueAzimuthDeg + halfHorizontalFov + paddingDeg
-        val bucketCount = profile.elevationAnglesDeg.size
-        val startIndex = azimuthToBucketIndex(minAzimuth, profile.azimuthStepDeg, bucketCount)
-        val endIndex = azimuthToBucketIndex(maxAzimuth, profile.azimuthStepDeg, bucketCount)
-        val indices = bucketIndexRange(startIndex, endIndex, bucketCount)
 
-        return indices.mapNotNull { bucketIndex ->
-            val bearingDeg = profile.azimuthDegForIndex(bucketIndex).toDouble()
+        return azimuthSamples(
+            minAzimuthDeg = minAzimuth,
+            maxAzimuthDeg = maxAzimuth,
+            stepDeg = profile.azimuthStepDeg
+        ).map { azimuthDeg ->
+            val bucketIndex = azimuthToBucketIndex(azimuthDeg, profile.azimuthStepDeg, profile.elevationAnglesDeg.size)
+            val bearingDeg = normalizeAzimuthDeg(azimuthDeg).toDouble()
             val elevationAngleDeg = profile.elevationAnglesDeg[bucketIndex].toDouble()
             val headingDelta = ScreenProjector.normalizeHeadingDelta(bearingDeg, trueAzimuthDeg)
             val relativeElevation = elevationAngleDeg - cameraElevationDeg.toDouble()
-            val anchorXPx =
+            HorizonScreenPoint(
+                xPx =
                 ScreenProjector.anchorXPx(
                     headingDeltaDeg = headingDelta,
                     halfHorizontalFovDeg = halfHorizontalFov,
                     screenWidthPx = screenWidthPx
-                )
-            val anchorYPx =
+                ),
+                yPx =
                 ScreenProjector.anchorYPx(
                     relativeElevationDeg = relativeElevation,
                     halfVerticalFovDeg = halfVerticalFov,
                     screenHeightPx = screenHeightPx
                 )
-            HorizonScreenPoint(xPx = anchorXPx, yPx = anchorYPx)
+            )
         }
+    }
+
+    internal fun azimuthSamples(minAzimuthDeg: Float, maxAzimuthDeg: Float, stepDeg: Float): List<Float> {
+        if (stepDeg <= 0f || minAzimuthDeg > maxAzimuthDeg) return emptyList()
+
+        val samples = mutableListOf<Float>()
+        var azimuth = minAzimuthDeg
+        while (azimuth <= maxAzimuthDeg + stepDeg * 0.01f) {
+            samples += azimuth
+            azimuth += stepDeg
+        }
+        return samples
+    }
+
+    internal fun normalizeAzimuthDeg(azimuthDeg: Float): Float {
+        var normalized = azimuthDeg % 360f
+        if (normalized < 0f) normalized += 360f
+        return normalized
     }
 
     private fun azimuthToBucketIndex(azimuthDeg: Float, azimuthStepDeg: Float, bucketCount: Int): Int {
-        var normalized = azimuthDeg % 360f
-        if (normalized < 0f) normalized += 360f
+        val normalized = normalizeAzimuthDeg(azimuthDeg)
         val rawIndex = floor(normalized / azimuthStepDeg).toInt()
         return rawIndex.coerceIn(0, bucketCount - 1)
     }
-
-    private fun bucketIndexRange(startIndex: Int, endIndex: Int, bucketCount: Int): List<Int> =
-        if (startIndex <= endIndex) {
-            (startIndex..endIndex).toList()
-        } else {
-            (startIndex until bucketCount).toList() + (0..endIndex).toList()
-        }
 }

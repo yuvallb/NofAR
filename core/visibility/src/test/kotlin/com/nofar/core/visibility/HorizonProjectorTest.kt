@@ -68,6 +68,39 @@ class HorizonProjectorTest {
     }
 
     @Test
+    fun projectedPoints_followMonotonicScreenXAcrossNorthWrap() {
+        val variedProfile =
+            HorizonProfile(
+                azimuthStepDeg = 2f,
+                elevationAnglesDeg = FloatArray(180) { index -> (index % 20).toFloat() }
+            )
+        val points =
+            HorizonProjector.project(
+                profile = variedProfile,
+                trueAzimuthDeg = 347f,
+                cameraElevationDeg = 0f,
+                fov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f),
+                screenWidthPx = 1080f,
+                screenHeightPx = 1920f
+            )
+
+        assertThat(points.size).isGreaterThan(4)
+        points.zipWithNext { previous, next ->
+            assertThat(next.xPx).isAtLeast(previous.xPx - 0.01f)
+        }
+    }
+
+    @Test
+    fun azimuthSamples_crossingNorth_stepsThroughContinuousAngles() {
+        val samples = HorizonProjector.azimuthSamples(minAzimuthDeg = 316f, maxAzimuthDeg = 384f, stepDeg = 2f)
+
+        assertThat(samples.first()).isWithin(0.001f).of(316f)
+        assertThat(samples.last()).isWithin(0.001f).of(384f)
+        assertThat(samples).contains(358f)
+        assertThat(samples).contains(360f)
+    }
+
+    @Test
     fun orientationChange_reprojectsSameProfileToDifferentPoints() {
         val variedProfile =
             HorizonProfile(

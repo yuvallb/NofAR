@@ -71,16 +71,29 @@ fun NofARHorizonOutline(points: List<HorizonOutlinePoint>, modifier: Modifier = 
     if (points.size < 2) return
 
     Canvas(modifier = modifier.fillMaxSize()) {
-        val path =
-            Path().apply {
-                moveTo(points.first().xPx, points.first().yPx)
-                points.drop(1).forEach { point -> lineTo(point.xPx, point.yPx) }
+        val maxJumpPx = size.width * 0.5f
+        var segmentStart = 0
+        for (index in 1..points.size) {
+            val shouldBreakSegment =
+                index == points.size ||
+                    kotlin.math.abs(points[index].xPx - points[index - 1].xPx) > maxJumpPx
+            if (shouldBreakSegment) {
+                val segment = points.subList(segmentStart, index)
+                if (segment.size >= 2) {
+                    val path =
+                        Path().apply {
+                            moveTo(segment.first().xPx, segment.first().yPx)
+                            segment.drop(1).forEach { point -> lineTo(point.xPx, point.yPx) }
+                        }
+                    drawPath(
+                        path = path,
+                        color = NofARColors.ArAccent.copy(alpha = 0.6f),
+                        style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
+                    )
+                }
+                segmentStart = index
             }
-        drawPath(
-            path = path,
-            color = NofARColors.ArAccent.copy(alpha = 0.6f),
-            style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
-        )
+        }
     }
 }
 
