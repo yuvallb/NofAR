@@ -5,6 +5,7 @@ import com.nofar.core.common.DispatcherProvider
 import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.DownloadStatus
+import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.LabelLanguage
 import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
@@ -76,13 +77,44 @@ class VisibilityPassSchedulerTest {
         dispatchers = dispatcherProvider(StandardTestDispatcher(testScheduler))
     )
 
-    private fun resultWith(horizonProfile: HorizonProfile?, eyeSource: ObserverEyeSource?): VisibilityResult =
-        VisibilityResult(
-            entities = emptyList(),
-            computationTimeMs = 1L,
-            horizonProfile = horizonProfile,
-            horizonEyeSource = eyeSource
-        )
+    @Test
+    fun hereContext_isPublishedToFlow() = runTest {
+        val place =
+            GeoEntity(
+                id = "place",
+                osmType = com.nofar.core.model.OsmType.NODE,
+                name = "Village",
+                type = com.nofar.core.model.GeoEntityType.VILLAGE,
+                lat = 32.5,
+                lon = 35.5,
+                elevation = null,
+                elevationSource = null,
+                lastSeenAt = Instant.EPOCH,
+                footprintRadiusM = 1_000.0
+            )
+        val here = HereContext(place = place)
+        val computer = FakeComputer(resultWith(horizonProfile = null, eyeSource = null, hereContext = here))
+        val scheduler = scheduler(computer, showHorizonOutline = false)
+
+        scheduler.start(this)
+        scheduler.setActiveRegions(listOf(sampleRegion()))
+        advanceUntilIdle()
+
+        assertThat(scheduler.hereContext.value).isEqualTo(here)
+        scheduler.stop()
+    }
+
+    private fun resultWith(
+        horizonProfile: HorizonProfile?,
+        eyeSource: ObserverEyeSource?,
+        hereContext: HereContext = HereContext()
+    ): VisibilityResult = VisibilityResult(
+        entities = emptyList(),
+        computationTimeMs = 1L,
+        horizonProfile = horizonProfile,
+        horizonEyeSource = eyeSource,
+        hereContext = hereContext
+    )
 
     private fun sampleLocation(): UserLocation = UserLocation(
         latitude = 32.5,

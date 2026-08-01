@@ -188,4 +188,7 @@ object AppConfig {
 
     /** Minimum angular diameter before a place renders as an area instead of a point (degrees). */
     const val EXPLORE_FOOTPRINT_MIN_ANGULAR_DEG: Double = 4.0
+
+    /** Treat the user as standing on a peak when within this distance of its point (meters). */
+    const val EXPLORE_HERE_PEAK_RADIUS_M: Double = 200.0
 }

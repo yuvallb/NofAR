@@ -59,6 +59,13 @@ Once Phase 0 is complete, use these commands (requires **JDK 26** to run Gradle;
 
 CI (GitHub Actions) runs `./gradlew spotlessCheck detekt lint test assembleDebug assembleRelease` on PRs and pushes to `main` using JDK 26.
 
+After every implementation task, run the full quality gate and fix any failures before considering the work done:
+
+```bash
+./gradlew spotlessCheck detekt lint test
+```
+
+Apply Spotless formatting automatically when needed (`./gradlew spotlessApply`), then re-run the command above until it passes.
 
 Do not add proprietary or analytics dependencies to the Gradle dependency tree.
 
@@ -141,7 +148,7 @@ These are non-negotiable for MVP — do not introduce alternatives without expli
 - Match [Now in Android](https://github.com/android/nowinandroid) conventions: naming, module boundaries, convention plugins, theme pattern (`NofARTheme`).
 - Keep diffs minimal and scoped to the task — no drive-by refactors.
 - Prefer self-explanatory code; comment only non-obvious business logic.
-- Run `spotlessCheck`, `detekt`, and `lint` before considering Android work complete.
+- After every implementation, run `./gradlew spotlessCheck detekt lint test` and fix all reported issues before finishing.
 
 ---
 

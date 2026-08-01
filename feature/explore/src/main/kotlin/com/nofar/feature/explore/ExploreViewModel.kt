@@ -30,11 +30,13 @@ import com.nofar.core.sensors.OrientationProvider
 import com.nofar.core.sensors.di.UnsmoothedOrientation
 import com.nofar.core.visibility.CameraFieldOfView
 import com.nofar.core.visibility.DisplayAltitudeResolver
+import com.nofar.core.visibility.HereContext
 import com.nofar.core.visibility.HorizonProfile
 import com.nofar.core.visibility.HorizonProjector
 import com.nofar.core.visibility.VisibilityPassScheduler
 import com.nofar.core.visibility.VisibilityWarning
 import com.nofar.core.visibility.VisibleEntity
+import com.nofar.core.visibility.excludingHereContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
@@ -93,6 +95,7 @@ constructor(
             onRefreshGate = { refreshGate() }
         )
     private var cachedVisibleEntities: List<VisibleEntity> = emptyList()
+    private var cachedHereContext: HereContext = HereContext()
     private var cachedHorizonProfile: HorizonProfile? = null
     private var currentOrientation: DeviceOrientation? = null
     private var currentRawOrientation: DeviceOrientation? = null
@@ -521,6 +524,12 @@ constructor(
             }
         }
         viewModelScope.launch {
+            visibilityPassScheduler.hereContext.collect { hereContext ->
+                cachedHereContext = hereContext
+                reprojectOverlay()
+            }
+        }
+        viewModelScope.launch {
             visibilityPassScheduler.horizonProfile.collect { profile ->
                 cachedHorizonProfile = profile
                 _uiState.update { it.copy(horizonMeanAngleDeg = profile?.meanElevationAngleDeg()) }
@@ -601,16 +610,18 @@ constructor(
                     arLabels = emptyList(),
                     horizonLineSegments = emptyList(),
                     horizonSegmentCount = 0,
-                    debugCameraElevationDeg = null
+                    debugCameraElevationDeg = null,
+                    exploreHere = ExploreHereUi()
                 )
             }
             return
         }
 
         val projectedOrientation = resolveProjectedOrientation(state, orientation)
+        val horizonEntities = cachedVisibleEntities.excludingHereContext(cachedHereContext)
         val (clusters, labels) =
             ExploreLabelProjector.project(
-                entities = cachedVisibleEntities,
+                entities = horizonEntities,
                 orientation = projectedOrientation,
                 fov = state.cameraFov,
                 screenWidthPx = state.screenWidthPx,
@@ -626,6 +637,7 @@ constructor(
                 horizonLineSegments = horizonSegments,
                 horizonSegmentCount = horizonSegments.size,
                 debugCameraElevationDeg = projectedOrientation.cameraElevationDeg,
+                exploreHere = exploreHereUiFrom(cachedHereContext),
                 expandedCluster =
                 state.expandedBucketIndex?.let { bucket ->
                     clusters.firstOrNull { cluster -> cluster.bucketIndex == bucket }
@@ -656,6 +668,12 @@ constructor(
             screenHeightPx = state.screenHeightPx
         ).map { polyline -> polyline.points.map { point -> HorizonOutlinePoint(point.xPx, point.yPx) } }
     }
+
+    private fun exploreHereUiFrom(hereContext: HereContext): ExploreHereUi = ExploreHereUi(
+        placeName = hereContext.place?.name,
+        peakName = hereContext.peak?.name,
+        peakElevationM = hereContext.peak?.elevation?.toInt()
+    )
 
     companion object {
         private const val EXPLORE_LOCATION_TOKEN = "explore"

@@ -54,5 +54,6 @@ data class ExploreUiState(
     val debugCameraElevationDeg: Float? = null,
     val horizonMeanAngleDeg: Float? = null,
     val horizonSegmentCount: Int = 0,
-    val horizonEyeSource: String? = null
+    val horizonEyeSource: String? = null,
+    val exploreHere: ExploreHereUi = ExploreHereUi()
 )

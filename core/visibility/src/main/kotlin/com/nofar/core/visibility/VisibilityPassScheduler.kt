@@ -28,6 +28,9 @@ constructor(
     private val dispatchers: DispatcherProvider
 ) {
     private val mutex = Mutex()
+    private val _hereContext = MutableStateFlow(HereContext())
+    val hereContext: StateFlow<HereContext> = _hereContext.asStateFlow()
+
     private val _visibleEntities = MutableStateFlow<List<VisibleEntity>>(emptyList())
     val visibleEntities: StateFlow<List<VisibleEntity>> = _visibleEntities.asStateFlow()
 
@@ -75,6 +78,7 @@ constructor(
         inFlightJob = null
         scope = null
         _visibleEntities.value = emptyList()
+        _hereContext.value = HereContext()
         _horizonProfile.value = null
         _horizonEyeSource.value = null
         _warnings.value = emptySet()
@@ -128,13 +132,15 @@ constructor(
                         VisibilityResult(
                             entities = emptyList(),
                             computationTimeMs = 0L,
-                            warnings = emptySet()
+                            warnings = emptySet(),
+                            hereContext = HereContext()
                         )
                     }
                 if (passSequence == sequenceNumber) {
                     lastPassAtMillis = currentLocation.timestampMillis
                     lastPassLocation = currentLocation
                     _visibleEntities.value = result.entities
+                    _hereContext.value = result.hereContext
                     _horizonProfile.value = result.horizonProfile
                     _horizonEyeSource.value = result.horizonEyeSource
                     _warnings.value = result.warnings

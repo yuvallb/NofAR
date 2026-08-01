@@ -14,6 +14,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import com.nofar.core.designsystem.component.NofARExploreAltitudeReadout
 import com.nofar.core.designsystem.component.NofARExploreBottomHud
+import com.nofar.core.designsystem.component.NofARExploreHereChip
 import com.nofar.core.designsystem.component.NofARLocationAccuracyBadge
 import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
@@ -233,11 +234,43 @@ private fun BoxScope.ExploreReadyChrome(
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit
 ) {
+    ExploreReadyTopChrome(uiState = uiState)
+    ExploreReadyStatusBanners(uiState = uiState)
+    if (uiState.showNoVisibleEntitiesHint) {
+        ExploreNoVisibleEntitiesHint(
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 128.dp)
+        )
+    }
+    ExploreReadyBottomChrome(
+        uiState = uiState,
+        onNavigateBack = onNavigateBack,
+        onNavigateToSettings = onNavigateToSettings
+    )
+}
+
+@Composable
+private fun BoxScope.ExploreReadyTopChrome(uiState: ExploreUiState) {
     ExploreCompassRibbon(uiState = uiState)
+    if (!uiState.exploreHere.isEmpty) {
+        NofARExploreHereChip(
+            placeName = uiState.exploreHere.placeName,
+            peakName = uiState.exploreHere.peakName,
+            peakElevationM = uiState.exploreHere.peakElevationM,
+            modifier =
+            Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 52.dp)
+        )
+    }
     CompassCalibrationHint(
         calibrationState = uiState.calibrationState,
         modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 72.dp)
     )
+}
+
+@Composable
+private fun BoxScope.ExploreReadyStatusBanners(uiState: ExploreUiState) {
     if (uiState.partialRegionWarning) {
         ExplorePartialRegionBanner(
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp)
@@ -257,11 +290,14 @@ private fun BoxScope.ExploreReadyChrome(
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp)
         )
     }
-    if (uiState.showNoVisibleEntitiesHint) {
-        ExploreNoVisibleEntitiesHint(
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 128.dp)
-        )
-    }
+}
+
+@Composable
+private fun BoxScope.ExploreReadyBottomChrome(
+    uiState: ExploreUiState,
+    onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit
+) {
     if (uiState.simpleModeEnabled) {
         Row(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp),

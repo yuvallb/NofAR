@@ -45,7 +45,7 @@ constructor(
         computeHorizonProfile: Boolean = true
     ): VisibilityResult {
         if (regions.isEmpty()) {
-            return VisibilityResult(entities = emptyList(), computationTimeMs = 0L)
+            return VisibilityResult(entities = emptyList(), computationTimeMs = 0L, hereContext = HereContext())
         }
 
         val warnings = mutableSetOf<VisibilityWarning>()
@@ -59,7 +59,14 @@ constructor(
             )
         observerElevation.warning?.let { warnings += it }
 
-        val candidates = queryCandidates(regions, location, resolutionLevel, warnings)
+        val candidateQuery = queryCandidates(regions, location, resolutionLevel, warnings)
+        val hereContext =
+            HereContextResolver.resolve(
+                observerLat = location.latitude,
+                observerLon = location.longitude,
+                entities = candidateQuery.allEntities
+            )
+        val candidates = candidateQuery.candidates
         val collectionRadiusM = regions.maxOf { RegionBounds.dataCollectionRadiusM(it) }
         val request =
             VisibilityRequest(
@@ -77,27 +84,15 @@ constructor(
             )
 
         return try {
-            val visibilityResult = visibilityEngine.computeVisibleEntities(request)
-            val observerEye =
-                ObserverEyeAltitude.resolve(
-                    observerElevationM = observerElevation.elevationM,
-                    demGroundM = observerDemGroundM
-                )
-            // H-DEC-3 / H-P1-08: match the entity-collection radius, capped for the §8 budget.
-            val horizonMaxRadiusM = minOf(collectionRadiusM, AppConfig.HORIZON_MAX_RADIUS_M)
-            val horizonProfile =
-                buildHorizonProfile(
-                    horizonProfileComputer = horizonProfileComputer,
-                    computeHorizonProfile = computeHorizonProfile,
-                    observerLat = location.latitude,
-                    observerLon = location.longitude,
-                    observerEyeM = observerEye.eyeM,
-                    sampler = sampler,
-                    maxRadiusM = horizonMaxRadiusM
-                )
-            visibilityResult.copy(
-                horizonProfile = horizonProfile,
-                horizonEyeSource = horizonProfile?.let { observerEye.source }
+            completeVisibilityResult(
+                visibilityResult = visibilityEngine.computeVisibleEntities(request),
+                location = location,
+                observerElevationM = observerElevation.elevationM,
+                observerDemGroundM = observerDemGroundM,
+                collectionRadiusM = collectionRadiusM,
+                computeHorizonProfile = computeHorizonProfile,
+                sampler = sampler,
+                hereContext = hereContext
             )
         } finally {
             demReaders.values.forEach { reader ->
@@ -106,12 +101,50 @@ constructor(
         }
     }
 
+    private fun completeVisibilityResult(
+        visibilityResult: VisibilityResult,
+        location: UserLocation,
+        observerElevationM: Double,
+        observerDemGroundM: Float?,
+        collectionRadiusM: Double,
+        computeHorizonProfile: Boolean,
+        sampler: DemElevationSampler,
+        hereContext: HereContext
+    ): VisibilityResult {
+        val observerEye =
+            ObserverEyeAltitude.resolve(
+                observerElevationM = observerElevationM,
+                demGroundM = observerDemGroundM
+            )
+        val horizonMaxRadiusM = minOf(collectionRadiusM, AppConfig.HORIZON_MAX_RADIUS_M)
+        val horizonProfile =
+            buildHorizonProfile(
+                horizonProfileComputer = horizonProfileComputer,
+                computeHorizonProfile = computeHorizonProfile,
+                observerLat = location.latitude,
+                observerLon = location.longitude,
+                observerEyeM = observerEye.eyeM,
+                sampler = sampler,
+                maxRadiusM = horizonMaxRadiusM
+            )
+        return visibilityResult.copy(
+            horizonProfile = horizonProfile,
+            horizonEyeSource = horizonProfile?.let { observerEye.source },
+            hereContext = hereContext
+        )
+    }
+
+    private data class CandidateQueryResult(
+        val allEntities: Collection<GeoEntity>,
+        val candidates: List<VisibilityCandidate>
+    )
+
     private suspend fun queryCandidates(
         regions: List<Region>,
         location: UserLocation,
         resolutionLevel: ResolutionLevel,
         warnings: MutableSet<VisibilityWarning>
-    ): List<VisibilityCandidate> {
+    ): CandidateQueryResult {
         val entitiesById = LinkedHashMap<String, GeoEntity>()
         for (region in regions) {
             val collectionRadiusM = RegionBounds.dataCollectionRadiusM(region)
@@ -145,17 +178,21 @@ constructor(
             warnings += VisibilityWarning.CANDIDATE_CAP_EXCEEDED
         }
 
-        return entitiesById.values
-            .sortedBy { entity ->
-                RegionBounds.haversineDistanceM(
-                    location.latitude,
-                    location.longitude,
-                    entity.lat,
-                    entity.lon
-                )
-            }
-            .take(AppConfig.VISIBILITY_MAX_CANDIDATES)
-            .map { entity -> entity.toCandidate(location) }
+        return CandidateQueryResult(
+            allEntities = entitiesById.values,
+            candidates =
+            entitiesById.values
+                .sortedBy { entity ->
+                    RegionBounds.haversineDistanceM(
+                        location.latitude,
+                        location.longitude,
+                        entity.lat,
+                        entity.lon
+                    )
+                }
+                .take(AppConfig.VISIBILITY_MAX_CANDIDATES)
+                .map { entity -> entity.toCandidate(location) }
+        )
     }
 
     private suspend fun openDemReaders(
