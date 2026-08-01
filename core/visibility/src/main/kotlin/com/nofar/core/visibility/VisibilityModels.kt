@@ -33,7 +33,9 @@ data class VisibilityResult(
     val entities: List<VisibleEntity>,
     val computationTimeMs: Long,
     val warnings: Set<VisibilityWarning> = emptySet(),
-    val horizonProfile: HorizonProfile? = null
+    val horizonProfile: HorizonProfile? = null,
+    /** Source of the observer eye used for the skyline sweep; surfaced in the Explore debug overlay. */
+    val horizonEyeSource: ObserverEyeSource? = null
 )
 
 enum class VisibilityWarning {

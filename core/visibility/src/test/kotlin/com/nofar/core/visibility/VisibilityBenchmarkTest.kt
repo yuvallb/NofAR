@@ -59,4 +59,25 @@ class VisibilityBenchmarkTest {
         // CI runs on JVM/emulator — allow relaxed threshold; physical device target is 200 ms.
         assertThat(elapsedMs).isLessThan(2_000L)
     }
+
+    // H-P1-18: the full-360° skyline sweep (~180 rays × ~101 samples at defaults) must fit inside the
+    // remaining §8 visibility budget. Device target is <200 ms as part of the pass; CI JVM is faster
+    // but shared runners are noisy, so allow generous headroom and check p95 over repeated sweeps.
+    @Test
+    fun horizonSweep_flatSampler_completesWithinBudget() {
+        val computer = HorizonProfileComputer()
+        val sampler = DemSampler { _, _ -> 100f }
+        val observerEyeM = 100.0 + AppConfig.EYE_HEIGHT_METERS
+
+        repeat(3) { computer.sweep(32.5, 35.5, observerEyeM, sampler) }
+        val samplesMs =
+            LongArray(10) {
+                val start = System.nanoTime()
+                computer.sweep(32.5, 35.5, observerEyeM, sampler)
+                (System.nanoTime() - start) / 1_000_000L
+            }
+
+        val p95Ms = samplesMs.sorted()[(0.95 * (samplesMs.size - 1)).toInt()]
+        assertThat(p95Ms).isLessThan(500L)
+    }
 }

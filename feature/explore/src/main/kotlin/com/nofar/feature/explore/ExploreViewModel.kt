@@ -14,6 +14,7 @@ import com.nofar.core.data.usecase.ExploreRegionResolution
 import com.nofar.core.data.usecase.ExploreRegionResolver
 import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
 import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
+import com.nofar.core.designsystem.component.HorizonOutlinePoint
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.CompassCalibrationState
@@ -31,7 +32,6 @@ import com.nofar.core.visibility.CameraFieldOfView
 import com.nofar.core.visibility.DisplayAltitudeResolver
 import com.nofar.core.visibility.HorizonProfile
 import com.nofar.core.visibility.HorizonProjector
-import com.nofar.core.visibility.HorizonScreenPoint
 import com.nofar.core.visibility.VisibilityPassScheduler
 import com.nofar.core.visibility.VisibilityWarning
 import com.nofar.core.visibility.VisibleEntity
@@ -523,13 +523,22 @@ constructor(
         viewModelScope.launch {
             visibilityPassScheduler.horizonProfile.collect { profile ->
                 cachedHorizonProfile = profile
+                _uiState.update { it.copy(horizonMeanAngleDeg = profile?.meanElevationAngleDeg()) }
                 reprojectOverlay()
+            }
+        }
+        viewModelScope.launch {
+            visibilityPassScheduler.horizonEyeSource.collect { source ->
+                _uiState.update { it.copy(horizonEyeSource = source?.name?.lowercase()) }
             }
         }
         viewModelScope.launch {
             visibilityPassScheduler.warnings.collect { warnings -> updatePartialWarning(warnings) }
         }
     }
+
+    private fun HorizonProfile.meanElevationAngleDeg(): Float? =
+        elevationAnglesDeg.takeIf { it.isNotEmpty() }?.average()?.toFloat()
 
     private fun updatePartialWarning(warnings: Set<VisibilityWarning>) {
         val regionPartial =
@@ -577,18 +586,22 @@ constructor(
         val state = _uiState.value
         val orientation = currentOrientation
         val canProject =
-            orientation != null &&
-                state.screenWidthPx > 0f &&
-                state.screenHeightPx > 0f &&
-                state.exploreGate == ExploreGate.READY &&
-                !state.locationAccuracyDegraded
+            ExplorePreconditions.canProjectOverlay(
+                hasOrientation = orientation != null,
+                screenWidthPx = state.screenWidthPx,
+                screenHeightPx = state.screenHeightPx,
+                gate = state.exploreGate,
+                locationAccuracyDegraded = state.locationAccuracyDegraded
+            )
 
-        if (!canProject) {
+        if (!canProject || orientation == null) {
             _uiState.update {
                 it.copy(
                     clusteredLabels = emptyList(),
                     arLabels = emptyList(),
-                    horizonLinePoints = emptyList()
+                    horizonLineSegments = emptyList(),
+                    horizonSegmentCount = 0,
+                    debugCameraElevationDeg = null
                 )
             }
             return
@@ -604,12 +617,15 @@ constructor(
                 screenHeightPx = state.screenHeightPx,
                 expandedBucketIndex = state.expandedBucketIndex
             )
+        val horizonSegments = projectHorizonLineSegments(state, projectedOrientation)
 
         _uiState.update {
             it.copy(
                 clusteredLabels = clusters,
                 arLabels = labels,
-                horizonLinePoints = projectHorizonLinePoints(state, projectedOrientation),
+                horizonLineSegments = horizonSegments,
+                horizonSegmentCount = horizonSegments.size,
+                debugCameraElevationDeg = projectedOrientation.cameraElevationDeg,
                 expandedCluster =
                 state.expandedBucketIndex?.let { bucket ->
                     clusters.firstOrNull { cluster -> cluster.bucketIndex == bucket }
@@ -625,21 +641,20 @@ constructor(
             orientation
         }
 
-    private fun projectHorizonLinePoints(
+    private fun projectHorizonLineSegments(
         state: ExploreUiState,
         orientation: DeviceOrientation
-    ): List<HorizonScreenPoint> {
-        if (!state.showHorizonOutline) return emptyList()
-        return cachedHorizonProfile?.let { profile ->
-            HorizonProjector.project(
-                profile = profile,
-                trueAzimuthDeg = orientation.trueAzimuthDeg,
-                cameraElevationDeg = orientation.cameraElevationDeg,
-                fov = state.cameraFov,
-                screenWidthPx = state.screenWidthPx,
-                screenHeightPx = state.screenHeightPx
-            )
-        } ?: emptyList()
+    ): List<List<HorizonOutlinePoint>> {
+        val profile = cachedHorizonProfile
+        if (!state.showHorizonOutline || profile == null) return emptyList()
+        return HorizonProjector.project(
+            profile = profile,
+            trueAzimuthDeg = orientation.trueAzimuthDeg,
+            cameraElevationDeg = orientation.cameraElevationDeg,
+            fov = state.cameraFov,
+            screenWidthPx = state.screenWidthPx,
+            screenHeightPx = state.screenHeightPx
+        ).map { polyline -> polyline.points.map { point -> HorizonOutlinePoint(point.xPx, point.yPx) } }
     }
 
     companion object {

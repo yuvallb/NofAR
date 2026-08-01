@@ -38,6 +38,8 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                 else -> throw IOException("GeoTIFF has neither tile nor strip offsets")
             }
 
+        normalizeNoData(elevations, directory.noDataValue)
+
         val writer = DemTileWriter(tileLat = tileLat, tileLon = tileLon)
         writer.write(outputFile, directory.width, directory.height, elevations)
         return GeoTiffConversionResult(
@@ -46,6 +48,24 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
             noDataValue = DemBinaryFormat.DEFAULT_NO_DATA_VALUE,
             sizeBytes = outputFile.length()
         )
+    }
+
+    /**
+     * Rewrites the source raster's own no-data sentinel (GDAL_NODATA, e.g. Copernicus GLO-30's
+     * `-32767`) to [DemBinaryFormat.DEFAULT_NO_DATA_VALUE], which is what the `.bin` header declares.
+     *
+     * Without this the sentinel survived into Explore as a real elevation, and because the skyline eye
+     * comes from the DEM pixel under the observer it produced a near-vertical horizon.
+     */
+    private fun normalizeNoData(elevations: FloatArray, sourceNoDataValue: Float?) {
+        val canonical = DemBinaryFormat.DEFAULT_NO_DATA_VALUE
+        for (index in elevations.indices) {
+            val value = elevations[index]
+            val isNoData = !value.isFinite() || (sourceNoDataValue != null && value == sourceNoDataValue)
+            if (isNoData) {
+                elevations[index] = canonical
+            }
+        }
     }
 
     private fun readTiledFloatRaster(bytes: ByteArray, directory: TiffDirectory): FloatArray {
@@ -186,7 +206,8 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         val stripOffsets: IntArray?,
         val stripByteCounts: IntArray?,
         val tileOffsets: IntArray?,
-        val tileByteCounts: IntArray?
+        val tileByteCounts: IntArray?,
+        val noDataValue: Float?
     ) {
         companion object {
             fun parse(bytes: ByteArray): TiffDirectory {
@@ -231,6 +252,7 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                 var stripByteCounts: IntArray? = null
                 var tileOffsets: IntArray? = null
                 var tileByteCounts: IntArray? = null
+                var noDataValue: Float? = null
 
                 fun applyEntry(bytes: ByteArray, byteOrder: ByteOrder, entryOffset: Int) {
                     val tag = readShort(bytes, entryOffset, byteOrder).toInt()
@@ -264,6 +286,8 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                             tileOffsets = readTagIntArray(bytes, byteOrder, entryOffset, type, count)
                         TAG_TILE_BYTE_COUNTS ->
                             tileByteCounts = readTagIntArray(bytes, byteOrder, entryOffset, type, count)
+                        TAG_GDAL_NODATA ->
+                            noDataValue = readTagAsciiFloat(bytes, byteOrder, entryOffset, type, count)
                     }
                 }
 
@@ -280,7 +304,8 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                     stripOffsets = stripOffsets,
                     stripByteCounts = stripByteCounts,
                     tileOffsets = tileOffsets,
-                    tileByteCounts = tileByteCounts
+                    tileByteCounts = tileByteCounts,
+                    noDataValue = noDataValue
                 )
             }
 
@@ -293,6 +318,30 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                     TYPE_SHORT -> readShort(bytes, valueOffset, byteOrder).toLong() and 0xFFFF
                     TYPE_LONG -> readInt(bytes, byteOrder, valueOffset).toLong() and 0xFFFF_FFFFL
                     else -> throw IOException("Unsupported TIFF scalar type: $type")
+                }
+            }
+
+            /**
+             * GDAL_NODATA is an ASCII tag (e.g. `"-32767"`), not a numeric one. Returns null when the
+             * tag is absent or unparseable so callers keep the raster values untouched.
+             */
+            private fun readTagAsciiFloat(
+                bytes: ByteArray,
+                byteOrder: ByteOrder,
+                entryOffset: Int,
+                type: Int,
+                count: Int
+            ): Float? {
+                if (type != TYPE_ASCII || count <= 0) return null
+                val valueField = entryOffset + 8
+                val dataOffset = if (count <= 4) valueField else readInt(bytes, byteOrder, valueField)
+                val inBounds = dataOffset >= 0 && dataOffset + count <= bytes.size
+                return if (!inBounds) {
+                    null
+                } else {
+                    String(bytes, dataOffset, count, Charsets.US_ASCII)
+                        .trim { it <= ' ' || it == '\u0000' }
+                        .toFloatOrNull()
                 }
             }
 
@@ -350,7 +399,9 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         private const val TAG_TILE_OFFSETS = 324
         private const val TAG_TILE_BYTE_COUNTS = 325
         private const val TAG_SAMPLE_FORMAT = 339
+        private const val TAG_GDAL_NODATA = 42113
 
+        private const val TYPE_ASCII = 2
         private const val TYPE_SHORT = 3
         private const val TYPE_LONG = 4
     }

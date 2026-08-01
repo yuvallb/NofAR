@@ -135,22 +135,46 @@ object AppConfig {
     /** Fallback vertical FOV when camera characteristics are unavailable (degrees). */
     const val CAMERA_VERTICAL_FOV_FALLBACK_DEG: Float = 45f
 
-    /** Azimuth step for the Explore horizon skyline sweep (degrees). */
+    /** Azimuth step for the Explore horizon skyline sweep (degrees). Sweep cost ≈ 360/step rays. */
     const val HORIZON_AZIMUTH_STEP_DEG: Float = 2f
 
-    /** Outward sample interval along each horizon azimuth ray (meters). */
+    /**
+     * Angular step used when reprojecting the cached skyline to screen space (degrees).
+     * Independent of [HORIZON_AZIMUTH_STEP_DEG]: the sweep is coarse (budget), the on-screen polyline
+     * is sampled finer via circular interpolation of the cached profile.
+     */
+    const val HORIZON_SCREEN_AZIMUTH_STEP_DEG: Float = 1f
+
+    /**
+     * Largest vertical jump (fraction of screen height) allowed *within* one skyline polyline.
+     *
+     * Vertical-bar mitigation: the sweep is coarse (2° buckets, 150 m ray steps) and picks each ray's
+     * max-slope sample, so near-field terrain and DEM coverage edges can make neighbouring azimuths
+     * differ by many degrees. Stroking straight through such a step draws the "yellow vertical bar /
+     * loop" artifact. Above this delta the polyline is broken instead — a small gap reads as honest
+     * missing skyline, a full-height bar reads as a rendering bug. It also covers the case where the
+     * skyline dives toward a screen edge just before leaving the vertical frustum (H-DEC-1 Option A).
+     */
+    const val HORIZON_MAX_SEGMENT_DELTA_Y_FRACTION: Float = 0.15f
+
+    /**
+     * Outward sample interval along each horizon azimuth ray (meters).
+     * Coarser than [VISIBILITY_RAY_STEP_METERS] (100 m) on purpose: the skyline sweeps ~180 rays per
+     * pass, so a 150 m step keeps sample count ≈ maxRadius/step + 1 within the §8 visibility budget.
+     */
     const val HORIZON_RAY_STEP_M: Double = 150.0
 
-    /** Maximum radius for the horizon skyline sweep (meters). */
+    /**
+     * Budget cap for the horizon skyline sweep radius (meters). The actual reach is
+     * `min(regionCollectionRadius, HORIZON_MAX_RADIUS_M)` (H-DEC-3): for the common 10 km region the
+     * 15 km collection radius is matched in full; larger regions cap here, so a peak label beyond the
+     * cap may sit slightly above the outline.
+     */
     const val HORIZON_MAX_RADIUS_M: Double = 15_000.0
 
     /**
-     * Extra azimuth padding beyond the horizontal FOV when reprojecting the cached horizon profile.
-     * Keeps the polyline continuous at screen edges.
+     * Multiplier applied to boundary radius-of-gyration when approximating place footprint (Prepare).
      */
-    const val HORIZON_SCREEN_PADDING_DEG: Float = 4f
-
-    /** Multiplier applied to boundary radius-of-gyration when approximating place footprint (Prepare). */
     const val FOOTPRINT_RADIUS_GYRATION_FACTOR: Double = 1.15
 
     /** Minimum stored footprint radius for places with boundary geometry (meters). */

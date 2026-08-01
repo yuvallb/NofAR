@@ -23,10 +23,14 @@ constructor(
     private val tileCoverageDao: TileCoverageDao,
     private val demTileDao: DemTileDao,
     private val visibilityEngine: VisibilityEngine,
-    private val observerElevationResolver: ObserverElevationResolver
+    private val observerElevationResolver: ObserverElevationResolver,
+    private val horizonProfileComputer: HorizonProfileComputer
 ) : RegionVisibilityComputer {
-    override suspend fun computeForRegions(regions: List<Region>, location: UserLocation): VisibilityResult =
-        computeForRegions(regions, location, AppConfig.defaultResolutionLevel)
+    override suspend fun computeForRegions(
+        regions: List<Region>,
+        location: UserLocation,
+        computeHorizonProfile: Boolean
+    ): VisibilityResult = computeForRegions(regions, location, AppConfig.defaultResolutionLevel, computeHorizonProfile)
 
     suspend fun computeForRegion(
         region: Region,
@@ -37,7 +41,8 @@ constructor(
     suspend fun computeForRegions(
         regions: List<Region>,
         location: UserLocation,
-        resolutionLevel: ResolutionLevel
+        resolutionLevel: ResolutionLevel,
+        computeHorizonProfile: Boolean = true
     ): VisibilityResult {
         if (regions.isEmpty()) {
             return VisibilityResult(entities = emptyList(), computationTimeMs = 0L)
@@ -46,10 +51,11 @@ constructor(
         val warnings = mutableSetOf<VisibilityWarning>()
         val demReaders = openDemReaders(regions, warnings)
         val sampler = DemElevationSampler(demReaders)
+        val observerDemGroundM = sampler.elevationAt(location.latitude, location.longitude)
         val observerElevation =
             observerElevationResolver.resolve(
                 location = location,
-                demElevationM = sampler.elevationAt(location.latitude, location.longitude)
+                demElevationM = observerDemGroundM
             )
         observerElevation.warning?.let { warnings += it }
 
@@ -72,15 +78,27 @@ constructor(
 
         return try {
             val visibilityResult = visibilityEngine.computeVisibleEntities(request)
-            val observerEyeM = observerElevation.elevationM + AppConfig.EYE_HEIGHT_METERS
+            val observerEye =
+                ObserverEyeAltitude.resolve(
+                    observerElevationM = observerElevation.elevationM,
+                    demGroundM = observerDemGroundM
+                )
+            // H-DEC-3 / H-P1-08: match the entity-collection radius, capped for the §8 budget.
+            val horizonMaxRadiusM = minOf(collectionRadiusM, AppConfig.HORIZON_MAX_RADIUS_M)
             val horizonProfile =
-                HorizonProfileComputer().sweep(
+                buildHorizonProfile(
+                    horizonProfileComputer = horizonProfileComputer,
+                    computeHorizonProfile = computeHorizonProfile,
                     observerLat = location.latitude,
                     observerLon = location.longitude,
-                    observerEyeM = observerEyeM,
-                    sampler = sampler
+                    observerEyeM = observerEye.eyeM,
+                    sampler = sampler,
+                    maxRadiusM = horizonMaxRadiusM
                 )
-            visibilityResult.copy(horizonProfile = horizonProfile)
+            visibilityResult.copy(
+                horizonProfile = horizonProfile,
+                horizonEyeSource = horizonProfile?.let { observerEye.source }
+            )
         } finally {
             demReaders.values.forEach { reader ->
                 runCatching { reader.close() }
@@ -195,4 +213,29 @@ constructor(
     companion object {
         private const val TAG = "VisibilityUseCase"
     }
+}
+
+/**
+ * Attaches (or skips) the skyline sweep for a pass. Extracted to file scope so the skip-when-disabled
+ * behavior (H-P1-11) and the "profile is actually computed" invariant (H-P1-16) are unit-testable
+ * without the full repository/DAO graph.
+ */
+internal fun buildHorizonProfile(
+    horizonProfileComputer: HorizonProfileComputer,
+    computeHorizonProfile: Boolean,
+    observerLat: Double,
+    observerLon: Double,
+    observerEyeM: Double,
+    sampler: DemSampler,
+    maxRadiusM: Double
+): HorizonProfile? = if (!computeHorizonProfile) {
+    null
+} else {
+    horizonProfileComputer.sweep(
+        observerLat = observerLat,
+        observerLon = observerLon,
+        observerEyeM = observerEyeM,
+        sampler = sampler,
+        maxRadiusM = maxRadiusM
+    )
 }

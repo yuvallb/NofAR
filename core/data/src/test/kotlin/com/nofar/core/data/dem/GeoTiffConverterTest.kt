@@ -58,6 +58,28 @@ class GeoTiffConverterTest {
         }
     }
 
+    // Copernicus GLO-30 declares its no-data as the ASCII GDAL_NODATA tag (-32767). The converter used to
+    // ignore the tag and stamp the header with -9999, so the sentinel reached Explore as a real elevation.
+    @Test
+    fun convert_honoursGdalNoDataTag_normalizingSentinelToHeaderValue() {
+        val width = 4
+        val height = 4
+        val sentinel = -32767f
+        val samples = FloatArray(width * height) { sentinel }
+        samples[0] = 72f
+        val input = tempDir.newFile("nodata.tif")
+        input.writeBytes(buildStripTiffWithNoData(width, height, samples, noDataText = "-32767"))
+
+        val output = tempDir.newFile("nodata.bin")
+        val result = DefaultGeoTiffConverter().convert(input, tileLat = 32, tileLon = 35, output)
+
+        assertThat(result.noDataValue).isWithin(0.001f).of(DemBinaryFormat.DEFAULT_NO_DATA_VALUE)
+        DemTileReader.open(output).use { reader ->
+            assertThat(reader.elevationAt(32.5, 35.5)).isNull()
+            assertThat(reader.elevationAt(32.999, 35.0)).isWithin(0.001f).of(72f)
+        }
+    }
+
     @Test
     fun convert_realCopernicusTile_whenFixturePresent() {
         val fixture = File(System.getProperty("copernicusDemFixture", "/tmp/copernicus_n32_e35.tif"))
@@ -95,6 +117,38 @@ class GeoTiffConverterTest {
         writeIfdEntry(buffer, 278, 3, 1, height)
         writeIfdEntry(buffer, 279, 4, 1, sampleBytes.size)
         buffer.putInt(0)
+        buffer.put(sampleBytes)
+        return buffer.array()
+    }
+
+    /** Same layout as [buildUncompressedStripTiff] plus an out-of-line ASCII GDAL_NODATA entry. */
+    private fun buildStripTiffWithNoData(width: Int, height: Int, samples: FloatArray, noDataText: String): ByteArray {
+        val sampleBytes = ByteBuffer.allocate(samples.size * Float.SIZE_BYTES)
+            .order(ByteOrder.LITTLE_ENDIAN)
+            .apply { samples.forEach { putFloat(it) } }
+            .array()
+        val entryCount = 9
+        val ifdOffset = 8
+        val asciiBytes = (noDataText + "\u0000").toByteArray(Charsets.US_ASCII)
+        val asciiOffset = ifdOffset + 2 + entryCount * 12 + 4
+        val dataOffset = asciiOffset + asciiBytes.size
+        val buffer = ByteBuffer.allocate(dataOffset + sampleBytes.size).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.put('I'.code.toByte())
+        buffer.put('I'.code.toByte())
+        buffer.putShort(42)
+        buffer.putInt(ifdOffset)
+        buffer.putShort(entryCount.toShort())
+        writeIfdEntry(buffer, 256, 3, 1, width)
+        writeIfdEntry(buffer, 257, 3, 1, height)
+        writeIfdEntry(buffer, 258, 3, 1, 32)
+        writeIfdEntry(buffer, 259, 3, 1, 1)
+        writeIfdEntry(buffer, 273, 4, 1, dataOffset)
+        writeIfdEntry(buffer, 277, 3, 1, 1)
+        writeIfdEntry(buffer, 278, 3, 1, height)
+        writeIfdEntry(buffer, 279, 4, 1, sampleBytes.size)
+        writeIfdEntry(buffer, 42113, 2, asciiBytes.size, asciiOffset)
+        buffer.putInt(0)
+        buffer.put(asciiBytes)
         buffer.put(sampleBytes)
         return buffer.array()
     }

@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -67,31 +68,21 @@ data class ArLabel(
 data class HorizonOutlinePoint(val xPx: Float, val yPx: Float)
 
 @Composable
-fun NofARHorizonOutline(points: List<HorizonOutlinePoint>, modifier: Modifier = Modifier) {
-    if (points.size < 2) return
+fun NofARHorizonOutline(segments: List<List<HorizonOutlinePoint>>, modifier: Modifier = Modifier) {
+    if (segments.isEmpty()) return
 
     Canvas(modifier = modifier.fillMaxSize()) {
-        val maxJumpPx = size.width * 0.5f
-        var segmentStart = 0
-        for (index in 1..points.size) {
-            val shouldBreakSegment =
-                index == points.size ||
-                    kotlin.math.abs(points[index].xPx - points[index - 1].xPx) > maxJumpPx
-            if (shouldBreakSegment) {
-                val segment = points.subList(segmentStart, index)
-                if (segment.size >= 2) {
-                    val path =
-                        Path().apply {
-                            moveTo(segment.first().xPx, segment.first().yPx)
-                            segment.drop(1).forEach { point -> lineTo(point.xPx, point.yPx) }
-                        }
-                    drawPath(
-                        path = path,
-                        color = NofARColors.ArAccent.copy(alpha = 0.6f),
-                        style = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
-                    )
-                }
-                segmentStart = index
+        clipRect(left = 0f, top = 0f, right = size.width, bottom = size.height) {
+            val stroke = Stroke(width = 1.5.dp.toPx(), cap = StrokeCap.Round)
+            val color = NofARColors.ArAccent.copy(alpha = 0.6f)
+            segments.forEach { segment ->
+                if (segment.size < 2) return@forEach
+                val path =
+                    Path().apply {
+                        moveTo(segment.first().xPx, segment.first().yPx)
+                        segment.drop(1).forEach { point -> lineTo(point.xPx, point.yPx) }
+                    }
+                drawPath(path = path, color = color, style = stroke)
             }
         }
     }

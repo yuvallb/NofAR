@@ -48,6 +48,24 @@ object ExplorePreconditions {
         }
     }
 
+    /**
+     * H-P2-02: the AR overlay (labels + horizon outline) may only be projected when Explore is fully
+     * live — READY gate, a real orientation, a measured surface, and non-degraded GPS. Extracted from
+     * `ExploreViewModel.reprojectOverlay` so the "gate clears the horizon" invariant is unit-testable
+     * without the full ViewModel graph.
+     */
+    fun canProjectOverlay(
+        hasOrientation: Boolean,
+        screenWidthPx: Float,
+        screenHeightPx: Float,
+        gate: ExploreGate,
+        locationAccuracyDegraded: Boolean
+    ): Boolean = hasOrientation &&
+        screenWidthPx > 0f &&
+        screenHeightPx > 0f &&
+        gate == ExploreGate.READY &&
+        !locationAccuracyDegraded
+
     private fun resolvePermissionGate(
         locationAccessState: LocationAccessState,
         waitingForGpsFix: Boolean,

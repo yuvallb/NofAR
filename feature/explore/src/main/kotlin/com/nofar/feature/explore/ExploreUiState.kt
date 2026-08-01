@@ -3,13 +3,13 @@ package com.nofar.feature.explore
 import com.nofar.core.data.usecase.ExploreRegionResolution
 import com.nofar.core.data.usecase.QuickRegionProposal
 import com.nofar.core.designsystem.component.ArLabel
+import com.nofar.core.designsystem.component.HorizonOutlinePoint
 import com.nofar.core.model.AltitudeReading
 import com.nofar.core.model.CompassCalibrationState
 import com.nofar.core.model.LocationAccessState
 import com.nofar.core.model.Region
 import com.nofar.core.visibility.CameraFieldOfView
 import com.nofar.core.visibility.ClusteredLabel
-import com.nofar.core.visibility.HorizonScreenPoint
 
 data class ExploreUiState(
     val compassBearingDeg: Float = 0f,
@@ -35,7 +35,7 @@ data class ExploreUiState(
     val showWifiOnlyBlocked: Boolean = false,
     val clusteredLabels: List<ClusteredLabel> = emptyList(),
     val arLabels: List<ArLabel> = emptyList(),
-    val horizonLinePoints: List<HorizonScreenPoint> = emptyList(),
+    val horizonLineSegments: List<List<HorizonOutlinePoint>> = emptyList(),
     val showHorizonOutline: Boolean = true,
     val expandedBucketIndex: Int? = null,
     val expandedCluster: ClusteredLabel? = null,
@@ -49,5 +49,10 @@ data class ExploreUiState(
     val debugRawAzimuthDeg: Float? = null,
     val debugSmoothedAzimuthDeg: Float? = null,
     val useRawSensorOverlay: Boolean = false,
-    val visibleEntityCount: Int = 0
+    val visibleEntityCount: Int = 0,
+    // Debug-only skyline diagnostics (populated on debug builds; see ExploreDebugReadout).
+    val debugCameraElevationDeg: Float? = null,
+    val horizonMeanAngleDeg: Float? = null,
+    val horizonSegmentCount: Int = 0,
+    val horizonEyeSource: String? = null
 )

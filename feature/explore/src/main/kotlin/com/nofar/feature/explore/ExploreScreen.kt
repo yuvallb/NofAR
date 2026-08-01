@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.nofar.core.designsystem.component.HorizonOutlinePoint
 import com.nofar.core.designsystem.component.NofARArLabel
 import com.nofar.core.designsystem.component.NofARCompassRibbon
 import com.nofar.core.designsystem.component.NofARExploreAltitudeReadout
@@ -90,9 +89,9 @@ private fun ExplorePermissionEffects(permissionState: PermissionState, viewModel
 
 @Composable
 internal fun BoxScope.ExploreArOverlay(uiState: ExploreUiState, onHiddenCountClick: (Int) -> Unit) {
-    if (uiState.showHorizonOutline && uiState.horizonLinePoints.size >= 2) {
+    if (uiState.showHorizonOutline && uiState.horizonLineSegments.isNotEmpty()) {
         NofARHorizonOutline(
-            points = uiState.horizonLinePoints.map { HorizonOutlinePoint(it.xPx, it.yPx) },
+            segments = uiState.horizonLineSegments,
             modifier = Modifier.fillMaxSize()
         )
     }
@@ -179,7 +178,22 @@ private fun ExploreDebugReadout(uiState: ExploreUiState) {
         if (uiState.visibleEntityCount > 0) {
             Text(text = "Visible: ${uiState.visibleEntityCount}", color = NofARColors.ArAccent)
         }
+        ExploreHorizonDebugReadout(uiState = uiState)
     }
+}
+
+@Composable
+private fun ExploreHorizonDebugReadout(uiState: ExploreUiState) {
+    val meanAngle = uiState.horizonMeanAngleDeg
+    val cameraElevation = uiState.debugCameraElevationDeg
+    if (meanAngle == null && cameraElevation == null) return
+    val meanText = meanAngle?.let { "%.1f".format(it) } ?: "—"
+    val pitchText = cameraElevation?.let { "%.1f".format(it) } ?: "—"
+    val eyeText = uiState.horizonEyeSource ?: "—"
+    Text(
+        text = "Horizon: mean $meanText° pitch $pitchText° seg ${uiState.horizonSegmentCount} eye $eyeText",
+        color = Color.White
+    )
 }
 
 @Composable

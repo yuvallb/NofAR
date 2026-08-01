@@ -34,8 +34,22 @@ class DemTileReader private constructor(
         val y = pixelY(lat)
         val offset = y * width + x
         val value = dataBuffer.getFloat(offset * Float.SIZE_BYTES)
-        return if (!value.isFinite() || value == noDataValue) null else value
+        return if (isPlausibleElevation(value)) value else null
     }
+
+    /**
+     * Guards against no-data sentinels that never got normalised to [noDataValue] — notably Copernicus
+     * GLO-30's `-32767`, which older tiles kept verbatim because the converter assumed `-9999`.
+     *
+     * Treating a sentinel as real elevation is not a cosmetic error: the Explore skyline derives the
+     * observer eye from the DEM pixel under the user, so one sentinel there put the eye ~32 km
+     * underground and made every azimuth's nearest sample read as ~90° — a horizon line that tracked
+     * camera pitch instead of terrain. Bounds are deliberately wide (Dead Sea floor to above Everest).
+     */
+    private fun isPlausibleElevation(value: Float): Boolean = value.isFinite() &&
+        value != noDataValue &&
+        value >= MIN_PLAUSIBLE_ELEVATION_M &&
+        value <= MAX_PLAUSIBLE_ELEVATION_M
 
     private fun isInsideTile(lat: Double, lon: Double): Boolean {
         val lat0 = tileLat.toDouble()
@@ -59,6 +73,12 @@ class DemTileReader private constructor(
 
     companion object {
         private const val MAX_RASTER_DIMENSION = 10_000
+
+        /** Below the Dead Sea floor (~-730 m); rejects `-9999` / `-32767` sentinels. */
+        private const val MIN_PLAUSIBLE_ELEVATION_M = -1_000f
+
+        /** Above Everest (8849 m); rejects `32767` and similar positive sentinels. */
+        private const val MAX_PLAUSIBLE_ELEVATION_M = 9_000f
 
         fun open(file: File): DemTileReader {
             val raf = RandomAccessFile(file, "r")

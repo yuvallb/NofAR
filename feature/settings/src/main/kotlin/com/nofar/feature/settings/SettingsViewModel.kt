@@ -69,16 +69,22 @@ constructor(
                 userPreferencesRepository.showRawSensorOverlay,
                 userPreferencesRepository.keepRawGeoTiff
             ) { wifiOnly, simpleMode, cacheLimitBytes, showRaw, keepTif ->
-                PreferenceSnapshot(
+                CorePreferenceSnapshot(
                     wifiOnly = wifiOnly,
                     simpleMode = simpleMode,
                     cacheLimitMb = cacheLimitBytes / (1024f * 1024f),
                     showRaw = showRaw,
-                    showHorizon = true,
                     keepTif = keepTif
                 )
-            }.combine(userPreferencesRepository.showHorizonOutline) { snapshot, showHorizon ->
-                snapshot.copy(showHorizon = showHorizon)
+            }.combine(userPreferencesRepository.showHorizonOutline) { core, showHorizon ->
+                PreferenceSnapshot(
+                    wifiOnly = core.wifiOnly,
+                    simpleMode = core.simpleMode,
+                    cacheLimitMb = core.cacheLimitMb,
+                    showRaw = core.showRaw,
+                    showHorizon = showHorizon,
+                    keepTif = core.keepTif
+                )
             }.collect { snapshot ->
                 _uiState.update {
                     it.copy(
@@ -236,6 +242,15 @@ constructor(
             _uiState.update { it.copy(showForceEvictConfirm = true) }
         }
     }
+
+    /** The five preferences that fit in a single [combine]; the sixth (horizon) is added downstream. */
+    private data class CorePreferenceSnapshot(
+        val wifiOnly: Boolean,
+        val simpleMode: Boolean,
+        val cacheLimitMb: Float,
+        val showRaw: Boolean,
+        val keepTif: Boolean
+    )
 
     private data class PreferenceSnapshot(
         val wifiOnly: Boolean,

@@ -13,7 +13,8 @@ class DemTileBinaryTest {
     fun fullTileGrid_roundTripCornerSamples() {
         val width = 3600
         val height = 3600
-        val elevations = FloatArray(width * height) { index -> index.toFloat() }
+        // Wrapped so every sample stays inside the reader's plausible-elevation band.
+        val elevations = FloatArray(width * height) { index -> (index % 3_000).toFloat() }
         val file = tempDir.newFile("full-tile.bin")
         DemTileWriter(tileLat = 32, tileLon = 35).write(file, width, height, elevations)
 
@@ -50,11 +51,46 @@ class DemTileBinaryTest {
         }
     }
 
+    // Device regression: tiles converted before GDAL_NODATA was honoured still hold Copernicus'
+    // -32767 sentinel while the header declares -9999. Accepting it as a real elevation put the Explore
+    // skyline eye ~32 km underground, so every azimuth read ~90° and the horizon tracked camera pitch.
+    @Test
+    fun unnormalizedNoDataSentinels_areRejectedAsElevations() {
+        val width = 10
+        val height = 10
+        val sentinel = -32767f
+        val elevations = FloatArray(width * height) { sentinel }
+        // One genuine sample in the north-west corner pixel proves the guard is value-based, not blanket.
+        elevations[0] = 72f
+        val file = tempDir.newFile("sentinel.bin")
+
+        DemTileWriter(tileLat = 32, tileLon = 35).write(file, width, height, elevations)
+
+        DemTileReader.open(file).use { reader ->
+            assertThat(reader.elevationAt(32.5, 35.5)).isNull()
+            assertThat(reader.elevationAt(32.999, 35.0)).isWithin(0.001f).of(72f)
+        }
+    }
+
+    @Test
+    fun implausiblyHighSentinel_isRejected() {
+        val width = 4
+        val height = 4
+        val elevations = FloatArray(width * height) { 32767f }
+        val file = tempDir.newFile("high-sentinel.bin")
+
+        DemTileWriter(tileLat = 32, tileLon = 35).write(file, width, height, elevations)
+
+        DemTileReader.open(file).use { reader ->
+            assertThat(reader.elevationAt(32.5, 35.5)).isNull()
+        }
+    }
+
     @Test
     fun largeGrid_roundTripSample() {
         val width = 100
         val height = 100
-        val elevations = buildElevationGrid(width, height) { row, col -> (row * width + col).toFloat() }
+        val elevations = buildElevationGrid(width, height) { row, col -> ((row * width + col) % 3_000).toFloat() }
         val file = tempDir.newFile("large.bin")
         DemTileWriter(tileLat = 32, tileLon = 35).write(file, width, height, elevations)
 

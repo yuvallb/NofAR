@@ -2,6 +2,7 @@ package com.nofar.core.visibility
 
 import android.util.Log
 import com.nofar.core.common.DispatcherProvider
+import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
@@ -12,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -22,6 +24,7 @@ class VisibilityPassScheduler
 constructor(
     private val locationRepository: LocationRepository,
     private val visibilityUseCase: RegionVisibilityComputer,
+    private val userPreferencesRepository: UserPreferencesRepository,
     private val dispatchers: DispatcherProvider
 ) {
     private val mutex = Mutex()
@@ -30,6 +33,9 @@ constructor(
 
     private val _horizonProfile = MutableStateFlow<HorizonProfile?>(null)
     val horizonProfile: StateFlow<HorizonProfile?> = _horizonProfile.asStateFlow()
+
+    private val _horizonEyeSource = MutableStateFlow<ObserverEyeSource?>(null)
+    val horizonEyeSource: StateFlow<ObserverEyeSource?> = _horizonEyeSource.asStateFlow()
 
     private val _warnings = MutableStateFlow<Set<VisibilityWarning>>(emptySet())
     val warnings: StateFlow<Set<VisibilityWarning>> = _warnings.asStateFlow()
@@ -70,6 +76,7 @@ constructor(
         scope = null
         _visibleEntities.value = emptyList()
         _horizonProfile.value = null
+        _horizonEyeSource.value = null
         _warnings.value = emptySet()
         activeRegions = emptyList()
         lastPassAtMillis = VisibilityPassPolicy.NO_PASS_YET
@@ -104,10 +111,12 @@ constructor(
             launchScope.launch(dispatchers.default) {
                 val result =
                     runCatching {
+                        val computeHorizonProfile = userPreferencesRepository.showHorizonOutline.first()
                         mutex.withLock {
                             visibilityUseCase.computeForRegions(
                                 regions = currentRegions,
-                                location = currentLocation
+                                location = currentLocation,
+                                computeHorizonProfile = computeHorizonProfile
                             )
                         }
                     }.getOrElse { error ->
@@ -127,6 +136,7 @@ constructor(
                     lastPassLocation = currentLocation
                     _visibleEntities.value = result.entities
                     _horizonProfile.value = result.horizonProfile
+                    _horizonEyeSource.value = result.horizonEyeSource
                     _warnings.value = result.warnings
                 }
             }
