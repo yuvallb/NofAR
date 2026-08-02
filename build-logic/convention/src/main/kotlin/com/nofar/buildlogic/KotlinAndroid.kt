@@ -21,6 +21,9 @@ internal fun Project.configureKotlinAndroid(extension: ApplicationExtension) {
         compileSdk = 36
         defaultConfig {
             minSdk = 26
+            ndk {
+                abiFilters += listOf("arm64-v8a", "x86_64")
+            }
         }
         compileOptions {
             sourceCompatibility = JavaVersion.VERSION_17

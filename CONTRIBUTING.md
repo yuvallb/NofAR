@@ -10,6 +10,17 @@ Thank you for your interest in contributing. NofAR is an offline-first, privacy-
 
 Branch from `main` and keep pull requests focused on one feature or phase slice.
 
+## Rust core (multiplatform migration)
+
+Android loads the shared Rust core via `:core:ffi` (UniFFI + JNA). iOS uses `ios/NofARCoreBridge`.
+
+```bash
+cd rust && cargo test --all
+./gradlew :core:ffi:test
+```
+
+Install [Rust 1.85+](https://rustup.rs/), `cargo-ndk`, and the Android NDK (r28+). See [rust/README.md](rust/README.md).
+
 ## Pull request checklist
 
 Before opening a PR:

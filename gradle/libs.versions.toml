@@ -32,6 +32,9 @@ datastore = "1.1.1"
 osmdroid = "6.1.20"
 mockwebserver = "4.12.0"
 
+jna = "5.16.0"
+uniffiKotlin = "0.28.3"
+
 [libraries]
 android-gradlePlugin = { group = "com.android.tools.build", name = "gradle", version.ref = "agp" }
 kotlin-gradlePlugin = { group = "org.jetbrains.kotlin", name = "kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -91,6 +94,7 @@ androidx-datastore-preferences = { group = "androidx.datastore", name = "datasto
 osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version.ref = "osmdroid" }
 okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "mockwebserver" }
 moshi-adapters = { group = "com.squareup.moshi", name = "moshi-adapters", version.ref = "moshi" }
+jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -112,3 +116,4 @@ nofar-android-lint = { id = "nofar.android.lint" }
 nofar-detekt = { id = "nofar.detekt" }
 nofar-spotless = { id = "nofar.spotless" }
 nofar-jvm-library = { id = "nofar.jvm.library" }
+nofar-rust = { id = "nofar.rust" }

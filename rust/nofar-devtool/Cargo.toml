@@ -1,0 +1,12 @@
+[package]
+name = "nofar-devtool"
+version = "0.1.0"
+edition.workspace = true
+publish = false
+
+[dependencies]
+nofar-core = { path = "../nofar-core" }
+
+[[bin]]
+name = "nofar-devtool"
+path = "src/main.rs"

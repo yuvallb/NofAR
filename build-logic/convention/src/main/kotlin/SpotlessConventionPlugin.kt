@@ -12,7 +12,7 @@ class SpotlessConventionPlugin : Plugin<Project> {
             extensions.configure<SpotlessExtension> {
                 kotlin {
                     target("**/*.kt")
-                    targetExclude("**/build/**")
+                    targetExclude("**/build/**", "**/generated/**")
                     ktlint().editorConfigOverride(
                         mapOf(
                             "max_line_length" to "120",

@@ -19,6 +19,9 @@ fun NofARApp(viewModel: AppStartupViewModel = hiltViewModel()) {
     ) {
         when (val state = startupState) {
             AppStartupState.Loading -> Unit
+            is AppStartupState.CoreUnavailable -> {
+                androidx.compose.material3.Text(text = state.message)
+            }
             is AppStartupState.Ready -> {
                 val navController = androidx.navigation.compose.rememberNavController()
                 NofARNavHost(

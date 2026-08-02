@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+    "nofar-core",
+    "nofar-ffi",
+    "xtask",
+    "nofar-devtool",
+]
+exclude = ["nofar-fuzz"]
+
+[workspace.package]
+edition = "2021"
+license = "Apache-2.0"
+repository = "https://github.com/nofar/nofar"
+
+[workspace.dependencies]
+thiserror = "2.0.12"
+uniffi = { version = "0.28.3", default-features = false }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+debug = 1
+strip = "none"
+panic = "unwind"

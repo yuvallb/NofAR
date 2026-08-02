@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nofar.core.data.preferences.SimpleModeDefaultsInitializer
 import com.nofar.core.data.preferences.UserPreferencesRepository
+import com.nofar.core.ffi.CoreVersionHandshake
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,8 @@ sealed interface AppStartupState {
     data object Loading : AppStartupState
 
     data class Ready(val simpleModeEnabled: Boolean) : AppStartupState
+
+    data class CoreUnavailable(val message: String) : AppStartupState
 }
 
 @HiltViewModel
@@ -30,6 +33,21 @@ constructor(
 
     init {
         viewModelScope.launch {
+            try {
+                CoreVersionHandshake.verify()
+            } catch (error: IllegalArgumentException) {
+                _startupState.value =
+                    AppStartupState.CoreUnavailable(
+                        error.message ?: "Rust core bindings version mismatch"
+                    )
+                return@launch
+            } catch (error: UnsatisfiedLinkError) {
+                _startupState.value =
+                    AppStartupState.CoreUnavailable(
+                        "Rust core native library failed to load: ${error.message}"
+                    )
+                return@launch
+            }
             simpleModeDefaultsInitializer.ensureApplied()
             val simpleModeEnabled = userPreferencesRepository.simpleModeEnabled.first()
             _startupState.value = AppStartupState.Ready(simpleModeEnabled)

@@ -70,5 +70,9 @@ gradlePlugin {
             id = "nofar.jvm.library"
             implementationClass = "JvmLibraryConventionPlugin"
         }
+        register("rust") {
+            id = "nofar.rust"
+            implementationClass = "NofarRustConventionPlugin"
+        }
     }
 }

@@ -22,5 +22,9 @@ Thumbs.db
 # Internal planning docs (optional local gitignore)
 /internal
 
-# DEM tile cache (runtime)
-dem_cache/
+# Rust / UniFFI / iOS generated artifacts
+/rust/target/
+/core/ffi/src/generated/
+/ios/NofARCoreBridge/Artifacts/
+/ios/NofARCoreBridge/Sources/NofARCoreBridge/Generated/
+

@@ -1,0 +1,5 @@
+[bindings.kotlin]
+package_name = "com.nofar.core.ffi"
+
+[bindings.swift]
+module_name = "NofARCoreFFI"
