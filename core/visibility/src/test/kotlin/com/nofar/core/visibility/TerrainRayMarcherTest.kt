@@ -190,6 +190,46 @@ class TerrainRayMarcherTest {
         assertThat(index).isEqualTo(2)
     }
 
+    @Test
+    fun missingDemSampleAlongRay_failsClosed_notVisible() {
+        val observerLat = 32.5
+        val observerLon = 35.5
+        val targetLat = 32.55
+        val targetLon = 35.55
+        val distanceM =
+            com.nofar.core.model.RegionBounds.haversineDistanceM(
+                observerLat,
+                observerLon,
+                targetLat,
+                targetLon
+            )
+        val sampler =
+            DemSampler { lat, lon ->
+                val nearObserver =
+                    kotlin.math.abs(lat - observerLat) < 1e-4 &&
+                        kotlin.math.abs(lon - observerLon) < 1e-4
+                val nearTarget =
+                    kotlin.math.abs(lat - targetLat) < 1e-4 &&
+                        kotlin.math.abs(lon - targetLon) < 1e-4
+                if (nearObserver || nearTarget) 100f else null
+            }
+
+        val visible =
+            rayMarcher.isTargetVisible(
+                observerLat = observerLat,
+                observerLon = observerLon,
+                targetLat = targetLat,
+                targetLon = targetLon,
+                totalDistanceM = distanceM,
+                observerEyeM = 101.7,
+                targetElevationM = 150.0,
+                rayStepM = 100.0,
+                sampler = sampler
+            )
+
+        assertThat(visible).isFalse()
+    }
+
     private fun trackReaders(map: Map<String, com.nofar.core.data.dem.DemTileReader>) {
         readers += map
     }
@@ -228,7 +268,7 @@ class ObserverElevationResolverTest {
     private val resolver = ObserverElevationResolver()
 
     @Test
-    fun gpsAltitudeUsedWhenAccuracyAcceptable() {
+    fun gpsAltitudeUsedWhenVerticalAccuracyAcceptable() {
         val result =
             resolver.resolve(
                 location =
@@ -237,12 +277,51 @@ class ObserverElevationResolverTest {
                     longitude = 35.0,
                     altitudeMeters = 450.0,
                     accuracyMeters = 10f,
+                    verticalAccuracyMeters = 20f,
                     timestampMillis = 0L
                 ),
                 demElevationM = 100f
             )
         assertThat(result.elevationM).isWithin(0.001).of(450.0)
         assertThat(result.warning).isNull()
+    }
+
+    @Test
+    fun demFallbackWhenVerticalAccuracyMissing() {
+        val result =
+            resolver.resolve(
+                location =
+                com.nofar.core.model.UserLocation(
+                    latitude = 32.0,
+                    longitude = 35.0,
+                    altitudeMeters = 450.0,
+                    accuracyMeters = 10f,
+                    verticalAccuracyMeters = null,
+                    timestampMillis = 0L
+                ),
+                demElevationM = 220f
+            )
+        assertThat(result.elevationM).isWithin(0.001).of(220.0)
+        assertThat(result.warning).isEqualTo(VisibilityWarning.OBSERVER_ELEVATION_FROM_DEM)
+    }
+
+    @Test
+    fun demFallbackWhenVerticalAccuracyAboveThreshold() {
+        val result =
+            resolver.resolve(
+                location =
+                com.nofar.core.model.UserLocation(
+                    latitude = 32.0,
+                    longitude = 35.0,
+                    altitudeMeters = 450.0,
+                    accuracyMeters = 10f,
+                    verticalAccuracyMeters = AppConfig.GPS_ALTITUDE_ACCURACY_THRESHOLD_METERS + 1f,
+                    timestampMillis = 0L
+                ),
+                demElevationM = 220f
+            )
+        assertThat(result.elevationM).isWithin(0.001).of(220.0)
+        assertThat(result.warning).isEqualTo(VisibilityWarning.OBSERVER_ELEVATION_FROM_DEM)
     }
 
     @Test

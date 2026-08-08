@@ -33,6 +33,9 @@ data class ClusteredLabel(
 
 object ExploreDistanceFormatter {
     fun format(distanceM: Double): String {
+        if (distanceM < 1_000.0) {
+            return "${kotlin.math.round(distanceM).toInt()} m"
+        }
         val km = distanceM / 1_000.0
         val rounded = round(km * 10.0) / 10.0
         return "$rounded km"

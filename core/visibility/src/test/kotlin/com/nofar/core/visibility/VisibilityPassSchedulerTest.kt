@@ -170,8 +170,60 @@ class VisibilityPassSchedulerTest {
         scheduler.stop()
     }
 
+    @Test
+    fun requestPass_forcesComputeEvenWithinInterval() = runTest {
+        val computer = RecordingComputer()
+        val scheduler = scheduler(computer, showHorizonOutline = false)
+        scheduler.start(this)
+        scheduler.setActiveRegions(listOf(sampleRegion()))
+        advanceUntilIdle()
+        val afterFirst = computer.computeCount
+
+        scheduler.requestPass(force = true)
+        advanceUntilIdle()
+
+        assertThat(computer.computeCount).isEqualTo(afterFirst + 1)
+        scheduler.stop()
+    }
+
+    @Test
+    fun periodicRefresh_ticksStationaryVirtualObserver() = runTest {
+        val virtualLocation =
+            UserLocation(
+                latitude = 31.0,
+                longitude = 35.0,
+                altitudeMeters = null,
+                accuracyMeters = 5f,
+                timestampMillis = 1_000L
+            )
+        val computer = RecordingComputer()
+        val scheduler =
+            VisibilityPassScheduler(
+                visibilityUseCase = computer,
+                userPreferencesRepository = FakeUserPreferencesRepository(showHorizon = false),
+                dispatchers = dispatcherProvider(StandardTestDispatcher(testScheduler))
+            )
+        scheduler.configureObserverLocation(
+            observerFlow = kotlinx.coroutines.flow.flowOf(virtualLocation),
+            periodicRefresh = true
+        )
+        scheduler.seedObserverLocation(virtualLocation)
+        scheduler.start(this)
+        scheduler.setActiveRegions(listOf(sampleRegion()))
+        testScheduler.runCurrent()
+        val afterFirst = computer.computeCount
+        assertThat(afterFirst).isAtLeast(1)
+
+        testScheduler.advanceTimeBy(2_100L)
+        testScheduler.runCurrent()
+
+        assertThat(computer.computeCount).isAtLeast(afterFirst + 1)
+        scheduler.stop()
+    }
+
     private class RecordingComputer : RegionVisibilityComputer {
         var lastLocation: UserLocation? = null
+        var computeCount: Int = 0
 
         override suspend fun computeForRegions(
             regions: List<Region>,
@@ -179,6 +231,7 @@ class VisibilityPassSchedulerTest {
             computeHorizonProfile: Boolean
         ): VisibilityResult {
             lastLocation = location
+            computeCount += 1
             return VisibilityResult(
                 entities = emptyList(),
                 computationTimeMs = 1L,

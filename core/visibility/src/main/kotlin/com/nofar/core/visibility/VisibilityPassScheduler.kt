@@ -3,17 +3,20 @@ package com.nofar.core.visibility
 import android.util.Log
 import com.nofar.core.common.DispatcherProvider
 import com.nofar.core.data.preferences.UserPreferencesRepository
+import com.nofar.core.model.AppConfig
 import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -48,12 +51,15 @@ constructor(
     private var sequenceNumber: Long = 0L
     private var inFlightJob: Job? = null
     private var collectorJob: Job? = null
+    private var periodicRefreshJob: Job? = null
     private var scope: CoroutineScope? = null
     private var observerLocationFlow: Flow<UserLocation>? = null
+    private var periodicRefreshEnabled: Boolean = false
     private var lastObserverLocation: UserLocation? = null
 
-    fun configureObserverLocation(observerFlow: Flow<UserLocation>) {
+    fun configureObserverLocation(observerFlow: Flow<UserLocation>, periodicRefresh: Boolean = false) {
         observerLocationFlow = observerFlow
+        periodicRefreshEnabled = periodicRefresh
     }
 
     fun setActiveRegions(regions: List<Region>) {
@@ -69,9 +75,17 @@ constructor(
         lastObserverLocation = location
     }
 
+    /** Forces a visibility pass with the last known observer location (e.g. preference change). */
+    fun requestPass(force: Boolean = true) {
+        lastObserverLocation?.let { location ->
+            triggerPass(force = force, location = location, regions = activeRegions)
+        }
+    }
+
     fun start(scope: CoroutineScope) {
         val flow = observerLocationFlow ?: error("configureObserverLocation before start")
         collectorJob?.cancel()
+        periodicRefreshJob?.cancel()
         inFlightJob?.cancel()
         inFlightJob = null
         this.scope = scope
@@ -82,11 +96,25 @@ constructor(
                     onLocationUpdate(location)
                 }
             }
+        if (periodicRefreshEnabled) {
+            periodicRefreshJob =
+                scope.launch(dispatchers.default) {
+                    while (isActive) {
+                        delay(AppConfig.visibilityRefreshMaxInterval)
+                        val location = lastObserverLocation ?: continue
+                        onLocationUpdate(
+                            location.copy(timestampMillis = System.currentTimeMillis())
+                        )
+                    }
+                }
+        }
     }
 
     fun stop() {
         collectorJob?.cancel()
         collectorJob = null
+        periodicRefreshJob?.cancel()
+        periodicRefreshJob = null
         inFlightJob?.cancel()
         inFlightJob = null
         scope = null

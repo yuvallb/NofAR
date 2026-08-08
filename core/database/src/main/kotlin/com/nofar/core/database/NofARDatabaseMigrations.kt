@@ -5,6 +5,27 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 object NofARDatabaseMigrations {
     /**
+     * Schema 1 and 2 share the same entity layout; only the Room identity hash / version bumped.
+     * Keep an explicit no-op migration so upgrades never hit destructive fallback.
+     */
+    val MIGRATION_1_2 =
+        object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // No structural changes between schema exports 1 and 2.
+            }
+        }
+
+    /** Adds optional place footprint radius used by Explore area labels. */
+    val MIGRATION_2_3 =
+        object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `geo_entity` ADD COLUMN `footprint_radius_m` REAL"
+                )
+            }
+        }
+
+    /**
      * Persist entity elevations as whole meters (INTEGER). DEM samples and OSM `ele` are rounded.
      */
     val MIGRATION_3_4 =

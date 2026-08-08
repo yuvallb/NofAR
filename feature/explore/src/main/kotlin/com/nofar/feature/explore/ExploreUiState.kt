@@ -56,7 +56,8 @@ data class ExploreUiState(
     val horizonSegmentCount: Int = 0,
     val horizonEyeSource: String? = null,
     val exploreHere: ExploreHereUi = ExploreHereUi(),
-    val virtualExploreSession: VirtualExploreSession? = null
+    val virtualExploreSession: VirtualExploreSession? = null,
+    val navigateToPrepare: ExplorePrepareNavigation? = null
 ) {
     val isVirtualExplore: Boolean get() = virtualExploreSession != null
 }

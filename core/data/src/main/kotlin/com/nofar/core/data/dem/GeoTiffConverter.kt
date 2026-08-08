@@ -20,8 +20,14 @@ data class GeoTiffConversionResult(val width: Int, val height: Int, val noDataVa
  */
 class DefaultGeoTiffConverter : GeoTiffConverter {
     override fun convert(inputFile: File, tileLat: Int, tileLon: Int, outputFile: File): GeoTiffConversionResult {
+        require(inputFile.length() <= MAX_INPUT_BYTES) {
+            "GeoTIFF exceeds size limit (${inputFile.length()} > $MAX_INPUT_BYTES bytes)"
+        }
         val bytes = inputFile.readBytes()
         val directory = TiffDirectory.parse(bytes)
+        require(directory.width in 1..MAX_RASTER_DIMENSION && directory.height in 1..MAX_RASTER_DIMENSION) {
+            "GeoTIFF dimensions ${directory.width}x${directory.height} outside 1..$MAX_RASTER_DIMENSION"
+        }
         require(directory.bitsPerSample == 32) {
             "Expected 32-bit samples, got ${directory.bitsPerSample}"
         }
@@ -154,7 +160,8 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         val decodedBytes =
             when (compression) {
                 COMPRESSION_NONE -> compressed
-                COMPRESSION_DEFLATE, COMPRESSION_ADOBE_DEFLATE -> inflateZlib(compressed)
+                COMPRESSION_DEFLATE, COMPRESSION_ADOBE_DEFLATE ->
+                    inflateZlib(compressed, maxDecodedBytes = sampleCount * Float.SIZE_BYTES)
                 else -> throw IOException("Unsupported TIFF compression: $compression")
             }
         val expectedBytes = sampleCount * Float.SIZE_BYTES
@@ -232,12 +239,13 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         }
     }
 
-    private fun inflateZlib(compressed: ByteArray): ByteArray {
+    private fun inflateZlib(compressed: ByteArray, maxDecodedBytes: Int): ByteArray {
         val inflater = Inflater()
         return try {
             inflater.setInput(compressed)
-            val output = ByteArrayOutputStream(compressed.size * 2)
+            val output = ByteArrayOutputStream(minOf(compressed.size * 2, maxDecodedBytes))
             val buffer = ByteArray(8192)
+            var decoded = 0
             while (!inflater.finished()) {
                 val count = inflater.inflate(buffer)
                 if (count == 0) {
@@ -245,6 +253,12 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                         throw IOException("Unexpected end of DEFLATE stream")
                     }
                     break
+                }
+                decoded += count
+                if (decoded > maxDecodedBytes) {
+                    throw IOException(
+                        "DEFLATE output exceeds size limit ($decoded > $maxDecodedBytes bytes)"
+                    )
                 }
                 output.write(buffer, 0, count)
             }
@@ -467,6 +481,12 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         private const val COMPRESSION_ADOBE_DEFLATE = 32946
         private const val PREDICTOR_NONE = 1
         private const val PREDICTOR_FLOATING_POINT = 3
+
+        /** Match Explore [DemTileReader] dimension cap. */
+        private const val MAX_RASTER_DIMENSION = 10_000
+
+        /** Align with DEM download cap in DefaultDemTileFetcher. */
+        private const val MAX_INPUT_BYTES: Long = 80L * 1024 * 1024
 
         private const val TAG_IMAGE_WIDTH = 256
         private const val TAG_IMAGE_LENGTH = 257

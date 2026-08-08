@@ -12,6 +12,8 @@ sealed interface ExploreNavigationDecision {
     data object Disabled : ExploreNavigationDecision
 
     data class Direct(val regionId: UUID) : ExploreNavigationDecision
+
+    data class Pick(val regions: List<Region>) : ExploreNavigationDecision
 }
 
 internal object HomeRegionLogic {
@@ -46,9 +48,11 @@ internal object HomeRegionLogic {
 
     fun resolveExploreNavigation(insideExploreRegions: List<Region>): ExploreNavigationDecision = when {
         insideExploreRegions.isEmpty() -> ExploreNavigationDecision.Disabled
+        insideExploreRegions.size == 1 ->
+            ExploreNavigationDecision.Direct(insideExploreRegions.single().id)
         else ->
-            ExploreNavigationDecision.Direct(
-                insideExploreRegions.maxBy { it.updatedAt }.id
+            ExploreNavigationDecision.Pick(
+                insideExploreRegions.sortedByDescending { it.updatedAt }
             )
     }
 }

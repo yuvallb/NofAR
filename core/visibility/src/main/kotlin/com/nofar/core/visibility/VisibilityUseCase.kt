@@ -5,10 +5,10 @@ import com.nofar.core.data.dem.DemTileReader
 import com.nofar.core.data.dem.RegionDemTileResolver
 import com.nofar.core.data.repository.DemTileRepository
 import com.nofar.core.data.repository.GeoEntityRepository
-import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.dao.TileCoverageDao
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.GeoEntity
+import com.nofar.core.model.GeoEntityType
 import com.nofar.core.model.Region
 import com.nofar.core.model.RegionBounds
 import com.nofar.core.model.ResolutionLevel
@@ -21,7 +21,6 @@ constructor(
     private val geoEntityRepository: GeoEntityRepository,
     private val demTileRepository: DemTileRepository,
     private val tileCoverageDao: TileCoverageDao,
-    private val demTileDao: DemTileDao,
     private val visibilityEngine: VisibilityEngine,
     private val observerElevationResolver: ObserverElevationResolver,
     private val horizonProfileComputer: HorizonProfileComputer
@@ -84,20 +83,33 @@ constructor(
             )
 
         return try {
-            completeVisibilityResult(
-                visibilityResult = visibilityEngine.computeVisibleEntities(request),
-                location = location,
-                observerElevationM = observerElevation.elevationM,
-                observerDemGroundM = observerDemGroundM,
-                collectionRadiusM = collectionRadiusM,
-                computeHorizonProfile = computeHorizonProfile,
-                sampler = sampler,
-                hereContext = hereContext
-            )
+            val result =
+                completeVisibilityResult(
+                    visibilityResult = visibilityEngine.computeVisibleEntities(request),
+                    location = location,
+                    observerElevationM = observerElevation.elevationM,
+                    observerDemGroundM = observerDemGroundM,
+                    collectionRadiusM = collectionRadiusM,
+                    computeHorizonProfile = computeHorizonProfile,
+                    sampler = sampler,
+                    hereContext = hereContext
+                )
+            warnIfOverBudget(result.computationTimeMs)
+            result
         } finally {
             demReaders.values.forEach { reader ->
                 runCatching { reader.close() }
             }
+        }
+    }
+
+    private fun warnIfOverBudget(computationTimeMs: Long) {
+        if (computationTimeMs > AppConfig.VISIBILITY_PASS_BUDGET_MS) {
+            Log.w(
+                TAG,
+                "Visibility pass took ${computationTimeMs}ms " +
+                    "(budget ${AppConfig.VISIBILITY_PASS_BUDGET_MS}ms)"
+            )
         }
     }
 
@@ -148,15 +160,24 @@ constructor(
         val entitiesById = LinkedHashMap<String, GeoEntity>()
         for (region in regions) {
             val collectionRadiusM = RegionBounds.dataCollectionRadiusM(region)
+            val observerToCenterM =
+                RegionBounds.haversineDistanceM(
+                    location.latitude,
+                    location.longitude,
+                    region.centerLat,
+                    region.centerLon
+                )
+            // Reach every point still inside the collection circle from the observer.
+            val queryRadiusM = collectionRadiusM + observerToCenterM
             val entities =
                 geoEntityRepository.queryWithinRadiusForRegion(
                     regionId = region.id,
                     regionCenterLat = region.centerLat,
                     regionCenterLon = region.centerLon,
                     regionRadiusM = collectionRadiusM,
-                    lat = region.centerLat,
-                    lon = region.centerLon,
-                    radiusM = collectionRadiusM,
+                    lat = location.latitude,
+                    lon = location.longitude,
+                    radiusM = queryRadiusM,
                     resolutionLevel = resolutionLevel
                 )
             entities.forEach { entity -> entitiesById.putIfAbsent(entity.id, entity) }
@@ -181,17 +202,13 @@ constructor(
         return CandidateQueryResult(
             allEntities = entitiesById.values,
             candidates =
-            entitiesById.values
-                .sortedBy { entity ->
-                    RegionBounds.haversineDistanceM(
-                        location.latitude,
-                        location.longitude,
-                        entity.lat,
-                        entity.lon
-                    )
-                }
-                .take(AppConfig.VISIBILITY_MAX_CANDIDATES)
-                .map { entity -> entity.toCandidate(location) }
+            VisibilityCandidateSelector
+                .select(
+                    entities = entitiesById.values,
+                    location = location,
+                    maxCandidates = AppConfig.VISIBILITY_MAX_CANDIDATES,
+                    peakBudget = AppConfig.PEAK_CANDIDATE_BUDGET
+                ).map { entity -> entity.toCandidate(location) }
         )
     }
 
@@ -199,18 +216,16 @@ constructor(
         regions: List<Region>,
         warnings: MutableSet<VisibilityWarning>
     ): Map<String, DemTileReader> {
-        val tileIds = LinkedHashSet<String>()
+        val expectedTileIds = LinkedHashSet<String>()
         for (region in regions) {
-            tileIds +=
-                RegionDemTileResolver.resolveTileIds(
+            expectedTileIds +=
+                RegionDemTileResolver.resolveExpectedTileIds(
                     region = region,
-                    tileCoverageDao = tileCoverageDao,
-                    demTileDao = demTileDao,
-                    tileReadable = demTileRepository::isBinReadable
+                    tileCoverageDao = tileCoverageDao
                 )
         }
         val readers = LinkedHashMap<String, DemTileReader>()
-        for (tileId in tileIds) {
+        for (tileId in expectedTileIds) {
             demTileRepository.ensureRegisteredFromBin(tileId)
             val reader = demTileRepository.openReader(tileId)
             if (reader == null) {
@@ -219,7 +234,7 @@ constructor(
             }
             readers[tileId] = reader
         }
-        if (readers.isEmpty() && tileIds.isNotEmpty()) {
+        if (readers.size < expectedTileIds.size) {
             warnings += VisibilityWarning.DEM_TILE_MISSING
         }
         return readers
@@ -250,6 +265,36 @@ constructor(
     companion object {
         private const val TAG = "VisibilityUseCase"
     }
+}
+
+/**
+ * Caps visibility candidates: nearest peaks up to [peakBudget], then nearest non-peaks to fill
+ * [maxCandidates].
+ */
+internal object VisibilityCandidateSelector {
+    fun select(
+        entities: Collection<GeoEntity>,
+        location: UserLocation,
+        maxCandidates: Int,
+        peakBudget: Int
+    ): List<GeoEntity> {
+        if (entities.size <= maxCandidates) {
+            return entities.sortedBy { entity -> distanceM(location, entity) }
+        }
+        val byDistance = entities.sortedBy { entity -> distanceM(location, entity) }
+        val peaks = byDistance.filter { it.type == GeoEntityType.PEAK }
+        val places = byDistance.filter { it.type != GeoEntityType.PEAK }
+        val selectedPeaks = peaks.take(peakBudget.coerceAtMost(maxCandidates))
+        val remaining = (maxCandidates - selectedPeaks.size).coerceAtLeast(0)
+        return selectedPeaks + places.take(remaining)
+    }
+
+    private fun distanceM(location: UserLocation, entity: GeoEntity): Double = RegionBounds.haversineDistanceM(
+        location.latitude,
+        location.longitude,
+        entity.lat,
+        entity.lon
+    )
 }
 
 /**

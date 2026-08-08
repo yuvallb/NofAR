@@ -70,7 +70,39 @@ sealed interface PrepareDownloadError {
     data class PartialDemFailure(val failedTiles: Int) : PrepareDownloadError
 
     data class Unknown(val message: String) : PrepareDownloadError
+
+    fun toUserMessage(): String = when (this) {
+        NoNetwork ->
+            "No network connection. Connect to Wi-Fi or mobile data to download."
+        AllMirrorsFailed ->
+            "All OpenStreetMap mirrors failed. Try again later or check your connection."
+        is PartialDemFailure ->
+            "Download finished with $failedTiles missing elevation tile(s). You can retry to fill gaps."
+        is Unknown -> message.ifBlank { "Download failed. You can retry to continue." }
+    }
+
+    companion object {
+        fun fromThrowable(error: Throwable): PrepareDownloadError {
+            if (error is PrepareDownloadException) return error.error
+            val message = error.message.orEmpty()
+            return when {
+                message.contains("All Overpass mirrors", ignoreCase = true) -> AllMirrorsFailed
+                message.contains("Unable to resolve host", ignoreCase = true) ||
+                    message.contains("Failed to connect", ignoreCase = true) ||
+                    message.contains("Network is unreachable", ignoreCase = true) ||
+                    message.contains("No address associated", ignoreCase = true) ||
+                    error is java.net.UnknownHostException ||
+                    error is java.net.ConnectException -> NoNetwork
+                message.contains("DEM", ignoreCase = true) &&
+                    message.contains("fail", ignoreCase = true) ->
+                    PartialDemFailure(failedTiles = 1)
+                else -> Unknown(message.ifBlank { "Download failed. You can retry to continue." })
+            }
+        }
+    }
 }
+
+class PrepareDownloadException(val error: PrepareDownloadError) : Exception(error.toUserMessage())
 
 @Singleton
 class PrepareDownloadOrchestrator
@@ -94,6 +126,9 @@ constructor(
     private val _progress = MutableStateFlow<PrepareProgress?>(null)
     val progress: StateFlow<PrepareProgress?> = _progress.asStateFlow()
 
+    private val _lastError = MutableStateFlow<PrepareDownloadError?>(null)
+    val lastError: StateFlow<PrepareDownloadError?> = _lastError.asStateFlow()
+
     @Volatile
     private var cancelled = false
 
@@ -107,10 +142,15 @@ constructor(
         cancelled = true
     }
 
+    fun clearLastError() {
+        _lastError.value = null
+    }
+
     suspend fun download(regionId: UUID): Result<Unit> {
         cancelled = false
         activeRegionId = regionId
         lastPersistedPercent = -1
+        _lastError.value = null
         val region =
             regionRepository.getRegion(regionId) ?: return Result.failure(IllegalStateException("Region missing"))
 
@@ -155,15 +195,32 @@ constructor(
                 regionRepository.updateRegion(region.copy(labelLanguage = labelLanguage))
             }
             overpassResponse.body.use { stream ->
-                val parsedEntities = mutableListOf<com.nofar.core.data.osm.ParsedOsmElement>()
                 val footprintByEntityId = mutableMapOf<String, Double>()
+                var savedCount = 0
                 entityCount =
                     overpassStreamParser.parse(
                         input = stream,
                         labelLanguage = labelLanguage,
                         onElement = { element ->
                             checkCancelled()
-                            parsedEntities.add(element)
+                            if (savedCount < MAX_OSM_ENTITIES) {
+                                // Stream upserts — never buffer the full Overpass entity list.
+                                coverageLinker.upsertAndLinkEntity(
+                                    regionId = regionId.toString(),
+                                    entity = overpassStreamParser.toGeoEntity(element).asEntity(),
+                                    displayName = element.name
+                                )
+                                savedCount++
+                                if (savedCount % 50 == 0) {
+                                    updateProgress(
+                                        PreparePhase.OSM,
+                                        ((savedCount.toDouble() / MAX_OSM_ENTITIES) * 40)
+                                            .toInt()
+                                            .coerceIn(1, 39),
+                                        message = "Saving OpenStreetMap features ($savedCount)…"
+                                    )
+                                }
+                            }
                         },
                         onFootprint = { entityId, radiusM ->
                             val existing = footprintByEntityId[entityId]
@@ -175,38 +232,13 @@ constructor(
                                 }
                         }
                     )
+                entityCount = savedCount
+                applyFootprints(regionId, footprintByEntityId)
                 updateProgress(
                     PreparePhase.OSM,
-                    _progress.value?.overallPercent?.coerceAtLeast(1) ?: 1,
-                    message = "Saving OpenStreetMap features…"
+                    40,
+                    message = "Saving OpenStreetMap features ($savedCount)…"
                 )
-                parsedEntities.forEachIndexed { index, element ->
-                    checkCancelled()
-                    val geoEntity =
-                        overpassStreamParser.toGeoEntity(element).copy(
-                            footprintRadiusM = footprintByEntityId[element.entityId]
-                        )
-                    // Upsert+link in one transaction so concurrent Home/Explore work cannot
-                    // orphan the row before coverage is written (FK constraint failure).
-                    coverageLinker.upsertAndLinkEntity(
-                        regionId = regionId.toString(),
-                        entity = geoEntity.asEntity(),
-                        displayName = element.name
-                    )
-                    if ((index + 1) % 50 == 0 || index + 1 == entityCount) {
-                        val ingestPct =
-                            if (entityCount > 0) {
-                                (((index + 1).toDouble() / entityCount) * 40).toInt().coerceIn(1, 40)
-                            } else {
-                                40
-                            }
-                        updateProgress(
-                            PreparePhase.OSM,
-                            ingestPct,
-                            message = "Saving OpenStreetMap features (${index + 1}/$entityCount)…"
-                        )
-                    }
-                }
             }
             val coverageCount = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString()).size
             if (coverageCount != entityCount) {
@@ -222,9 +254,16 @@ constructor(
             applyOsmAutoName(regionId)
 
             // DEM phase (40–90%)
-            val tiles = DemTileId.intersectingTiles(
-                RegionBounds.boundingBox(region.centerLat, region.centerLon, collectionRadiusM)
-            )
+            val tiles =
+                DemTileId.intersectingTiles(
+                    RegionBounds.boundingBox(region.centerLat, region.centerLon, collectionRadiusM)
+                )
+            if (tiles.size > MAX_DEM_TILES_PER_REGION) {
+                throw IllegalStateException(
+                    "Region requires ${tiles.size} DEM tiles (max $MAX_DEM_TILES_PER_REGION); " +
+                        "move the center away from the poles or shrink the radius"
+                )
+            }
             val linkedTileIds = mutableListOf<String>()
             tiles.forEachIndexed { index, (tileLat, tileLon) ->
                 checkCancelled()
@@ -251,7 +290,12 @@ constructor(
                 val tifFile = File(demDirectory, "$tileId.tif")
                 try {
                     if (!tifFile.exists()) {
-                        demTileFetcher.fetchTile(tileLat, tileLon, tifFile) { bytesRead, totalBytes ->
+                        demTileFetcher.fetchTile(
+                            tileLat = tileLat,
+                            tileLon = tileLon,
+                            outputFile = tifFile,
+                            isCancelled = { cancelled }
+                        ) { bytesRead, totalBytes ->
                             val tileFraction = if (totalBytes != null && totalBytes > 0) {
                                 bytesRead.toDouble() / totalBytes
                             } else {
@@ -313,14 +357,15 @@ constructor(
             // Post-processing (90–100%)
             updateProgress(PreparePhase.POST_PROCESSING, 90, message = "Filling elevations…")
             persistProgress(90)
-            postProcessor.process(regionId) { processed, total ->
-                val pct = 90 + ((processed * 9) / total.coerceAtLeast(1))
-                updateProgress(
-                    PreparePhase.POST_PROCESSING,
-                    pct.coerceIn(90, 99),
-                    message = "Filling elevations ($processed/$total)…"
-                )
-            }
+            val elevationFillOk =
+                postProcessor.process(regionId) { processed, total ->
+                    val pct = 90 + ((processed * 9) / total.coerceAtLeast(1))
+                    updateProgress(
+                        PreparePhase.POST_PROCESSING,
+                        pct.coerceIn(90, 99),
+                        message = "Filling elevations ($processed/$total)…"
+                    )
+                }
             // Drop entities left without coverage after re-download (Requirements §5.3).
             geoEntityRepository.garbageCollectOrphans()
             updateProgress(PreparePhase.POST_PROCESSING, 100, message = "Finalizing…")
@@ -329,6 +374,7 @@ constructor(
                 when {
                     demFailures > 0 -> DownloadStatus.PARTIAL
                     entityCount == 0 -> DownloadStatus.PARTIAL
+                    !elevationFillOk -> DownloadStatus.PARTIAL
                     else -> DownloadStatus.READY
                 }
             regionRepository.updateDownloadStatus(regionId, terminalStatus, progressPct = 100)
@@ -343,6 +389,7 @@ constructor(
             throw cancelled
         } catch (error: Exception) {
             Log.e(TAG, "Prepare download failed for region $regionId", error)
+            _lastError.value = PrepareDownloadError.fromThrowable(error)
             val status =
                 if (entityCount > 0 || demFailures > 0) DownloadStatus.PARTIAL else DownloadStatus.NOT_DOWNLOADED
             regionRepository.updateDownloadStatus(regionId, status, progressPct = _progress.value?.overallPercent ?: 0)
@@ -352,6 +399,19 @@ constructor(
                 _progress.value = null
                 activeRegionId = null
             }
+        }
+    }
+
+    private suspend fun applyFootprints(regionId: UUID, footprintByEntityId: Map<String, Double>) {
+        if (footprintByEntityId.isEmpty()) return
+        for ((entityId, radiusM) in footprintByEntityId) {
+            checkCancelled()
+            val entity = geoEntityRepository.getById(entityId) ?: continue
+            coverageLinker.upsertAndLinkEntity(
+                regionId = regionId.toString(),
+                entity = entity.copy(footprintRadiusM = radiusM).asEntity(),
+                displayName = entity.name
+            )
         }
     }
 
@@ -490,5 +550,11 @@ constructor(
 
     companion object {
         private const val TAG = "PrepareDownload"
+
+        /** Hard cap so a pathological Overpass response cannot grow the Room DB unboundedly. */
+        const val MAX_OSM_ENTITIES: Int = 50_000
+
+        /** Caps polar / corrupted-region tile explosions (20 km + padding ≈ a few tiles mid-lat). */
+        const val MAX_DEM_TILES_PER_REGION: Int = 64
     }
 }

@@ -184,7 +184,6 @@ private fun BoxScope.ExploreGateContent(
         ExploreGate.CAMERA_DENIED -> ExploreCameraPermissionOverlay(permissionState = permissionState)
         ExploreGate.COMPASS_UNAVAILABLE -> ExploreCompassUnavailableOverlay(onExit = onNavigateBack)
         ExploreGate.REGION_MISSING -> ExploreRegionDataErrorOverlay(onExit = onNavigateBack)
-        ExploreGate.REGION_OUTSIDE -> Unit
         ExploreGate.GRACE_EXPIRED -> Unit
     }
 }

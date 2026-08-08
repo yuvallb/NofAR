@@ -4,13 +4,14 @@ import com.google.common.truth.Truth.assertThat
 import com.nofar.core.model.GeoEntityType
 import com.nofar.core.model.LabelLanguage
 import com.nofar.core.model.OsmType
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 class OverpassStreamParserTest {
     private val parser = OverpassStreamParser()
 
     @Test
-    fun parse_streamsElementsWithoutLoadingFullDocument() {
+    fun parse_streamsElementsWithoutLoadingFullDocument() = runTest {
         val fixture = javaClass.getResourceAsStream("/overpass_fixture.json")!!
         var peakCount = 0
         val count =
@@ -22,7 +23,7 @@ class OverpassStreamParserTest {
     }
 
     @Test
-    fun parse_skipsUnnamedEntities() {
+    fun parse_skipsUnnamedEntities() = runTest {
         val json =
             """
             {"elements":[
@@ -31,13 +32,28 @@ class OverpassStreamParserTest {
             ]}
             """.trimIndent()
         val parsed = mutableListOf<ParsedOsmElement>()
-        val count = parser.parse(json.byteInputStream(), parsed::add)
+        val count = parser.parse(json.byteInputStream()) { parsed += it }
         assertThat(count).isEqualTo(1)
         assertThat(parsed.single().name).isEqualTo("Mount Test")
     }
 
     @Test
-    fun parse_hebrew_usesLocalizedNameWithFallback() {
+    fun parse_skipsInvalidCoordinates() = runTest {
+        val json =
+            """
+            {"elements":[
+              {"type":"node","id":1,"lat":91.0,"lon":35.0,"tags":{"natural":"peak","name":"Bad"}},
+              {"type":"node","id":2,"lat":32.1,"lon":35.1,"tags":{"natural":"peak","name":"Good"}}
+            ]}
+            """.trimIndent()
+        val parsed = mutableListOf<ParsedOsmElement>()
+        val count = parser.parse(json.byteInputStream()) { parsed += it }
+        assertThat(count).isEqualTo(1)
+        assertThat(parsed.single().name).isEqualTo("Good")
+    }
+
+    @Test
+    fun parse_hebrew_usesLocalizedNameWithFallback() = runTest {
         val json =
             """
             {"elements":[
@@ -47,7 +63,12 @@ class OverpassStreamParserTest {
             ]}
             """.trimIndent()
         val parsed = mutableListOf<ParsedOsmElement>()
-        val count = parser.parse(json.byteInputStream(), LabelLanguage.HEBREW, parsed::add)
+        val count =
+            parser.parse(
+                input = json.byteInputStream(),
+                labelLanguage = LabelLanguage.HEBREW,
+                onElement = { parsed += it }
+            )
         assertThat(count).isEqualTo(3)
         assertThat(parsed[0].name).isEqualTo("הר בדיקה")
         assertThat(parsed[0].canonicalName).isEqualTo("Mount Test")
@@ -57,7 +78,7 @@ class OverpassStreamParserTest {
     }
 
     @Test
-    fun parse_english_prefersNameEnOverHebrewPrimaryName() {
+    fun parse_english_prefersNameEnOverHebrewPrimaryName() = runTest {
         val json =
             """
             {"elements":[
@@ -65,7 +86,11 @@ class OverpassStreamParserTest {
             ]}
             """.trimIndent()
         val parsed = mutableListOf<ParsedOsmElement>()
-        parser.parse(json.byteInputStream(), LabelLanguage.ENGLISH, parsed::add)
+        parser.parse(
+            input = json.byteInputStream(),
+            labelLanguage = LabelLanguage.ENGLISH,
+            onElement = { parsed += it }
+        )
         assertThat(parsed.single().name).isEqualTo("Mount Hermon")
         assertThat(parsed.single().canonicalName).isEqualTo("הר חרמון")
         assertThat(parser.toGeoEntity(parsed.single()).name).isEqualTo("Mount Hermon")
@@ -91,7 +116,7 @@ class OverpassStreamParserTest {
     }
 
     @Test
-    fun parse_boundaryRelationMatchingPlace_emitsFootprint() {
+    fun parse_boundaryRelationMatchingPlace_emitsFootprint() = runTest {
         val json =
             """
             {"elements":[
@@ -124,7 +149,7 @@ class OverpassStreamParserTest {
     }
 
     @Test
-    fun parse_unmatchedBoundaryRelation_ignored() {
+    fun parse_unmatchedBoundaryRelation_ignored() = runTest {
         val json =
             """
             {"elements":[
@@ -147,7 +172,7 @@ class OverpassStreamParserTest {
     }
 
     @Test
-    fun parse_twoBoundariesForSamePlace_keepsSmallestRadius() {
+    fun parse_twoBoundariesForSamePlace_keepsSmallestRadius() = runTest {
         val json =
             """
             {"elements":[

@@ -60,6 +60,7 @@ import org.osmdroid.config.Configuration
 @Composable
 fun PrepareScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: PrepareViewModel = hiltViewModel()
 ) {
@@ -70,6 +71,7 @@ fun PrepareScreen(
         uiState.downloadUiState == PrepareDownloadUiState.DOWNLOADING ||
             uiState.downloadUiState == PrepareDownloadUiState.ESTIMATING
     var trackDownloadForAutoNavigate by remember { mutableStateOf(false) }
+    var showHelpDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.downloadUiState) {
         if (uiState.downloadUiState == PrepareDownloadUiState.DOWNLOADING ||
@@ -111,19 +113,21 @@ fun PrepareScreen(
             },
             actions = {
                 if (isDownloading) {
-                    Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "More options",
-                        tint = NofARColors.TextSecondary,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
+                    TextButton(onClick = onNavigateToSettings) {
+                        Icon(
+                            imageVector = Icons.Default.MoreVert,
+                            contentDescription = "Settings",
+                            tint = NofARColors.TextSecondary
+                        )
+                    }
                 } else {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Help,
-                        contentDescription = "Help",
-                        tint = NofARColors.TextSecondary,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
+                    TextButton(onClick = { showHelpDialog = true }) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Help,
+                            contentDescription = "Help",
+                            tint = NofARColors.TextSecondary
+                        )
+                    }
                 }
             }
         )
@@ -166,6 +170,29 @@ fun PrepareScreen(
     if (uiState.showWifiOnlyBlocked) {
         WifiOnlyBlockedDialog(onDismiss = viewModel::dismissWifiOnlyBlocked)
     }
+    if (showHelpDialog) {
+        PrepareHelpDialog(onDismiss = { showHelpDialog = false })
+    }
+}
+
+@Composable
+private fun PrepareHelpDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Prepare help") },
+        text = {
+            Text(
+                "Tap the map to place a circular region, adjust the radius, then download " +
+                    "OpenStreetMap places and elevation tiles for offline Explore. " +
+                    "Downloads require a network connection and only run in Prepare mode."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("OK")
+            }
+        }
+    )
 }
 
 @Composable

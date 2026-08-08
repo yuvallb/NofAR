@@ -1,4 +1,4 @@
-@file:Suppress("CyclomaticComplexMethod", "ReturnCount")
+@file:Suppress("CyclomaticComplexMethod", "ReturnCount", "TooManyFunctions")
 
 package com.nofar.core.data.osm
 
@@ -38,13 +38,13 @@ private data class BoundaryMember(val osmType: OsmType, val ref: Long, val geome
  * Streams Overpass JSON elements one-by-one without loading the full response into memory.
  */
 class OverpassStreamParser {
-    fun parse(input: InputStream, onElement: (ParsedOsmElement) -> Unit): Int =
+    suspend fun parse(input: InputStream, onElement: suspend (ParsedOsmElement) -> Unit): Int =
         parse(input, LabelLanguage.DEFAULT, onElement)
 
-    fun parse(
+    suspend fun parse(
         input: InputStream,
         labelLanguage: LabelLanguage,
-        onElement: (ParsedOsmElement) -> Unit,
+        onElement: suspend (ParsedOsmElement) -> Unit,
         onFootprint: (entityId: String, radiusM: Double) -> Unit = { _, _ -> }
     ): Int {
         val reader = input.source().buffer().let { JsonReader.of(it) }
@@ -71,12 +71,12 @@ class OverpassStreamParser {
         return count
     }
 
-    private fun parseElementsArray(
+    private suspend fun parseElementsArray(
         reader: JsonReader,
         labelLanguage: LabelLanguage,
         knownPlaceIds: MutableSet<String>,
         footprintByEntityId: MutableMap<String, Double>,
-        onElement: (ParsedOsmElement) -> Unit
+        onElement: suspend (ParsedOsmElement) -> Unit
     ): Int {
         var count = 0
         reader.beginArray()
@@ -142,6 +142,7 @@ class OverpassStreamParser {
         val canonicalName = OsmNameResolver.resolveCanonicalName(tags) ?: displayName
         val resolvedLat = lat ?: centerLat ?: return emptyList()
         val resolvedLon = lon ?: centerLon ?: return emptyList()
+        if (!isValidCoordinate(resolvedLat, resolvedLon)) return emptyList()
         val elevation = tags["ele"]?.toDoubleOrNull()?.let { kotlin.math.round(it).toInt() }
 
         if (entityType != GeoEntityType.PEAK) {
@@ -220,7 +221,7 @@ class OverpassStreamParser {
                 }
             }
             reader.endObject()
-            if (lat != null && lon != null) {
+            if (lat != null && lon != null && isValidCoordinate(lat, lon)) {
                 points += lat to lon
             }
         }
@@ -269,6 +270,11 @@ class OverpassStreamParser {
         }
         return null
     }
+
+    private fun isValidCoordinate(lat: Double, lon: Double): Boolean = lat.isFinite() &&
+        lon.isFinite() &&
+        lat in -90.0..90.0 &&
+        lon in -180.0..180.0
 
     fun toGeoEntity(element: ParsedOsmElement, seenAt: Instant = Instant.now()): GeoEntity = GeoEntity(
         id = element.entityId,

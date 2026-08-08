@@ -25,6 +25,18 @@ object AppConfig {
     /** Maximum circular region radius (kilometers). */
     const val REGION_RADIUS_MAX_KM: Double = 20.0
 
+    /** Web-mercator-safe latitude clamp for map center (degrees). */
+    const val MAP_CENTER_LAT_MIN: Double = -85.0
+
+    /** Web-mercator-safe latitude clamp for map center (degrees). */
+    const val MAP_CENTER_LAT_MAX: Double = 85.0
+
+    /** Longitude clamp for map center (degrees). */
+    const val MAP_CENTER_LON_MIN: Double = -180.0
+
+    /** Longitude clamp for map center (degrees). */
+    const val MAP_CENTER_LON_MAX: Double = 180.0
+
     /** Default circular region radius for Simple Mode auto-download (meters). */
     const val SIMPLE_MODE_DEFAULT_RADIUS_M: Double = 10_000.0
 
@@ -77,6 +89,15 @@ object AppConfig {
 
     /** Maximum candidate entities passed to the visibility engine per pass. */
     const val VISIBILITY_MAX_CANDIDATES: Int = 100
+
+    /**
+     * When capping candidates, keep up to this many nearest peaks before filling the remainder
+     * with nearest places ([VISIBILITY_MAX_CANDIDATES] total).
+     */
+    const val PEAK_CANDIDATE_BUDGET: Int = 70
+
+    /** Soft budget for a visibility pass (milliseconds); exceeded passes log a warning. */
+    const val VISIBILITY_PASS_BUDGET_MS: Long = 200L
 
     /** GPS altitude is used when vertical accuracy is at or below this threshold (meters). */
     const val GPS_ALTITUDE_ACCURACY_THRESHOLD_METERS: Float = 50f

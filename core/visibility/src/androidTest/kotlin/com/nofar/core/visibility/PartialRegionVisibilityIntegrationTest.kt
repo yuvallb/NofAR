@@ -59,9 +59,9 @@ class PartialRegionVisibilityIntegrationTest {
                 geoEntityRepository = geoEntityRepository,
                 demTileRepository = demTileRepository,
                 tileCoverageDao = database.tileCoverageDao(),
-                demTileDao = database.demTileDao(),
                 visibilityEngine = DemRaycastVisibilityEngine(DefaultDispatchers),
-                observerElevationResolver = ObserverElevationResolver()
+                observerElevationResolver = ObserverElevationResolver(),
+                horizonProfileComputer = HorizonProfileComputer()
             )
     }
 

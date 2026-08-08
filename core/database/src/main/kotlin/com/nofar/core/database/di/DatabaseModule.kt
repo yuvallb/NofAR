@@ -34,8 +34,11 @@ object DatabaseModule {
         NofARDatabase.DATABASE_NAME
     )
         .useBundledSqliteWithRTree()
-        .addMigrations(NofARDatabaseMigrations.MIGRATION_3_4)
-        .fallbackToDestructiveMigration(dropAllTables = true)
+        .addMigrations(
+            NofARDatabaseMigrations.MIGRATION_1_2,
+            NofARDatabaseMigrations.MIGRATION_2_3,
+            NofARDatabaseMigrations.MIGRATION_3_4
+        )
         .setQueryCoroutineContext(Dispatchers.IO)
         .build()
 

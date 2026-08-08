@@ -4,8 +4,6 @@ import com.nofar.core.data.prepare.PrepareDownloadScheduler
 import com.nofar.core.data.prepare.PrepareWorkState
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.usecase.ExploreRegionResolution
-import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
-import com.nofar.core.data.usecase.QuickRegionProposal
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.Region
 import java.util.UUID
@@ -16,53 +14,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+/**
+ * Observes downloads already started from Prepare. Explore must not enqueue network work itself.
+ */
 internal class ExploreDownloadController(
     private val scope: CoroutineScope,
     private val regionRepository: RegionRepository,
-    private val quickRegionDownloadUseCase: QuickRegionDownloadUseCase,
     private val downloadScheduler: PrepareDownloadScheduler,
     private val uiState: MutableStateFlow<ExploreUiState>,
     private val onDownloadComplete: suspend (Region) -> Unit,
     private val onRefreshGate: () -> Unit
 ) {
-    var pendingCellularProposal: QuickRegionProposal? = null
     private var observationJob: Job? = null
-
-    suspend fun startDownload(proposal: QuickRegionProposal) {
-        uiState.update {
-            it.copy(
-                downloadPromptDismissed = false,
-                downloadUiMessage = null,
-                downloadProgressPct = 0
-            )
-        }
-        val result =
-            quickRegionDownloadUseCase.createAndEnqueueAtLocation(
-                centerLat = proposal.centerLat,
-                centerLon = proposal.centerLon,
-                radiusM = proposal.radiusM,
-                name = proposal.name,
-                existingRegionId = proposal.existingRegionId
-            )
-        result
-            .onSuccess { regionId ->
-                val region = regionRepository.getRegion(regionId)
-                if (region != null) {
-                    uiState.update {
-                        it.copy(
-                            regionResolution = ExploreRegionResolution.Downloading(region),
-                            downloadPrompt = null
-                        )
-                    }
-                    observeProgress(regionId)
-                }
-                onRefreshGate()
-            }.onFailure { error ->
-                uiState.update {
-                    it.copy(downloadUiMessage = error.message ?: "Download failed. Try again.")
-                }
-            }
-    }
 
     fun observeProgress(regionId: UUID) {
         observationJob?.cancel()
@@ -149,7 +112,7 @@ internal class ExploreDownloadController(
 
     private fun failDownload() {
         uiState.update {
-            it.copy(downloadUiMessage = "Download failed. Try again.")
+            it.copy(downloadUiMessage = "Download failed. Try again from Prepare.")
         }
         onRefreshGate()
     }

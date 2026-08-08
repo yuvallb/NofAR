@@ -5,10 +5,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 
-const val PREPARE_ROUTE = "prepare"
-const val PREPARE_ROUTE_WITH_ARG = "prepare?regionId={regionId}"
-
-fun NavGraphBuilder.prepareScreen(onNavigateBack: () -> Unit) {
+fun NavGraphBuilder.prepareScreen(onNavigateBack: () -> Unit, onNavigateToSettings: () -> Unit = {}) {
     composable(
         route = PREPARE_ROUTE_WITH_ARG,
         arguments =
@@ -17,9 +14,32 @@ fun NavGraphBuilder.prepareScreen(onNavigateBack: () -> Unit) {
                 type = NavType.StringType
                 nullable = true
                 defaultValue = null
+            },
+            navArgument("centerLat") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+            navArgument("centerLon") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+            navArgument("radiusM") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
+            },
+            navArgument("name") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = null
             }
         )
     ) {
-        PrepareScreen(onNavigateBack = onNavigateBack)
+        PrepareScreen(
+            onNavigateBack = onNavigateBack,
+            onNavigateToSettings = onNavigateToSettings
+        )
     }
 }

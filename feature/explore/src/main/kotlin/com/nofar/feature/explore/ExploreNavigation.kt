@@ -8,6 +8,7 @@ import androidx.navigation.navArgument
 fun NavGraphBuilder.exploreScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToPrepare: (ExplorePrepareNavigation) -> Unit,
     onChangeVirtualLocation: () -> Unit
 ) {
     composable(
@@ -34,6 +35,7 @@ fun NavGraphBuilder.exploreScreen(
         ExploreScreen(
             onNavigateBack = onNavigateBack,
             onNavigateToSettings = onNavigateToSettings,
+            onNavigateToPrepare = onNavigateToPrepare,
             onChangeVirtualLocation = onChangeVirtualLocation
         )
     }

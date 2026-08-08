@@ -31,7 +31,7 @@ import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.AppMetadata
 import com.nofar.core.model.LabelLanguage
-import com.nofar.core.network.OverpassConfig
+import com.nofar.core.model.OverpassMirrors
 import com.nofar.core.ui.LabelLanguageDropdown
 
 internal const val OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright"
@@ -282,13 +282,22 @@ internal fun SettingsLegalSection() {
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
-    OverpassConfig.mirrorBaseUrls.forEach { mirror ->
+    OverpassMirrors.baseUrls.forEach { mirror ->
         Text(
             text = "• $mirror",
             style = MaterialTheme.typography.bodySmall,
             color = NofARColors.TextCaption
         )
     }
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text =
+        "If primary Overpass mirrors are unavailable, Prepare fails over to the next " +
+            "mirror in the list. Each request includes the circular region bounding box " +
+            "(approximate location), not a continuous GPS track.",
+        style = MaterialTheme.typography.bodySmall,
+        color = NofARColors.TextCaption
+    )
     Spacer(modifier = Modifier.height(8.dp))
     Text(
         text =

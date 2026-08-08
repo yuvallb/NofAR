@@ -21,6 +21,10 @@ object NetworkModule {
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
+        // Do not hardcode CertificatePinner pins here: SPKI pins rotate and would break
+        // production downloads. Prefer platform TLS + app network_security_config (cleartext
+        // blocked). Add CertificatePinner only after documenting current pins for Overpass
+        // mirrors and the Copernicus DEM S3 endpoint.
         .build()
 
     @Provides

@@ -6,8 +6,9 @@ import org.junit.Test
 
 class LabelClusteringTest {
     @Test
-    fun distanceFormatter_alwaysUsesKilometersWithOneDecimal() {
-        assertThat(ExploreDistanceFormatter.format(821.0)).isEqualTo("0.8 km")
+    fun distanceFormatter_usesMetersBelowOneKilometer() {
+        assertThat(ExploreDistanceFormatter.format(821.0)).isEqualTo("821 m")
+        assertThat(ExploreDistanceFormatter.format(999.4)).isEqualTo("999 m")
         assertThat(ExploreDistanceFormatter.format(7_500.0)).isEqualTo("7.5 km")
         assertThat(ExploreDistanceFormatter.format(1_000.0)).isEqualTo("1.0 km")
     }

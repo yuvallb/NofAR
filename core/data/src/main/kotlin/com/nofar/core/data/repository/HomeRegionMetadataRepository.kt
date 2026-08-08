@@ -9,7 +9,12 @@ import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
-data class HomeRegionMetadata(val demSizeBytes: Long, val latestDemTimestamp: Instant?, val liveEntityCount: Int = 0)
+data class HomeRegionMetadata(
+    val demSizeBytes: Long,
+    val latestDemTimestamp: Instant?,
+    val liveEntityCount: Int = 0,
+    val tileCount: Int = 0
+)
 
 class HomeRegionMetadataRepository
 @Inject
@@ -36,7 +41,8 @@ constructor(
             return HomeRegionMetadata(
                 demSizeBytes = 0L,
                 latestDemTimestamp = null,
-                liveEntityCount = liveEntityCount
+                liveEntityCount = liveEntityCount,
+                tileCount = 0
             )
         }
         var demSizeBytes = 0L
@@ -51,7 +57,8 @@ constructor(
         return HomeRegionMetadata(
             demSizeBytes = demSizeBytes,
             latestDemTimestamp = latestDemTimestamp,
-            liveEntityCount = liveEntityCount
+            liveEntityCount = liveEntityCount,
+            tileCount = tileIds.size
         )
     }
 }

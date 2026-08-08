@@ -5,15 +5,12 @@ package com.nofar.feature.explore
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nofar.core.data.network.NetworkConnectivityMonitor
 import com.nofar.core.data.preferences.UserPreferencesRepository
-import com.nofar.core.data.prepare.DownloadPolicy
 import com.nofar.core.data.prepare.PrepareDownloadScheduler
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.usecase.ExploreRegionResolution
 import com.nofar.core.data.usecase.ExploreRegionResolver
 import com.nofar.core.data.usecase.InsideRegionUseCase
-import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
 import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
 import com.nofar.core.designsystem.component.HorizonOutlinePoint
 import com.nofar.core.location.LocationController
@@ -46,7 +43,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -69,9 +65,7 @@ constructor(
     private val regionCoverageRepairUseCase: RegionCoverageRepairUseCase,
     private val insideRegionUseCase: InsideRegionUseCase,
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val quickRegionDownloadUseCase: QuickRegionDownloadUseCase,
-    private val downloadScheduler: PrepareDownloadScheduler,
-    private val networkConnectivityMonitor: NetworkConnectivityMonitor
+    private val downloadScheduler: PrepareDownloadScheduler
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ExploreUiState())
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
@@ -102,7 +96,6 @@ constructor(
         ExploreDownloadController(
             scope = viewModelScope,
             regionRepository = regionRepository,
-            quickRegionDownloadUseCase = quickRegionDownloadUseCase,
             downloadScheduler = downloadScheduler,
             uiState = _uiState,
             onDownloadComplete = { region -> applyActiveRegions(listOf(region)) },
@@ -141,7 +134,10 @@ constructor(
         val observerFlow =
             virtualObserverLocation?.let { location -> flowOf(location) }
                 ?: locationRepository.locationFlow
-        visibilityPassScheduler.configureObserverLocation(observerFlow)
+        visibilityPassScheduler.configureObserverLocation(
+            observerFlow = observerFlow,
+            periodicRefresh = virtualObserverLocation != null
+        )
     }
 
     fun onLocationPermissionChanged(accessState: LocationAccessState) {
@@ -204,49 +200,27 @@ constructor(
 
     fun onDownloadRegionConfirmed() {
         val proposal = _uiState.value.downloadPrompt ?: return
-        if (!networkConnectivityMonitor.isNetworkAvailable()) {
-            _uiState.update {
-                it.copy(downloadUiMessage = "No network connection. Connect to Wi-Fi or mobile data to download.")
-            }
-            return
+        // Offline Explore constraint: Prepare owns all network downloads.
+        _uiState.update {
+            it.copy(
+                navigateToPrepare = ExplorePrepareNavigation.fromProposal(proposal),
+                showCellularWarning = false,
+                showWifiOnlyBlocked = false
+            )
         }
-        viewModelScope.launch {
-            val wifiOnly = userPreferencesRepository.wifiOnlyDownloads.first()
-            val onCellular = networkConnectivityMonitor.isCellularNetwork()
-            when (
-                val gate =
-                    DownloadPolicy.evaluateStart(
-                        networkAvailable = true,
-                        wifiOnlyDownloads = wifiOnly,
-                        onCellularNetwork = onCellular,
-                        estimateBytes = proposal.estimateBytes
-                    )
-            ) {
-                is DownloadPolicy.GateResult.Blocked -> {
-                    if (wifiOnly && onCellular) {
-                        _uiState.update { it.copy(showWifiOnlyBlocked = true) }
-                    } else {
-                        _uiState.update { it.copy(downloadUiMessage = gate.message) }
-                    }
-                }
-                DownloadPolicy.GateResult.CellularWarning -> {
-                    downloadController.pendingCellularProposal = proposal
-                    _uiState.update { it.copy(showCellularWarning = true) }
-                }
-                DownloadPolicy.GateResult.Proceed -> downloadController.startDownload(proposal)
-            }
-        }
+    }
+
+    fun onPrepareNavigationHandled() {
+        _uiState.update { it.copy(navigateToPrepare = null) }
     }
 
     fun confirmCellularDownload() {
-        val proposal = downloadController.pendingCellularProposal ?: _uiState.value.downloadPrompt ?: return
-        downloadController.pendingCellularProposal = null
+        // Legacy path: cellular confirmation now also routes to Prepare.
         _uiState.update { it.copy(showCellularWarning = false) }
-        viewModelScope.launch { downloadController.startDownload(proposal) }
+        onDownloadRegionConfirmed()
     }
 
     fun dismissCellularWarning() {
-        downloadController.pendingCellularProposal = null
         _uiState.update { it.copy(showCellularWarning = false) }
     }
 
@@ -277,6 +251,8 @@ constructor(
         viewModelScope.launch {
             userPreferencesRepository.showHorizonOutline.collect { enabled ->
                 _uiState.update { it.copy(showHorizonOutline = enabled) }
+                // Preference gates the sweep inside the visibility pass — reproject alone is not enough.
+                visibilityPassScheduler.requestPass(force = true)
                 reprojectOverlay()
             }
         }

@@ -19,7 +19,6 @@ android {
 dependencies {
     implementation(project(":core:model"))
     implementation(project(":core:data"))
-    implementation(project(":core:network"))
     testImplementation(libs.junit)
     testImplementation(libs.truth)
     testImplementation(libs.kotlinx.coroutines.test)

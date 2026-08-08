@@ -43,6 +43,7 @@ import com.nofar.feature.explore.BuildConfig
 fun ExploreScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToPrepare: (ExplorePrepareNavigation) -> Unit,
     onChangeVirtualLocation: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ExploreViewModel = hiltViewModel()
@@ -50,6 +51,13 @@ fun ExploreScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val permissionState = rememberNofARPermissionState()
     ExplorePermissionEffects(permissionState = permissionState, viewModel = viewModel)
+
+    LaunchedEffect(uiState.navigateToPrepare) {
+        uiState.navigateToPrepare?.let { target ->
+            onNavigateToPrepare(target)
+            viewModel.onPrepareNavigationHandled()
+        }
+    }
 
     ExploreScreenRoot(
         modifier = modifier,

@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.nofar.core.data.network.NetworkConnectivityMonitor
 import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.prepare.DownloadPolicy
+import com.nofar.core.data.prepare.PrepareDownloadError
 import com.nofar.core.data.prepare.PrepareDownloadOrchestrator
 import com.nofar.core.data.prepare.PrepareDownloadScheduler
 import com.nofar.core.data.prepare.PrepareEstimator
@@ -15,6 +16,7 @@ import com.nofar.core.data.prepare.PreparePhase
 import com.nofar.core.data.prepare.PrepareProgress
 import com.nofar.core.data.prepare.PrepareWorkState
 import com.nofar.core.data.prepare.RegionNamePolicy
+import com.nofar.core.data.repository.HomeRegionMetadataRepository
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
 import com.nofar.core.location.LocationController
@@ -83,6 +85,7 @@ class PrepareViewModel
 @Inject
 constructor(
     private val regionRepository: RegionRepository,
+    private val metadataRepository: HomeRegionMetadataRepository,
     private val quickRegionDownloadUseCase: QuickRegionDownloadUseCase,
     private val downloadScheduler: PrepareDownloadScheduler,
     private val orchestrator: PrepareDownloadOrchestrator,
@@ -107,17 +110,20 @@ constructor(
             hasSetInitialLocation = true
         }
         if (!editingExistingRegion) {
+            applyProposedRegionFromArgs(savedStateHandle)
             viewModelScope.launch {
                 val preferredLanguage = downloadPreferences.preferredLabelLanguage.first()
                 _uiState.update { it.copy(labelLanguage = preferredLanguage, labelLanguageLocked = false) }
-                locationRepository.lastLocation?.let { location ->
-                    setRegionCenter(
-                        lat = location.latitude,
-                        lon = location.longitude,
-                        recenterMap = true,
-                        suggestName = true
-                    )
-                    hasSetInitialLocation = true
+                if (!hasSetInitialLocation) {
+                    locationRepository.lastLocation?.let { location ->
+                        setRegionCenter(
+                            lat = location.latitude,
+                            lon = location.longitude,
+                            recenterMap = true,
+                            suggestName = true
+                        )
+                        hasSetInitialLocation = true
+                    }
                 }
                 locationRepository.locationFlow.collect { location ->
                     if (pendingRecenterOnLocation || !hasSetInitialLocation) {
@@ -145,6 +151,27 @@ constructor(
                 pollDownloadProgressFromDb()
             }
         }
+    }
+
+    private fun applyProposedRegionFromArgs(savedStateHandle: SavedStateHandle) {
+        val centerLat = PrepareRouteBuilder.parseDouble(savedStateHandle.get("centerLat"))
+        val centerLon = PrepareRouteBuilder.parseDouble(savedStateHandle.get("centerLon"))
+        if (centerLat == null || centerLon == null) return
+        val radiusM = PrepareRouteBuilder.parseDouble(savedStateHandle.get("radiusM"))
+        val name = PrepareRouteBuilder.parseName(savedStateHandle.get("name"))
+        setRegionCenter(
+            lat = centerLat,
+            lon = centerLon,
+            recenterMap = true,
+            suggestName = name.isNullOrBlank()
+        )
+        if (!name.isNullOrBlank()) {
+            _uiState.update { it.copy(regionName = name.take(40)) }
+        }
+        if (radiusM != null) {
+            onRadiusChanged(radiusM / 1000.0)
+        }
+        hasSetInitialLocation = true
     }
 
     private fun observeDownloadedRegions() {
@@ -265,16 +292,18 @@ constructor(
     }
 
     private fun setRegionCenter(lat: Double, lon: Double, recenterMap: Boolean, suggestName: Boolean) {
+        val clampedLat = lat.coerceIn(AppConfig.MAP_CENTER_LAT_MIN, AppConfig.MAP_CENTER_LAT_MAX)
+        val clampedLon = lon.coerceIn(AppConfig.MAP_CENTER_LON_MIN, AppConfig.MAP_CENTER_LON_MAX)
         _uiState.update {
             val name =
                 if (suggestName && it.regionName.isBlank()) {
-                    "Region near ${"%.2f".format(lat)}, ${"%.2f".format(lon)}"
+                    "Region near ${"%.2f".format(clampedLat)}, ${"%.2f".format(clampedLon)}"
                 } else {
                     it.regionName
                 }
             it.copy(
-                centerLat = lat,
-                centerLon = lon,
+                centerLat = clampedLat,
+                centerLon = clampedLon,
                 regionName = name,
                 mapRecenterNonce = if (recenterMap) it.mapRecenterNonce + 1 else it.mapRecenterNonce,
                 waitingForGpsFix = false,
@@ -343,7 +372,7 @@ constructor(
             _uiState.update {
                 it.copy(
                     downloadUiState = PrepareDownloadUiState.ERROR,
-                    errorMessage = "No network connection. Connect to Wi-Fi or mobile data to download."
+                    errorMessage = PrepareDownloadError.NoNetwork.toUserMessage()
                 )
             }
             return
@@ -399,12 +428,20 @@ constructor(
         orchestrator.cancel()
         viewModelScope.launch {
             val region = regionRepository.getRegion(regionId)
+            // Query coverage without region geometry so we only count linked tiles, not expected ones.
+            val metadata = metadataRepository.getMetadata(regionId)
             val status =
-                when (region?.downloadStatus) {
-                    DownloadStatus.READY, DownloadStatus.PARTIAL -> DownloadStatus.PARTIAL
-                    else -> DownloadStatus.NOT_DOWNLOADED
-                }
-            regionRepository.updateDownloadStatus(regionId, status, _uiState.value.progress?.overallPercent ?: 0)
+                PrepareCancelStatus.resolve(
+                    region = region,
+                    progress = _uiState.value.progress,
+                    hasTileCoverage = metadata.tileCount > 0,
+                    liveEntityCount = metadata.liveEntityCount
+                )
+            regionRepository.updateDownloadStatus(
+                regionId,
+                status,
+                _uiState.value.progress?.overallPercent ?: 0
+            )
             _uiState.update {
                 it.copy(
                     downloadUiState = PrepareDownloadUiState.PAUSED,
@@ -497,22 +534,33 @@ constructor(
                     regionId = region.id,
                     existingRegion = region,
                     regionName = region.name,
-                    centerLat = region.centerLat,
-                    centerLon = region.centerLon,
-                    radiusKm = region.radiusM / 1000.0,
+                    centerLat =
+                    region.centerLat.coerceIn(AppConfig.MAP_CENTER_LAT_MIN, AppConfig.MAP_CENTER_LAT_MAX),
+                    centerLon =
+                    region.centerLon.coerceIn(AppConfig.MAP_CENTER_LON_MIN, AppConfig.MAP_CENTER_LON_MAX),
+                    radiusKm =
+                    (region.radiusM / 1000.0).coerceIn(
+                        AppConfig.REGION_RADIUS_MIN_KM,
+                        AppConfig.REGION_RADIUS_MAX_KM
+                    ),
                     estimateBytes = region.estimatedSizeBytes,
                     labelLanguage = preferredLanguage,
                     labelLanguageLocked = region.downloadStatus == DownloadStatus.DOWNLOADING,
                     downloadUiState =
                     when (region.downloadStatus) {
-                        DownloadStatus.READY -> PrepareDownloadUiState.COMPLETE
+                        DownloadStatus.READY, DownloadStatus.PARTIAL -> PrepareDownloadUiState.COMPLETE
                         DownloadStatus.DOWNLOADING -> PrepareDownloadUiState.DOWNLOADING
-                        DownloadStatus.PARTIAL -> PrepareDownloadUiState.ERROR
                         DownloadStatus.NOT_DOWNLOADED -> PrepareDownloadUiState.IDLE
+                    },
+                    errorMessage =
+                    if (region.downloadStatus == DownloadStatus.PARTIAL) {
+                        "Download complete with partial DEM or elevation coverage. Retry to fill gaps."
+                    } else {
+                        null
                     },
                     step =
                     when (region.downloadStatus) {
-                        DownloadStatus.READY -> PrepareStep.COMPLETE
+                        DownloadStatus.READY, DownloadStatus.PARTIAL -> PrepareStep.COMPLETE
                         DownloadStatus.DOWNLOADING -> PrepareStep.DOWNLOAD
                         else -> PrepareStep.ESTIMATE
                     },
@@ -548,16 +596,21 @@ constructor(
                 val region = regionRepository.getRegion(regionId)
                 when (region?.downloadStatus) {
                     DownloadStatus.READY, DownloadStatus.PARTIAL -> markDownloadComplete(region)
-                    else ->
+                    else -> {
+                        val typed =
+                            orchestrator.lastError.value
+                                ?: PrepareDownloadError.Unknown("Download failed. You can retry to continue.")
                         _uiState.update {
                             it.copy(
                                 downloadUiState = PrepareDownloadUiState.ERROR,
                                 step = PrepareStep.ESTIMATE,
-                                errorMessage = "Download failed. You can retry to continue.",
+                                errorMessage = typed.toUserMessage(),
                                 existingRegion = region,
                                 progress = null
                             )
                         }
+                        orchestrator.clearLastError()
+                    }
                 }
             }
             PrepareWorkState.CANCELLED -> {

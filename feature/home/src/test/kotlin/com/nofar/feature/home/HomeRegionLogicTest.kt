@@ -148,7 +148,7 @@ class HomeRegionLogicTest {
     }
 
     @Test
-    fun resolveExploreNavigation_multipleRegions_navigatesToNewest() {
+    fun resolveExploreNavigation_multipleRegions_showsPickerSortedByUpdatedAt() {
         val older = sampleRegion(updatedAt = Instant.parse("2024-01-01T00:00:00Z"))
         val newer =
             sampleRegion(
@@ -156,7 +156,18 @@ class HomeRegionLogicTest {
                 updatedAt = Instant.parse("2024-06-01T00:00:00Z")
             )
         val decision = HomeRegionLogic.resolveExploreNavigation(listOf(older, newer))
-        assertEquals(ExploreNavigationDecision.Direct(newer.id), decision)
+        assertEquals(
+            ExploreNavigationDecision.Pick(listOf(newer, older)),
+            decision
+        )
+    }
+
+    @Test
+    fun resolveExploreNavigation_empty_isDisabled() {
+        assertEquals(
+            ExploreNavigationDecision.Disabled,
+            HomeRegionLogic.resolveExploreNavigation(emptyList())
+        )
     }
 
     private fun sampleRegion(

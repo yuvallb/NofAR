@@ -14,8 +14,9 @@ fun interface DemSampler {
 /**
  * Multi-tile elevation lookup for ray-marching. Selects the correct [DemTileReader] by lat/lon.
  *
- * **No-data handling:** samples with no elevation (missing tile or no-data pixel) are skipped
- * during occlusion checks — they do not block line of sight.
+ * **No-data handling:** [elevationAt] returns null for missing tiles or no-data pixels.
+ * Callers that march terrain (e.g. [TerrainRayMarcher]) treat null as blocking / not visible
+ * (fail closed).
  */
 class DemElevationSampler(demReaders: Map<String, DemTileReader>) : DemSampler {
     private val readersByOrigin: Map<Pair<Int, Int>, DemTileReader> =

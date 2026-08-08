@@ -58,7 +58,7 @@ constructor(
                         )
                     }
                 }.onFailure { error ->
-                    Log.w(TAG, "Failed to register DEM tile $tileId from ${binFile.absolutePath}", error)
+                    Log.w(TAG, "Failed to register DEM tile $tileId from bin", error)
                 }.isSuccess
         }
     }
@@ -66,7 +66,7 @@ constructor(
     override fun openReader(tileId: String): DemTileReader? {
         val file = demFile(tileId)
         if (!file.exists()) {
-            Log.w(TAG, "DEM bin missing for tile $tileId at ${file.absolutePath}")
+            Log.w(TAG, "DEM bin missing for tile $tileId")
             return null
         }
         return runCatching { DemTileReader.open(file) }.getOrElse { error ->
@@ -103,9 +103,25 @@ constructor(
     override suspend fun getAllLruCandidates(): List<DemTile> =
         demTileDao.getAllLruCandidates().map { it.asExternalModel() }
 
-    fun demFile(tileId: String): File = File(demDirectory, DemTileId.binFileName(tileId))
+    fun demFile(tileId: String): File {
+        requireValidTileId(tileId)
+        val file = File(demDirectory, DemTileId.binFileName(tileId))
+        val canonicalDem = demDirectory.canonicalFile
+        val canonicalFile = file.canonicalFile
+        require(canonicalFile.path.startsWith(canonicalDem.path + File.separator) || canonicalFile == canonicalDem) {
+            "DEM path escapes dem directory for tile $tileId"
+        }
+        return file
+    }
 
-    fun demFilePath(tileId: String): String = "dem/${DemTileId.binFileName(tileId)}"
+    fun demFilePath(tileId: String): String {
+        requireValidTileId(tileId)
+        return "dem/${DemTileId.binFileName(tileId)}"
+    }
+
+    private fun requireValidTileId(tileId: String) {
+        require(DemTileId.parse(tileId) != null) { "Invalid DEM tile id: $tileId" }
+    }
 
     companion object {
         private const val TAG = "DefaultDemTileRepository"

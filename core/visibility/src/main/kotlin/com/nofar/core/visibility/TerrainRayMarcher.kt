@@ -13,6 +13,9 @@ class TerrainRayMarcher {
 
     /**
      * Returns true when no terrain sample along the profile blocks the sight line to the target.
+     *
+     * Missing DEM samples along the ray (excluding endpoints) fail closed: the target is treated as
+     * not visible rather than assuming clear line of sight through unknown terrain.
      */
     fun isTargetVisible(
         observerLat: Double,
@@ -23,7 +26,7 @@ class TerrainRayMarcher {
         observerEyeM: Double,
         targetElevationM: Double,
         rayStepM: Double,
-        sampler: DemElevationSampler
+        sampler: DemSampler
     ): Boolean {
         if (totalDistanceM <= 0.0) return true
 
@@ -43,7 +46,9 @@ class TerrainRayMarcher {
         return (1 until sampleCount - 1).none { index ->
             val distance = sampleDistances[index]
             val terrainElevation =
-                sampler.elevationAt(sampleLats[index], sampleLons[index])?.toDouble() ?: return@none false
+                sampler.elevationAt(sampleLats[index], sampleLons[index])?.toDouble()
+                    // Fail closed: missing DEM counts as a blocker → none returns false → not visible.
+                    ?: return@none true
             val sightLineHeight =
                 observerEyeM + (targetElevationM - observerEyeM) * (distance / totalDistanceM)
             val bulge =
