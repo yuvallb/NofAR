@@ -2,10 +2,9 @@ package com.nofar.core.database.dao
 
 import androidx.room.Dao
 import androidx.room.Delete
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import com.nofar.core.database.model.RegionEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -20,7 +19,11 @@ interface RegionDao {
     @Query("SELECT * FROM region ORDER BY updated_at DESC")
     suspend fun getAll(): List<RegionEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /**
+     * Insert-or-update in place. Do not use OnConflictStrategy.REPLACE: that deletes the
+     * row and re-inserts it, which CASCADE-deletes region_entity_coverage / tile_coverage.
+     */
+    @Upsert
     suspend fun upsert(region: RegionEntity): Long
 
     @Update
@@ -47,11 +50,20 @@ interface RegionDao {
         UPDATE region SET
             download_status = :status,
             download_progress_pct = :progressPct,
+            osm_dataset_version = COALESCE(:osmDatasetVersion, osm_dataset_version),
+            entity_count = COALESCE(:entityCount, entity_count),
             updated_at = :updatedAt
         WHERE id = :regionId
         """
     )
-    suspend fun updateDownloadStatus(regionId: String, status: String, progressPct: Int, updatedAt: Long): Int
+    suspend fun updateDownloadStatus(
+        regionId: String,
+        status: String,
+        progressPct: Int,
+        updatedAt: Long,
+        osmDatasetVersion: Long? = null,
+        entityCount: Int? = null
+    ): Int
 
     @Query(
         """

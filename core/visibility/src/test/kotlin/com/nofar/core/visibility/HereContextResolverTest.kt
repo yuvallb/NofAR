@@ -219,7 +219,7 @@ class HereContextResolverTest {
         type = GeoEntityType.PEAK,
         lat = lat,
         lon = lon,
-        elevation = 900.0,
+        elevation = 900,
         elevationSource = ElevationSource.OSM_TAG,
         lastSeenAt = Instant.EPOCH,
         footprintRadiusM = null

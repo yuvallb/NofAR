@@ -1,9 +1,8 @@
 package com.nofar.core.database.dao
 
 import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Upsert
 import com.nofar.core.database.model.DemTileEntity
 
 @Dao
@@ -14,7 +13,11 @@ interface DemTileDao {
     @Query("SELECT * FROM dem_tile WHERE tile_id IN (:tileIds)")
     suspend fun getByIds(tileIds: List<String>): List<DemTileEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    /**
+     * Insert-or-update in place. OnConflictStrategy.REPLACE would CASCADE-delete
+     * tile_coverage rows that reference this tile.
+     */
+    @Upsert
     suspend fun upsert(tile: DemTileEntity): Long
 
     @Query("UPDATE dem_tile SET ref_count = ref_count + 1 WHERE tile_id = :tileId")

@@ -36,7 +36,7 @@ interface GeoEntityDao {
         type: String,
         lat: Double,
         lon: Double,
-        elevation: Double?,
+        elevation: Int?,
         elevationSource: String?,
         lastSeenAt: Long,
         footprintRadiusM: Double?

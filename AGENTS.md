@@ -131,6 +131,26 @@ These are non-negotiable for MVP — do not introduce alternatives without expli
 
 ---
 
+## Device access (adb) and DB dumps
+
+- **Do not run `adb` (or equivalent device/emulator shell commands) unless you have both a written justification and explicit user permission** for that specific use. Prefer code inspection, unit tests, and any artifacts the user already provided.
+- **Do not pull, copy, or create on-device / app-database dumps unless the user explicitly approves.** When a dump would help, ask first with:
+  1. **Why** you need it (what hypothesis it would confirm or rule out).
+  2. **What** you need (e.g. `geo_entity` elevation columns, DEM tile metadata — not a blanket full-disk pull).
+  3. **How** the developer can produce it themselves if they prefer, with concrete commands, for example:
+
+```bash
+# List devices (developer-run)
+adb devices
+
+# Example: export the Room DB from a debug install (also copy -wal/-shm if present)
+adb exec-out run-as com.nofar.app cat databases/nofar.db > nofar.db
+```
+
+- Treat any provided DB dump as sensitive local data: do not commit it, and do not broaden the ask beyond the justified tables/columns.
+
+---
+
 ## What not to do
 
 - Do not commit secrets (API keys, `local.properties`, credentials).
@@ -140,6 +160,7 @@ These are non-negotiable for MVP — do not introduce alternatives without expli
 - Do not make feature modules depend on each other.
 - Do not create git commits or open PRs unless the user explicitly asks.
 - Do not edit `internal/Requirements.md` or phase docs unless the user requests spec changes.
+- Do not run adb or request/create DB dumps without justification and explicit user permission (see **Device access (adb) and DB dumps**).
 
 ---
 

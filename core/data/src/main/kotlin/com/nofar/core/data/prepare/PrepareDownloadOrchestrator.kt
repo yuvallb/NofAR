@@ -10,6 +10,7 @@
 package com.nofar.core.data.prepare
 
 import android.content.Context
+import android.util.Log
 import com.nofar.core.data.dem.DefaultGeoTiffConverter
 import com.nofar.core.data.dem.DemTileReader
 import com.nofar.core.data.dem.GeoTiffConversionResult
@@ -24,6 +25,7 @@ import com.nofar.core.database.dao.CoverageLinker
 import com.nofar.core.database.dao.RegionEntityCoverageDao
 import com.nofar.core.database.dao.TileCoverageDao
 import com.nofar.core.database.model.TileCoverageEntity
+import com.nofar.core.database.model.asEntity
 import com.nofar.core.model.DemTile
 import com.nofar.core.model.DemTileId
 import com.nofar.core.model.DownloadStatus
@@ -152,7 +154,6 @@ constructor(
             }
             overpassResponse.body.use { stream ->
                 val parsedEntities = mutableListOf<com.nofar.core.data.osm.ParsedOsmElement>()
-                val linkedEntities = mutableListOf<Pair<String, String>>()
                 val footprintByEntityId = mutableMapOf<String, Double>()
                 entityCount =
                     overpassStreamParser.parse(
@@ -183,8 +184,13 @@ constructor(
                         overpassStreamParser.toGeoEntity(element).copy(
                             footprintRadiusM = footprintByEntityId[element.entityId]
                         )
-                    geoEntityRepository.upsert(geoEntity)
-                    linkedEntities.add(geoEntity.id to element.name)
+                    // Upsert+link in one transaction so concurrent Home/Explore work cannot
+                    // orphan the row before coverage is written (FK constraint failure).
+                    coverageLinker.upsertAndLinkEntity(
+                        regionId = regionId.toString(),
+                        entity = geoEntity.asEntity(),
+                        displayName = element.name
+                    )
                     if ((index + 1) % 50 == 0 || index + 1 == entityCount) {
                         val ingestPct =
                             if (entityCount > 0) {
@@ -198,9 +204,6 @@ constructor(
                             message = "Saving OpenStreetMap features (${index + 1}/$entityCount)…"
                         )
                     }
-                }
-                if (linkedEntities.isNotEmpty()) {
-                    coverageLinker.linkEntities(regionId.toString(), linkedEntities)
                 }
             }
             val coverageCount = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString()).size
@@ -294,6 +297,7 @@ constructor(
                     persistProgress(completedPct)
                 } catch (error: Exception) {
                     demFailures++
+                    Log.w(TAG, "DEM tile failed for $tileId", error)
                     tifFile.delete()
                 }
             }
@@ -315,6 +319,8 @@ constructor(
                     message = "Filling elevations ($processed/$total)…"
                 )
             }
+            // Drop entities left without coverage after re-download (Requirements §5.3).
+            geoEntityRepository.garbageCollectOrphans()
             updateProgress(PreparePhase.POST_PROCESSING, 100, message = "Finalizing…")
 
             val terminalStatus =
@@ -334,6 +340,7 @@ constructor(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
+            Log.e(TAG, "Prepare download failed for region $regionId", error)
             val status =
                 if (entityCount > 0 || demFailures > 0) DownloadStatus.PARTIAL else DownloadStatus.NOT_DOWNLOADED
             regionRepository.updateDownloadStatus(regionId, status, progressPct = _progress.value?.overallPercent ?: 0)
@@ -476,4 +483,8 @@ constructor(
 
     private val demDirectory: File
         get() = File(context.filesDir, "dem/raw").also { it.mkdirs() }
+
+    companion object {
+        private const val TAG = "PrepareDownload"
+    }
 }

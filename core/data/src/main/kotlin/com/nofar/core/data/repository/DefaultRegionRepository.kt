@@ -46,16 +46,14 @@ constructor(private val regionDao: RegionDao) : RegionRepository {
         osmDatasetVersion: java.time.Instant?,
         entityCount: Int?
     ) {
-        val existing = regionDao.getById(id.toString()) ?: return
-        val updated =
-            existing.copy(
-                downloadStatus = status.name,
-                downloadProgressPct = progressPct,
-                osmDatasetVersion = osmDatasetVersion?.toEpochMilli() ?: existing.osmDatasetVersion,
-                entityCount = entityCount ?: existing.entityCount,
-                updatedAt = java.time.Instant.now().toEpochMilli()
-            )
-        regionDao.upsert(updated)
+        regionDao.updateDownloadStatus(
+            regionId = id.toString(),
+            status = status.name,
+            progressPct = progressPct,
+            updatedAt = java.time.Instant.now().toEpochMilli(),
+            osmDatasetVersion = osmDatasetVersion?.toEpochMilli(),
+            entityCount = entityCount
+        )
     }
 
     override suspend fun hasActiveDownload(): Boolean =

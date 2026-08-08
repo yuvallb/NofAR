@@ -136,7 +136,7 @@ class RegionDeletionUseCaseTest {
                 type = "PEAK",
                 lat = 32.0,
                 lon = 35.0,
-                elevation = 100.0,
+                elevation = 100,
                 elevationSource = "OSM_TAG",
                 lastSeenAt = 0
             )

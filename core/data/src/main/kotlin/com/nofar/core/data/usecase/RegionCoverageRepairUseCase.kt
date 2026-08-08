@@ -1,6 +1,7 @@
 package com.nofar.core.data.usecase
 
 import com.nofar.core.data.dem.RegionDemTileResolver
+import com.nofar.core.data.prepare.MissingEntityElevationFiller
 import com.nofar.core.data.repository.DemTileRepository
 import com.nofar.core.database.GeoEntitySpatialQuery
 import com.nofar.core.database.RTreeMaintenance
@@ -17,7 +18,11 @@ import javax.inject.Inject
 
 /**
  * Repairs missing junction-table rows left by earlier downloads where entities or DEM tiles
- * were persisted but coverage links were not written.
+ * were persisted but coverage links were not written, and backfills entity elevations from
+ * DEM when OSM `ele` was absent.
+ *
+ * Does **not** run orphan GC: that must not run while another region download is upserting
+ * entities that are not yet coverage-linked (FOREIGN KEY failures / data loss).
  */
 class RegionCoverageRepairUseCase
 @Inject
@@ -28,7 +33,8 @@ constructor(
     private val demTileDao: DemTileDao,
     private val demTileRepository: DemTileRepository,
     private val coverageLinker: CoverageLinker,
-    private val spatialQuery: GeoEntitySpatialQuery
+    private val spatialQuery: GeoEntitySpatialQuery,
+    private val elevationFiller: MissingEntityElevationFiller
 ) {
     suspend fun repairIfNeeded(region: Region) {
         rTreeMaintenance.backfillMissingEntriesIfNeeded()
@@ -37,6 +43,7 @@ constructor(
         }
         repairEntityCoverage(region)
         repairTileCoverage(region)
+        fillMissingElevations(region)
     }
 
     private suspend fun repairEntityCoverage(region: Region) {
@@ -73,6 +80,12 @@ constructor(
                 demTileRepository.incrementRefCount(tileId)
             }
         }
+    }
+
+    private suspend fun fillMissingElevations(region: Region) {
+        val entityIds = regionEntityCoverageDao.getEntityIdsForRegion(region.id.toString())
+        if (entityIds.isEmpty()) return
+        elevationFiller.fill(entityIds, refreshDemSamples = false)
     }
 
     private suspend fun registerIntersectingBins(region: Region) {

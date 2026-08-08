@@ -732,7 +732,7 @@ constructor(
     private fun exploreHereUiFrom(hereContext: HereContext): ExploreHereUi = ExploreHereUi(
         placeName = hereContext.place?.name,
         peakName = hereContext.peak?.name,
-        peakElevationM = hereContext.peak?.elevation?.toInt()
+        peakElevationM = hereContext.peak?.elevation
     )
 
     companion object {

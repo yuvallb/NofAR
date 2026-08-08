@@ -103,7 +103,7 @@ class PartialRegionVisibilityIntegrationTest {
                 type = GeoEntityType.PEAK.name,
                 lat = 32.05,
                 lon = 35.05,
-                elevation = 500.0,
+                elevation = 500,
                 elevationSource = "OSM_TAG",
                 lastSeenAt = now
             )
@@ -172,7 +172,7 @@ class PartialRegionVisibilityIntegrationTest {
                 type = GeoEntityType.PEAK.name,
                 lat = 32.05,
                 lon = 35.05,
-                elevation = 500.0,
+                elevation = 500,
                 elevationSource = "OSM_TAG",
                 lastSeenAt = now
             )

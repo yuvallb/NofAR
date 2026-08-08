@@ -92,10 +92,10 @@ constructor(private val dispatchers: DispatcherProvider) :
         targetLon: Double
     ): Double {
         candidate.entity.elevation?.let { elevation ->
-            if (candidate.entity.footprintRadiusM == null) return elevation
+            if (candidate.entity.footprintRadiusM == null) return elevation.toDouble()
         }
         return sampler.elevationAt(targetLat, targetLon)?.toDouble()
-            ?: candidate.entity.elevation
+            ?: candidate.entity.elevation?.toDouble()
             ?: 0.0
     }
 }

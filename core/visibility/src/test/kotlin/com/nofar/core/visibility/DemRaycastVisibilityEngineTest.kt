@@ -25,7 +25,7 @@ class DemRaycastVisibilityEngineTest {
         val reader = VisibilityTestDem.writeFlatTile(tempDir, tileLat, tileLon, elevationM = 100f)
         val demReaders = singleTileReaders(reader, tileLat, tileLon)
         val engine = DemRaycastVisibilityEngine(DefaultDispatchers)
-        val visiblePeak = sampleEntity("visible", tileLat + 0.55, tileLon + 0.55, 150.0)
+        val visiblePeak = sampleEntity("visible", tileLat + 0.55, tileLon + 0.55, 150)
         val observerLat = tileLat + 0.5
         val observerLon = tileLon + 0.5
 
@@ -64,7 +64,7 @@ class DemRaycastVisibilityEngineTest {
                 tileLon
             )
         val engine = DemRaycastVisibilityEngine(DefaultDispatchers)
-        val hiddenPeak = sampleEntity("hidden", tileLat + 0.58, tileLon + 0.58, 350.0)
+        val hiddenPeak = sampleEntity("hidden", tileLat + 0.58, tileLon + 0.58, 350)
         val observerLat = tileLat + 0.5
         val observerLon = tileLon + 0.5
 
@@ -116,7 +116,7 @@ class DemRaycastVisibilityEngineTest {
         )
 }
 
-private fun sampleEntity(id: String, lat: Double, lon: Double, elevation: Double): com.nofar.core.model.GeoEntity =
+private fun sampleEntity(id: String, lat: Double, lon: Double, elevation: Int): com.nofar.core.model.GeoEntity =
     com.nofar.core.model.GeoEntity(
         id = id,
         osmType = com.nofar.core.model.OsmType.NODE,

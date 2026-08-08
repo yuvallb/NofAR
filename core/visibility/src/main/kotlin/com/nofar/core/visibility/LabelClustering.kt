@@ -481,7 +481,7 @@ object ExploreLabelRenderer {
         entityId = entity.entity.id,
         name = entity.entity.name,
         isPeak = entity.entity.type == GeoEntityType.PEAK,
-        elevationM = entity.entity.elevation?.toInt(),
+        elevationM = entity.entity.elevation,
         distanceM = entity.nearEdgeDistanceM,
         distanceDisplay = ExploreDistanceFormatter.format(entity.nearEdgeDistanceM),
         terrainAnchorXPx = anchorXPx,

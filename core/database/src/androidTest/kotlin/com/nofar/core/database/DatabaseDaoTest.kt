@@ -57,6 +57,60 @@ class RegionDaoTest {
         assertThat(fixtures.regionDao.getAll().map { it.name }).containsExactly("Newer", "Older").inOrder()
     }
 
+    @Test
+    fun upsert_preservesEntityAndTileCoverage() = runTest {
+        val region = sampleRegion(name = "CoverageKeep")
+        fixtures.regionDao.upsert(region)
+        fixtures.geoEntityUpserter.upsert(
+            GeoEntityEntity(
+                id = "node/keep",
+                osmType = "node",
+                name = "Keep",
+                type = GeoEntityType.PEAK.name,
+                lat = 32.0,
+                lon = 35.0,
+                elevation = 100,
+                elevationSource = "OSM",
+                lastSeenAt = System.currentTimeMillis()
+            )
+        )
+        fixtures.coverageDao.insert(
+            RegionEntityCoverageEntity(region.id, "node/keep", displayName = "Keep")
+        )
+        val tileId = "Copernicus_DSM_COG_10_N32_00_E035_00_DEM"
+        fixtures.demTileDao.upsert(
+            DemTileEntity(
+                tileId = tileId,
+                filePath = "dem/$tileId.bin",
+                width = 3600,
+                height = 3600,
+                tileLat = 32,
+                tileLon = 35,
+                noDataValue = -9999f,
+                sizeBytes = 1000,
+                refCount = 1,
+                lastAccessedAt = System.currentTimeMillis()
+            )
+        )
+        fixtures.tileCoverageDao.insert(
+            com.nofar.core.database.model.TileCoverageEntity(region.id, tileId)
+        )
+
+        fixtures.regionDao.upsert(region.copy(name = "CoverageKeep-Updated", entityCount = 1))
+        fixtures.regionDao.updateDownloadStatus(
+            regionId = region.id,
+            status = DownloadStatus.PARTIAL.name,
+            progressPct = 40,
+            updatedAt = System.currentTimeMillis(),
+            entityCount = 1
+        )
+
+        assertThat(fixtures.coverageDao.getEntityIdsForRegion(region.id)).containsExactly("node/keep")
+        assertThat(fixtures.tileCoverageDao.getTileIdsForRegion(region.id)).containsExactly(tileId)
+        assertThat(fixtures.regionDao.getById(region.id)?.name).isEqualTo("CoverageKeep-Updated")
+        assertThat(fixtures.regionDao.getById(region.id)?.entityCount).isEqualTo(1)
+    }
+
     private fun sampleRegion(
         id: String = UUID.randomUUID().toString(),
         name: String = "Test",
@@ -101,6 +155,46 @@ class GeoEntityDaoTest {
         fixtures.geoEntityUpserter.upsert(entity)
         fixtures.geoEntityUpserter.upsert(entity.copy(name = "Updated"))
         assertThat(fixtures.geoEntityDao.getByOsmId("node/42")?.name).isEqualTo("Updated")
+    }
+
+    @Test
+    fun upsert_nullElevation_preservesExistingDemSample() = runTest {
+        fixtures.geoEntityUpserter.upsert(
+            sampleEntity(id = "node/preserve").copy(
+                elevation = 247,
+                elevationSource = "DEM_SAMPLE"
+            )
+        )
+        fixtures.geoEntityUpserter.upsert(
+            sampleEntity(id = "node/preserve").copy(
+                name = "Renamed",
+                elevation = null,
+                elevationSource = null
+            )
+        )
+        val stored = fixtures.geoEntityDao.getByOsmId("node/preserve")
+        assertThat(stored?.name).isEqualTo("Renamed")
+        assertThat(stored?.elevation).isEqualTo(247)
+        assertThat(stored?.elevationSource).isEqualTo("DEM_SAMPLE")
+    }
+
+    @Test
+    fun upsert_incomingOsmElevation_replacesDemSample() = runTest {
+        fixtures.geoEntityUpserter.upsert(
+            sampleEntity(id = "node/osm-wins").copy(
+                elevation = 247,
+                elevationSource = "DEM_SAMPLE"
+            )
+        )
+        fixtures.geoEntityUpserter.upsert(
+            sampleEntity(id = "node/osm-wins").copy(
+                elevation = 120,
+                elevationSource = "OSM_TAG"
+            )
+        )
+        val stored = fixtures.geoEntityDao.getByOsmId("node/osm-wins")
+        assertThat(stored?.elevation).isEqualTo(120)
+        assertThat(stored?.elevationSource).isEqualTo("OSM_TAG")
     }
 
     @Test
@@ -285,7 +379,7 @@ class GeoEntityDaoTest {
         type = type,
         lat = lat,
         lon = lon,
-        elevation = 100.0,
+        elevation = 100,
         elevationSource = "OSM_TAG",
         lastSeenAt = System.currentTimeMillis()
     )
@@ -327,4 +421,65 @@ class DemTileDaoTest {
         fixtures.demTileDao.decrementRefCount(tileId, System.currentTimeMillis())
         assertThat(fixtures.demTileDao.getById(tileId)?.refCount).isEqualTo(1)
     }
+
+    @Test
+    fun upsert_preservesTileCoverageLinks() = runTest {
+        val region = sampleRegionForTile()
+        fixtures.regionDao.upsert(region)
+        val tileId = "Copernicus_DSM_COG_10_N33_00_E035_00_DEM"
+        fixtures.demTileDao.upsert(
+            DemTileEntity(
+                tileId = tileId,
+                filePath = "dem/$tileId.bin",
+                width = 3600,
+                height = 3600,
+                tileLat = 33,
+                tileLon = 35,
+                noDataValue = -9999f,
+                sizeBytes = 1000,
+                refCount = 1,
+                lastAccessedAt = System.currentTimeMillis()
+            )
+        )
+        fixtures.tileCoverageDao.insert(
+            com.nofar.core.database.model.TileCoverageEntity(region.id, tileId)
+        )
+
+        fixtures.demTileDao.upsert(
+            DemTileEntity(
+                tileId = tileId,
+                filePath = "dem/$tileId.bin",
+                width = 3600,
+                height = 3600,
+                tileLat = 33,
+                tileLon = 35,
+                noDataValue = -9999f,
+                sizeBytes = 2000,
+                refCount = 2,
+                lastAccessedAt = System.currentTimeMillis()
+            )
+        )
+
+        assertThat(fixtures.tileCoverageDao.getTileIdsForRegion(region.id)).containsExactly(tileId)
+        assertThat(fixtures.demTileDao.getById(tileId)?.sizeBytes).isEqualTo(2000)
+    }
+
+    private fun sampleRegionForTile(): RegionEntity = RegionEntity(
+        id = UUID.randomUUID().toString(),
+        name = "TileRegion",
+        centerLat = 33.0,
+        centerLon = 35.0,
+        radiusM = 10_000.0,
+        minLat = 32.9,
+        maxLat = 33.1,
+        minLon = 34.9,
+        maxLon = 35.1,
+        createdAt = System.currentTimeMillis(),
+        updatedAt = System.currentTimeMillis(),
+        downloadStatus = DownloadStatus.READY.name,
+        downloadProgressPct = 100,
+        osmDatasetVersion = null,
+        estimatedSizeBytes = 0,
+        entityCount = 0
+    )
 }

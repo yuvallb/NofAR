@@ -7,6 +7,7 @@ import com.nofar.core.database.dao.GeoEntityDao
 import com.nofar.core.database.dao.GeoEntitySpatialDao
 import com.nofar.core.database.dao.RegionDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
+import com.nofar.core.database.dao.RegionIngestDao
 import com.nofar.core.database.dao.TileCoverageDao
 import com.nofar.core.database.model.DemTileEntity
 import com.nofar.core.database.model.GeoEntityEntity
@@ -22,7 +23,7 @@ import com.nofar.core.database.model.TileCoverageEntity
         DemTileEntity::class,
         TileCoverageEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class NofARDatabase : RoomDatabase() {
@@ -37,6 +38,8 @@ abstract class NofARDatabase : RoomDatabase() {
     abstract fun demTileDao(): DemTileDao
 
     abstract fun tileCoverageDao(): TileCoverageDao
+
+    abstract fun regionIngestDao(): RegionIngestDao
 
     companion object {
         const val DATABASE_NAME = "nofar.db"

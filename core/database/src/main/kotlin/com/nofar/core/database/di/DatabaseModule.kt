@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.nofar.core.database.GeoEntitySpatialQuery
 import com.nofar.core.database.NofARDatabase
+import com.nofar.core.database.NofARDatabaseMigrations
 import com.nofar.core.database.dao.CoverageLinker
 import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.dao.GeoEntityDao
@@ -11,6 +12,7 @@ import com.nofar.core.database.dao.GeoEntitySpatialDao
 import com.nofar.core.database.dao.GeoEntityUpserter
 import com.nofar.core.database.dao.RegionDao
 import com.nofar.core.database.dao.RegionEntityCoverageDao
+import com.nofar.core.database.dao.RegionIngestDao
 import com.nofar.core.database.dao.TileCoverageDao
 import com.nofar.core.database.useBundledSqliteWithRTree
 import dagger.Module
@@ -32,6 +34,7 @@ object DatabaseModule {
         NofARDatabase.DATABASE_NAME
     )
         .useBundledSqliteWithRTree()
+        .addMigrations(NofARDatabaseMigrations.MIGRATION_3_4)
         .fallbackToDestructiveMigration(dropAllTables = true)
         .setQueryCoroutineContext(Dispatchers.IO)
         .build()
@@ -56,11 +59,15 @@ object DatabaseModule {
     fun provideTileCoverageDao(database: NofARDatabase): TileCoverageDao = database.tileCoverageDao()
 
     @Provides
+    fun provideRegionIngestDao(database: NofARDatabase): RegionIngestDao = database.regionIngestDao()
+
+    @Provides
     @Singleton
     fun provideCoverageLinker(
         regionEntityCoverageDao: RegionEntityCoverageDao,
-        tileCoverageDao: TileCoverageDao
-    ): CoverageLinker = CoverageLinker(regionEntityCoverageDao, tileCoverageDao)
+        tileCoverageDao: TileCoverageDao,
+        regionIngestDao: RegionIngestDao
+    ): CoverageLinker = CoverageLinker(regionEntityCoverageDao, tileCoverageDao, regionIngestDao)
 
     @Provides
     @Singleton

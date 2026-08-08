@@ -298,7 +298,7 @@ private fun sampleEntity(id: String, type: GeoEntityType): GeoEntity = GeoEntity
     type = type,
     lat = 32.1,
     lon = 35.1,
-    elevation = 500.0,
+    elevation = 500,
     elevationSource = ElevationSource.OSM_TAG,
     lastSeenAt = Instant.EPOCH
 )

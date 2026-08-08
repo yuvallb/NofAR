@@ -21,7 +21,7 @@ data class ParsedOsmElement(
     val type: GeoEntityType,
     val lat: Double,
     val lon: Double,
-    val elevation: Double?
+    val elevation: Int?
 ) {
     val entityId: String get() = "${osmType.name.lowercase()}/$osmId"
 }
@@ -142,7 +142,7 @@ class OverpassStreamParser {
         val canonicalName = OsmNameResolver.resolveCanonicalName(tags) ?: displayName
         val resolvedLat = lat ?: centerLat ?: return emptyList()
         val resolvedLon = lon ?: centerLon ?: return emptyList()
-        val elevation = tags["ele"]?.toDoubleOrNull()
+        val elevation = tags["ele"]?.toDoubleOrNull()?.let { kotlin.math.round(it).toInt() }
 
         if (entityType != GeoEntityType.PEAK) {
             knownPlaceIds += "${resolvedType.name.lowercase()}/$osmId"

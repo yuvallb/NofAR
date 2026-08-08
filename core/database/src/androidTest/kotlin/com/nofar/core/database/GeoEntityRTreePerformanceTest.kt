@@ -37,7 +37,7 @@ class GeoEntityRTreePerformanceTest {
                     type = GeoEntityType.TOWN.name,
                     lat = 32.0 + (index % 100) * 0.001,
                     lon = 35.0 + (index / 100) * 0.001,
-                    elevation = 200.0,
+                    elevation = 200,
                     elevationSource = "OSM_TAG",
                     lastSeenAt = System.currentTimeMillis()
                 )

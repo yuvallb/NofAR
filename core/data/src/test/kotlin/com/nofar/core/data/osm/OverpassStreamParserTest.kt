@@ -82,7 +82,7 @@ class OverpassStreamParserTest {
                 type = GeoEntityType.CITY,
                 lat = 32.8,
                 lon = 34.98,
-                elevation = 10.0
+                elevation = 10
             )
         val entity = parser.toGeoEntity(element)
         assertThat(entity.id).isEqualTo("node/42")

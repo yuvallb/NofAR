@@ -30,7 +30,8 @@ data class GeoEntity(
     val type: GeoEntityType,
     val lat: Double,
     val lon: Double,
-    val elevation: Double?,
+    /** Orthometric height in whole meters (OSM `ele` or DEM sample). */
+    val elevation: Int?,
     val elevationSource: ElevationSource?,
     val lastSeenAt: Instant,
     /** Approximate ground footprint radius (meters), derived from OSM boundary geometry at Prepare time. */
