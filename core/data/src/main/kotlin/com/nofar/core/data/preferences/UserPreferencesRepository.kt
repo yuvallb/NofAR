@@ -51,6 +51,12 @@ interface UserPreferencesRepository {
 
     suspend fun setPreferredLabelLanguage(language: LabelLanguage)
 
+    /**
+     * Seeds [preferredLabelLanguage] once when the preference has never been written
+     * (first app launch). No-op if the user (or a prior seed) already chose a value.
+     */
+    suspend fun ensurePreferredLabelLanguageInitialized(detected: LabelLanguage)
+
     suspend fun setShowHorizonOutline(enabled: Boolean)
 }
 
@@ -140,6 +146,14 @@ constructor(@ApplicationContext context: Context) :
     override suspend fun setPreferredLabelLanguage(language: LabelLanguage) {
         dataStore.edit { prefs ->
             prefs[PREFERRED_LABEL_LANGUAGE_KEY] = language.name
+        }
+    }
+
+    override suspend fun ensurePreferredLabelLanguageInitialized(detected: LabelLanguage) {
+        dataStore.edit { prefs ->
+            if (prefs[PREFERRED_LABEL_LANGUAGE_KEY] == null) {
+                prefs[PREFERRED_LABEL_LANGUAGE_KEY] = detected.name
+            }
         }
     }
 

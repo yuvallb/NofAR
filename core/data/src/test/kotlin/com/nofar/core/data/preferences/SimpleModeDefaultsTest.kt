@@ -96,6 +96,8 @@ class SimpleModeDefaultsTest {
 
         override suspend fun setPreferredLabelLanguage(language: LabelLanguage) = Unit
 
+        override suspend fun ensurePreferredLabelLanguageInitialized(detected: LabelLanguage) = Unit
+
         override suspend fun setShowHorizonOutline(enabled: Boolean) = Unit
     }
 

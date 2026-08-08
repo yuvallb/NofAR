@@ -20,4 +20,21 @@ class LabelLanguageTest {
         assertEquals("name:en", LabelLanguage.ENGLISH.osmNameTag)
         assertEquals("name:ru", LabelLanguage.RUSSIAN.osmNameTag)
     }
+
+    @Test
+    fun fromDeviceLanguageCode_mapsSupportedLanguages() {
+        assertEquals(LabelLanguage.HEBREW, LabelLanguage.fromDeviceLanguageCode("he"))
+        assertEquals(LabelLanguage.HEBREW, LabelLanguage.fromDeviceLanguageCode("iw"))
+        assertEquals(LabelLanguage.HEBREW, LabelLanguage.fromDeviceLanguageCode("HE"))
+        assertEquals(LabelLanguage.ARABIC, LabelLanguage.fromDeviceLanguageCode("ar"))
+        assertEquals(LabelLanguage.ENGLISH, LabelLanguage.fromDeviceLanguageCode("en"))
+        assertEquals(LabelLanguage.RUSSIAN, LabelLanguage.fromDeviceLanguageCode("ru"))
+    }
+
+    @Test
+    fun fromDeviceLanguageCode_unsupportedFallsBackToDefault() {
+        assertEquals(LabelLanguage.DEFAULT, LabelLanguage.fromDeviceLanguageCode("fr"))
+        assertEquals(LabelLanguage.DEFAULT, LabelLanguage.fromDeviceLanguageCode("de"))
+        assertEquals(LabelLanguage.DEFAULT, LabelLanguage.fromDeviceLanguageCode(""))
+    }
 }
