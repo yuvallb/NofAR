@@ -46,6 +46,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 
 data class PrepareProgress(
+    val regionId: UUID,
     val phase: PreparePhase,
     val overallPercent: Int,
     val osmBytesRead: Long = 0L,
@@ -139,6 +140,7 @@ constructor(
                             ).toInt().coerceIn(0, 40)
                     _progress.value =
                         PrepareProgress(
+                            regionId = regionId,
                             phase = PreparePhase.OSM,
                             overallPercent = pct,
                             osmBytesRead = bytes,
@@ -451,8 +453,10 @@ constructor(
         remainingBytesEstimate: Long = _progress.value?.remainingBytesEstimate ?: 0L,
         message: String = _progress.value?.message ?: ""
     ) {
+        val regionId = activeRegionId ?: return
         _progress.value =
             PrepareProgress(
+                regionId = regionId,
                 phase = phase,
                 overallPercent = overallPercent.coerceIn(0, 100),
                 osmBytesRead = osmBytesRead,

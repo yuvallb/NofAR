@@ -136,20 +136,7 @@ constructor(
         refreshEstimate()
         viewModelScope.launch {
             orchestrator.progress.collect { progress ->
-                if (progress == null) return@collect
-                _uiState.update { state ->
-                    if (state.downloadUiState == PrepareDownloadUiState.COMPLETE ||
-                        state.downloadUiState == PrepareDownloadUiState.ERROR
-                    ) {
-                        state.copy(progress = progress)
-                    } else {
-                        state.copy(
-                            progress = progress,
-                            downloadUiState = PrepareDownloadUiState.DOWNLOADING,
-                            step = PrepareStep.DOWNLOAD
-                        )
-                    }
-                }
+                _uiState.update { state -> applyLiveDownloadProgress(state, progress) }
             }
         }
         viewModelScope.launch {
@@ -195,6 +182,7 @@ constructor(
                             progress =
                             state.progress?.copy(overallPercent = region.downloadProgressPct)
                                 ?: PrepareProgress(
+                                    regionId = regionId,
                                     phase = PreparePhase.OSM,
                                     overallPercent = region.downloadProgressPct
                                 ),
@@ -531,6 +519,7 @@ constructor(
                     progress =
                     if (region.downloadStatus == DownloadStatus.DOWNLOADING) {
                         PrepareProgress(
+                            regionId = region.id,
                             phase = PreparePhase.OSM,
                             overallPercent = region.downloadProgressPct
                         )
