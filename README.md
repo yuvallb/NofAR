@@ -9,8 +9,10 @@ No accounts. No backend. No tracking.
 | | |
 |---|---|
 | **Platform** | Android 8.0+ (API 26) |
+| **Package** | `com.nofar.app` |
 | **License** | [Apache 2.0](LICENSE) |
-| **Status** | Under active development - not ready to use |
+| **Status** | Beta — functionality complete; store listing in progress |
+| **Privacy** | [Policy](https://yuvallb.github.io/NofAR/privacy/) · [source](docs/privacy.md) |
 
 ---
 
@@ -24,6 +26,8 @@ No accounts. No backend. No tracking.
   - **Prepare** — Draw a region on a map and download OSM + DEM data (internet required; resumable downloads).
   - **Explore** — Full-screen camera view with compass-corrected AR labels for what you can actually see.
 - **Privacy by design** — GPS-only location (no network location), no analytics, no crash reporting that phones home.
+
+**Permissions:** precise location and camera (Explore / region detection); internet only for Prepare downloads. A real device outdoors works best for GPS and compass.
 
 ---
 
@@ -52,7 +56,6 @@ During Explore, visibility and rendering run on two cadences: a low-frequency pa
 
 Overpass requests use a descriptive `User-Agent` and tiered public mirror failover. DEM tiles are cached globally and shared across overlapping regions.
 
-
 ---
 
 ## Getting started
@@ -73,23 +76,28 @@ cp local.properties.example local.properties
 ./gradlew spotlessCheck detekt lint test
 ```
 
-Release builds:
+**Release builds** (minified). For a Play-signed AAB, copy [`keystore.properties.example`](keystore.properties.example) → `keystore.properties` and point it at your upload keystore (never commit secrets). Without that file, release falls back to the debug keystore so CI still works — do not upload that to Play.
 
 ```bash
-./gradlew :app:assembleRelease
+./gradlew :app:assembleRelease :app:bundleRelease
+# Optional device smoke-test:
+# adb install -r app/build/outputs/apk/release/app-release.apk
 ```
 
-CI will run `spotlessCheck`, `detekt`, `lint`, `test`, `assembleDebug`, and `assembleRelease` on pull requests.
+CI runs `spotlessCheck`, `detekt`, `lint`, `test`, `assembleDebug`, and `assembleRelease` on pull requests.
+
+Store listing copy and graphics live under [`fastlane/metadata/android/en-US/`](fastlane/metadata/android/en-US/) (add real phone screenshots before submitting to Play / F-Droid).
 
 ---
 
-## Architecture (target)
+## Architecture
 
 The app follows the modular layout of [Now in Android](https://github.com/android/nowinandroid):
 
 ```
 :app
 :core:model, :core:common, :core:database, :core:data, :core:network
+:core:location, :core:sensors, :core:visibility
 :core:ui, :core:designsystem, :core:testing
 :feature:home, :feature:prepare, :feature:explore, :feature:settings
 :build-logic:convention
@@ -120,6 +128,9 @@ Feature modules depend only on `core:*`, not on each other. Unidirectional flow:
 ## Contributing
 
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for branch naming, PR checklist, and code style. Keep changes aligned with the existing architecture and privacy constraints (no proprietary analytics, no network in Explore/Home).
+
+- Issues: [github.com/yuvallb/NofAR/issues](https://github.com/yuvallb/NofAR/issues)
+- Privacy: [yuvallb.github.io/NofAR/privacy](https://yuvallb.github.io/NofAR/privacy/)
 
 For agent-assisted development in this repo, see [AGENTS.md](AGENTS.md).
 
