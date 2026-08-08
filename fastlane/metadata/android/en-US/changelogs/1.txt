@@ -1,0 +1,1 @@
+Initial public release of NofAR: offline AR labels for visible peaks and places with Prepare-mode OSM + DEM downloads.

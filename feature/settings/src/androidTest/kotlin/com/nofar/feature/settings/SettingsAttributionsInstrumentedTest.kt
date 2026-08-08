@@ -30,7 +30,7 @@ class SettingsAttributionsInstrumentedTest {
     }
 
     @Test
-    fun aboutSection_showsVersionAndApacheNotice() {
+    fun aboutSection_showsVersionApacheAndPrivacyLinks() {
         composeRule.setContent {
             NofARTheme {
                 SettingsAboutSection()
@@ -38,6 +38,8 @@ class SettingsAttributionsInstrumentedTest {
         }
 
         composeRule.onNodeWithTag("app_version").assertIsDisplayed()
+        composeRule.onNodeWithTag("privacy_policy").assertIsDisplayed()
+        composeRule.onNodeWithText("Privacy Policy").assertIsDisplayed()
         composeRule.onNodeWithTag("apache_license").assertIsDisplayed()
         composeRule.onNodeWithText("Licensed under Apache License 2.0").assertIsDisplayed()
     }

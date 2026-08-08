@@ -1,0 +1,20 @@
+NofAR is an offline-first Android app for hikers and travelers. Download map data for a circular area, then point your phone at the horizon to see terrain-aware labels for peaks, cities, towns, and villages — filtered by real line-of-sight over the landscape.
+
+No accounts. No backend. No tracking.
+
+FEATURES
+• Offline Explore — once a region is downloaded, Explore and Home work without network access
+• Terrain-aware visibility — labels hide when ridges block the view, using live DEM raycasting
+• Circular regions (5–20 km) — draw an area, download OpenStreetMap places/peaks and Copernicus elevation tiles
+• Home — manage regions and enter Explore when you are inside a ready region
+• Prepare — map widget to define a region and download data (internet required; resumable)
+• Explore — full-screen camera with compass-corrected AR labels
+• Privacy by design — GPS-only location, no analytics or crash reporting that phones home
+
+DATA SOURCES
+• © OpenStreetMap contributors (ODbL)
+• Copernicus DEM, ESA / Airbus
+
+Source code: https://github.com/yuvallb/NofAR
+License: Apache 2.0
+Privacy: https://yuvallb.github.io/NofAR/privacy/

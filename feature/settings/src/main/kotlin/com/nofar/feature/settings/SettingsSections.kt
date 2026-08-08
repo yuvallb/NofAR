@@ -331,6 +331,11 @@ internal fun SettingsAboutSection() {
     )
     Spacer(modifier = Modifier.height(8.dp))
     SettingsLinkText(
+        text = "Privacy Policy",
+        testTag = "privacy_policy",
+        onClick = { openHttpsUrl(context, AppMetadata.PRIVACY_POLICY_URL) }
+    )
+    SettingsLinkText(
         text = "Source code on GitHub",
         onClick = { openHttpsUrl(context, AppMetadata.GITHUB_REPOSITORY_URL) }
     )
