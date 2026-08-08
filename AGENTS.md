@@ -112,12 +112,37 @@ These are non-negotiable for MVP — do not introduce alternatives without expli
 3. Verify all **acceptance criteria** in the phase file before considering the phase done.
 4. Phases 2 and 3 can run in parallel after their prerequisites; Phase 4 needs both.
 
+### Room database migrations
+
+Public baseline is `@Database(version = 1)` with schema export under
+`core/database/schemas/`. Production `DatabaseModule` registers
+`NofARDatabaseMigrations.ALL` and must **not** use `fallbackToDestructiveMigration`
+(or on-downgrade). See `core/database/schemas/README.md` for table inventory.
+
+When changing the schema after first public release:
+
+1. Implement entity/DAO changes in `:core:database`.
+2. Add an explicit `Migration(from, to)` in `NofARDatabaseMigrations` and include it in `ALL`
+   (e.g. `MIGRATION_1_2`) **before** bumping `@Database(version = …)`.
+3. If the migration recreates `geo_entity` or its indexes, re-create R-Tree objects the same way
+   `RTreeCallback` / prior migrations do (`geo_entity_rtree` + `geo_entity_ai` / `_au` / `_ad`).
+4. Bump `NofARDatabase` version by exactly one step per migration edge.
+5. Export schema JSON: `./gradlew :core:database:kspDebugKotlin` and commit the new
+   `schemas/com.nofar.core.database.NofARDatabase/<version>.json`.
+6. Update `core/database/schemas/README.md` version history.
+7. Prefer an instrumented migration test (Room `MigrationTestHelper`) for non-trivial SQL;
+   fresh-install coverage remains in existing database instrumented tests.
+8. Run `./gradlew spotlessCheck detekt lint test` before finishing.
+
+Do not flatten or renumber published schema versions. Do not wipe user databases to “fix” a
+migration in production code.
+
 ---
 
 ## Testing expectations
 
 - **Unit tests:** pure logic (raycast, clustering, One Euro Filter, parsers).
-- **Instrumented tests:** database, critical UI flows.
+- **Instrumented tests:** database, critical UI flows; non-trivial Room migrations when schema changes.
 - No phase merges without its acceptance criteria met.
 - Add or update tests for behavior you change; do not add trivial tests that only assert the obvious.
 
@@ -161,6 +186,7 @@ adb exec-out run-as com.nofar.app cat databases/nofar.db > nofar.db
 - Do not create git commits or open PRs unless the user explicitly asks.
 - Do not edit `internal/Requirements.md` or phase docs unless the user requests spec changes.
 - Do not run adb or request/create DB dumps without justification and explicit user permission (see **Device access (adb) and DB dumps**).
+- Do not call `fallbackToDestructiveMigration` on the production Room builder; ship explicit migrations from baseline v1 (see **Room database migrations**).
 
 ---
 

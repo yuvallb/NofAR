@@ -8,8 +8,8 @@ import com.nofar.core.model.OverpassMirrors
  * Failover order: HPI → overpass-api.de/
  *
  * Privacy: each query POSTs an Overpass QL string that includes the region bbox (and thus an
- * approximate location). On failover, that same query is retried against the next mirror. 
- 
+ * approximate location). On failover, that same query is retried against the next mirror.
+
  * [DefaultOverpassApi] fails over on I/O errors and any non-success HTTP response (including 429
  * and 5xx) until mirrors are exhausted.
  */

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "75fb97e537cd26adee1b2ef97d0ef68e",
+    "identityHash": "8b639f9f6a51cdba5e85aeb4573c2349",
     "entities": [
       {
         "tableName": "region",
@@ -130,7 +130,7 @@
       },
       {
         "tableName": "geo_entity",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`row_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `id` TEXT NOT NULL, `osm_type` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `elevation` REAL, `elevation_source` TEXT, `last_seen_at` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`row_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `id` TEXT NOT NULL, `osm_type` TEXT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `lat` REAL NOT NULL, `lon` REAL NOT NULL, `elevation` INTEGER, `elevation_source` TEXT, `last_seen_at` INTEGER NOT NULL, `footprint_radius_m` REAL)",
         "fields": [
           {
             "fieldPath": "rowId",
@@ -177,7 +177,7 @@
           {
             "fieldPath": "elevation",
             "columnName": "elevation",
-            "affinity": "REAL"
+            "affinity": "INTEGER"
           },
           {
             "fieldPath": "elevationSource",
@@ -189,6 +189,11 @@
             "columnName": "last_seen_at",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "footprintRadiusM",
+            "columnName": "footprint_radius_m",
+            "affinity": "REAL"
           }
         ],
         "primaryKey": {
@@ -431,7 +436,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '75fb97e537cd26adee1b2ef97d0ef68e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8b639f9f6a51cdba5e85aeb4573c2349')"
     ]
   }
 }

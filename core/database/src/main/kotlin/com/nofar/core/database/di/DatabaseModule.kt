@@ -34,11 +34,8 @@ object DatabaseModule {
         NofARDatabase.DATABASE_NAME
     )
         .useBundledSqliteWithRTree()
-        .addMigrations(
-            NofARDatabaseMigrations.MIGRATION_1_2,
-            NofARDatabaseMigrations.MIGRATION_2_3,
-            NofARDatabaseMigrations.MIGRATION_3_4
-        )
+        // No fallbackToDestructiveMigration — ship explicit migrations from baseline v1 only.
+        .addMigrations(*NofARDatabaseMigrations.ALL)
         .setQueryCoroutineContext(Dispatchers.IO)
         .build()
 

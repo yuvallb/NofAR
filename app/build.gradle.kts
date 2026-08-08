@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.nofar.android.application)
     alias(libs.plugins.nofar.android.hilt)
@@ -5,6 +7,21 @@ plugins {
     alias(libs.plugins.nofar.android.lint)
     alias(libs.plugins.nofar.detekt)
 }
+
+// applicationId is the public store identity — do not change after first Play/F-Droid upload.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties =
+    Properties().apply {
+        if (keystorePropertiesFile.exists()) {
+            keystorePropertiesFile.inputStream().use(::load)
+        }
+    }
+val hasReleaseKeystore =
+    keystorePropertiesFile.exists() &&
+        keystoreProperties.getProperty("storeFile") != null &&
+        keystoreProperties.getProperty("storePassword") != null &&
+        keystoreProperties.getProperty("keyAlias") != null &&
+        keystoreProperties.getProperty("keyPassword") != null
 
 android {
     namespace = "com.nofar.app"
@@ -15,6 +32,17 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (hasReleaseKeystore) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -23,6 +51,14 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // CI without secrets keeps assembleRelease working via debug signing.
+            // Play uploads must use keystore.properties (never commit it).
+            signingConfig =
+                if (hasReleaseKeystore) {
+                    signingConfigs.getByName("release")
+                } else {
+                    signingConfigs.getByName("debug")
+                }
         }
     }
 }

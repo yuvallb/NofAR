@@ -1,3 +1,6 @@
 # Copy to local.properties and set your Android SDK path (gitignored).
 # macOS default after installing Android Studio:
 sdk.dir=/Users/yuvallb/Library/Android/sdk
+
+# Release signing (Play uploads): copy keystore.properties.example → keystore.properties
+# and point storeFile at your upload keystore. Never commit keystore.properties or *.jks.
