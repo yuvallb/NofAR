@@ -84,6 +84,9 @@ object AppConfig {
     /** AR labels are hidden when horizontal GPS accuracy exceeds this (meters). */
     const val EXPLORE_LOCATION_ACCURACY_THRESHOLD_METERS: Float = 30f
 
+    /** Synthetic horizontal accuracy for Expert virtual observer sessions (meters). */
+    const val VIRTUAL_OBSERVER_ACCURACY_METERS: Float = 5f
+
     /** Mean Earth radius for haversine and curvature correction (meters). */
     const val EARTH_RADIUS_METERS: Double = 6_371_000.0
 
@@ -191,4 +194,16 @@ object AppConfig {
 
     /** Treat the user as standing on a peak when within this distance of its point (meters). */
     const val EXPLORE_HERE_PEAK_RADIUS_M: Double = 200.0
+
+    /** Azimuth step for expert virtual-location map viewshed (degrees). */
+    const val MAP_PREVIEW_AZIMUTH_STEP_DEG: Float = 1f
+
+    /** Radial step along each viewshed ray (meters). */
+    const val MAP_PREVIEW_RADIAL_STEP_M: Double = 100.0
+
+    /** Vertical clearance before terrain counts as blocking in map viewshed preview (meters). */
+    const val MAP_PREVIEW_OCCLUSION_TOLERANCE_M: Double = 2.0
+
+    /** Square mask raster size for map viewshed overlay (pixels). */
+    const val MAP_PREVIEW_MASK_SIZE_PX: Int = 512
 }

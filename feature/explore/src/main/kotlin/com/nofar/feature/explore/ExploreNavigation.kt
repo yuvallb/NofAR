@@ -5,25 +5,36 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 
-const val EXPLORE_ROUTE = "explore"
-const val EXPLORE_ROUTE_WITH_ARG = "explore?regionId={regionId}"
-const val EXPLORE_START_ROUTE = "explore?regionId="
-
-fun NavGraphBuilder.exploreScreen(onNavigateBack: () -> Unit, onNavigateToSettings: () -> Unit) {
+fun NavGraphBuilder.exploreScreen(
+    onNavigateBack: () -> Unit,
+    onNavigateToSettings: () -> Unit,
+    onChangeVirtualLocation: () -> Unit
+) {
     composable(
-        route = EXPLORE_ROUTE_WITH_ARG,
+        route = EXPLORE_ROUTE_WITH_ARGS,
         arguments =
         listOf(
             navArgument("regionId") {
                 type = NavType.StringType
                 nullable = true
-                defaultValue = null
+                defaultValue = ""
+            },
+            navArgument("virtualLat") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = ""
+            },
+            navArgument("virtualLon") {
+                type = NavType.StringType
+                nullable = true
+                defaultValue = ""
             }
         )
     ) {
         ExploreScreen(
             onNavigateBack = onNavigateBack,
-            onNavigateToSettings = onNavigateToSettings
+            onNavigateToSettings = onNavigateToSettings,
+            onChangeVirtualLocation = onChangeVirtualLocation
         )
     }
 }

@@ -3,7 +3,6 @@ package com.nofar.core.visibility
 import com.google.common.truth.Truth.assertThat
 import com.nofar.core.common.DispatcherProvider
 import com.nofar.core.data.preferences.UserPreferencesRepository
-import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.LabelLanguage
@@ -14,9 +13,7 @@ import java.util.UUID
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -71,11 +68,13 @@ class VisibilityPassSchedulerTest {
         computer: RegionVisibilityComputer,
         showHorizonOutline: Boolean
     ): VisibilityPassScheduler = VisibilityPassScheduler(
-        locationRepository = FakeLocationRepository(sampleLocation()),
         visibilityUseCase = computer,
         userPreferencesRepository = FakeUserPreferencesRepository(showHorizonOutline),
         dispatchers = dispatcherProvider(StandardTestDispatcher(testScheduler))
-    )
+    ).also { scheduler ->
+        scheduler.configureObserverLocation(kotlinx.coroutines.flow.flowOf(sampleLocation()))
+        scheduler.seedObserverLocation(sampleLocation())
+    }
 
     @Test
     fun hereContext_isPublishedToFlow() = runTest {
@@ -143,6 +142,52 @@ class VisibilityPassSchedulerTest {
         entityCount = 1
     )
 
+    @Test
+    fun fixedObserverFlow_usesConfiguredLocationForPass() = runTest {
+        val virtualLocation =
+            UserLocation(
+                latitude = 31.0,
+                longitude = 35.0,
+                altitudeMeters = null,
+                accuracyMeters = 5f,
+                timestampMillis = 2_000L
+            )
+        val computer = RecordingComputer()
+        val scheduler =
+            VisibilityPassScheduler(
+                visibilityUseCase = computer,
+                userPreferencesRepository = FakeUserPreferencesRepository(showHorizon = false),
+                dispatchers = dispatcherProvider(StandardTestDispatcher(testScheduler))
+            )
+        scheduler.configureObserverLocation(kotlinx.coroutines.flow.flowOf(virtualLocation))
+        scheduler.seedObserverLocation(virtualLocation)
+        scheduler.start(this)
+        scheduler.setActiveRegions(listOf(sampleRegion()))
+        advanceUntilIdle()
+
+        assertThat(computer.lastLocation?.latitude).isEqualTo(31.0)
+        assertThat(computer.lastLocation?.longitude).isEqualTo(35.0)
+        scheduler.stop()
+    }
+
+    private class RecordingComputer : RegionVisibilityComputer {
+        var lastLocation: UserLocation? = null
+
+        override suspend fun computeForRegions(
+            regions: List<Region>,
+            location: UserLocation,
+            computeHorizonProfile: Boolean
+        ): VisibilityResult {
+            lastLocation = location
+            return VisibilityResult(
+                entities = emptyList(),
+                computationTimeMs = 1L,
+                warnings = emptySet(),
+                hereContext = HereContext()
+            )
+        }
+    }
+
     private class FakeComputer(private val result: VisibilityResult) : RegionVisibilityComputer {
         var lastComputeHorizonProfile: Boolean? = null
 
@@ -154,21 +199,6 @@ class VisibilityPassSchedulerTest {
             lastComputeHorizonProfile = computeHorizonProfile
             return result
         }
-    }
-
-    private class FakeLocationRepository(private val initial: UserLocation) : LocationRepository {
-        override val locationFlow: Flow<UserLocation> = MutableSharedFlow()
-        override val significantMoveFlow: SharedFlow<UserLocation> = MutableSharedFlow()
-        override val lastLocation: UserLocation = initial
-        override val isActive: Boolean = true
-
-        override fun start() = Unit
-
-        override fun stop() = Unit
-
-        override fun clearCachedLocation() = Unit
-
-        override fun onPermissionRevoked() = Unit
     }
 
     private class FakeUserPreferencesRepository(showHorizon: Boolean) : UserPreferencesRepository {

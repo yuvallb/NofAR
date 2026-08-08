@@ -55,5 +55,8 @@ data class ExploreUiState(
     val horizonMeanAngleDeg: Float? = null,
     val horizonSegmentCount: Int = 0,
     val horizonEyeSource: String? = null,
-    val exploreHere: ExploreHereUi = ExploreHereUi()
-)
+    val exploreHere: ExploreHereUi = ExploreHereUi(),
+    val virtualExploreSession: VirtualExploreSession? = null
+) {
+    val isVirtualExplore: Boolean get() = virtualExploreSession != null
+}

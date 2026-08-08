@@ -48,6 +48,7 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToPrepare: (UUID?) -> Unit,
     onNavigateToExplore: (UUID) -> Unit,
+    onNavigateToVirtualLocationPicker: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -85,6 +86,7 @@ fun HomeScreen(
             onNavigateToSettings = onNavigateToSettings,
             onNavigateToPrepare = onNavigateToPrepare,
             onGlobalEnterExplore = viewModel::onGlobalEnterExploreClicked,
+            onExploreAnotherLocation = onNavigateToVirtualLocationPicker,
             onDelete = viewModel::onDeleteClicked,
             modifier = Modifier.padding(padding)
         )
@@ -112,6 +114,7 @@ private fun HomeScreenContent(
     onNavigateToSettings: () -> Unit,
     onNavigateToPrepare: (UUID?) -> Unit,
     onGlobalEnterExplore: () -> Unit,
+    onExploreAnotherLocation: () -> Unit,
     onDelete: (UUID) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -132,7 +135,9 @@ private fun HomeScreenContent(
         )
         GlobalEnterExploreSection(
             enabled = uiState.enterExploreEnabled,
-            onClick = onGlobalEnterExplore
+            onClick = onGlobalEnterExplore,
+            showExploreAnotherLocation = uiState.exploreAnotherLocationEnabled,
+            onExploreAnotherLocation = onExploreAnotherLocation
         )
         NofARSecondaryOutlinedButton(
             text = "+ ADD REGION",
@@ -158,7 +163,12 @@ private fun HomeScreenContent(
 }
 
 @Composable
-private fun GlobalEnterExploreSection(enabled: Boolean, onClick: () -> Unit) {
+private fun GlobalEnterExploreSection(
+    enabled: Boolean,
+    onClick: () -> Unit,
+    showExploreAnotherLocation: Boolean,
+    onExploreAnotherLocation: () -> Unit
+) {
     Column(modifier = Modifier.padding(horizontal = 16.dp)) {
         NofARPrimaryButton(
             text = "ENTER EXPLORE",
@@ -172,6 +182,14 @@ private fun GlobalEnterExploreSection(enabled: Boolean, onClick: () -> Unit) {
                 text = "Add region or move inside a ready region to explore the horizon.",
                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                 color = NofARColors.TextCaption
+            )
+        }
+        if (showExploreAnotherLocation) {
+            Spacer(modifier = Modifier.height(8.dp))
+            NofARSecondaryOutlinedButton(
+                text = "EXPLORE ANOTHER LOCATION",
+                onClick = onExploreAnotherLocation,
+                modifier = Modifier.fillMaxWidth()
             )
         }
         Spacer(modifier = Modifier.height(8.dp))

@@ -9,13 +9,15 @@ const val HOME_ROUTE = "home"
 fun NavGraphBuilder.homeScreen(
     onNavigateToSettings: () -> Unit,
     onNavigateToPrepare: (UUID?) -> Unit,
-    onNavigateToExplore: (UUID) -> Unit
+    onNavigateToExplore: (UUID) -> Unit,
+    onNavigateToVirtualLocationPicker: () -> Unit
 ) {
     composable(route = HOME_ROUTE) {
         HomeScreen(
             onNavigateToSettings = onNavigateToSettings,
             onNavigateToPrepare = onNavigateToPrepare,
-            onNavigateToExplore = onNavigateToExplore
+            onNavigateToExplore = onNavigateToExplore,
+            onNavigateToVirtualLocationPicker = onNavigateToVirtualLocationPicker
         )
     }
 }

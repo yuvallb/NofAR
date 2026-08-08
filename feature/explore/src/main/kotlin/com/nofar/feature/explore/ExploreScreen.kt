@@ -43,6 +43,7 @@ import com.nofar.feature.explore.BuildConfig
 fun ExploreScreen(
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onChangeVirtualLocation: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ExploreViewModel = hiltViewModel()
 ) {
@@ -56,6 +57,7 @@ fun ExploreScreen(
         permissionState = permissionState,
         onNavigateBack = onNavigateBack,
         onNavigateToSettings = onNavigateToSettings,
+        onChangeVirtualLocation = onChangeVirtualLocation,
         onScreenSizeChanged = viewModel::onScreenSizeChanged,
         onFieldOfViewChanged = viewModel::onCameraFieldOfViewChanged,
         onHiddenCountClick = viewModel::onHiddenCountClicked,

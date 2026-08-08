@@ -3,7 +3,8 @@
     "SwallowedException",
     "LongMethod",
     "CyclomaticComplexMethod",
-    "MaxLineLength"
+    "MaxLineLength",
+    "TooManyFunctions"
 )
 
 package com.nofar.core.data.prepare
@@ -11,6 +12,7 @@ package com.nofar.core.data.prepare
 import android.content.Context
 import com.nofar.core.data.dem.DefaultGeoTiffConverter
 import com.nofar.core.data.dem.DemTileReader
+import com.nofar.core.data.dem.GeoTiffConversionResult
 import com.nofar.core.data.dem.GeoTiffConverter
 import com.nofar.core.data.osm.OverpassStreamParser
 import com.nofar.core.data.preferences.UserPreferencesRepository
@@ -223,10 +225,9 @@ constructor(
                 checkCancelled()
                 val tileId = DemTileId.fromCoordinates(tileLat, tileLon)
                 val binFile = demTileRepository.demFile(tileId)
-                if (binFile.exists()) {
+                if (demTileRepository.isBinReadable(tileId)) {
                     ensureTileRegistered(tileId, binFile)
-                    demTileRepository.incrementRefCount(tileId)
-                    linkTileCoverage(regionId, tileId)
+                    acquireTileForRegion(regionId, tileId)
                     linkedTileIds.add(tileId)
                     val pct = 40 + ((index + 1) * 50 / tiles.size.coerceAtLeast(1))
                     updateProgress(
@@ -238,27 +239,32 @@ constructor(
                     persistProgress(pct)
                     return@forEachIndexed
                 }
+                if (binFile.exists()) {
+                    binFile.delete()
+                }
 
                 val tifFile = File(demDirectory, "$tileId.tif")
                 try {
-                    demTileFetcher.fetchTile(tileLat, tileLon, tifFile) { bytesRead, totalBytes ->
-                        val tileFraction = if (totalBytes != null && totalBytes > 0) {
-                            bytesRead.toDouble() / totalBytes
-                        } else {
-                            0.5
+                    if (!tifFile.exists()) {
+                        demTileFetcher.fetchTile(tileLat, tileLon, tifFile) { bytesRead, totalBytes ->
+                            val tileFraction = if (totalBytes != null && totalBytes > 0) {
+                                bytesRead.toDouble() / totalBytes
+                            } else {
+                                0.5
+                            }
+                            val pct =
+                                40 + (((index + tileFraction * 0.7) * 50) / tiles.size.coerceAtLeast(1)).toInt()
+                            val remaining =
+                                estimate.totalEstimateBytes - (estimate.osmEstimateBytes + bytesRead)
+                            updateProgress(
+                                PreparePhase.DEM,
+                                pct.coerceIn(40, 90),
+                                demTileIndex = index + 1,
+                                demTileCount = tiles.size,
+                                remainingBytesEstimate = remaining.coerceAtLeast(0),
+                                message = "Downloading DEM tile ${index + 1}/${tiles.size}"
+                            )
                         }
-                        val pct =
-                            40 + (((index + tileFraction * 0.7) * 50) / tiles.size.coerceAtLeast(1)).toInt()
-                        val remaining =
-                            estimate.totalEstimateBytes - (estimate.osmEstimateBytes + bytesRead)
-                        updateProgress(
-                            PreparePhase.DEM,
-                            pct.coerceIn(40, 90),
-                            demTileIndex = index + 1,
-                            demTileCount = tiles.size,
-                            remainingBytesEstimate = remaining.coerceAtLeast(0),
-                            message = "Downloading DEM tile ${index + 1}/${tiles.size}"
-                        )
                     }
 
                     val convertPct =
@@ -276,25 +282,13 @@ constructor(
                         tifFile.delete()
                     }
 
-                    val existing = demTileRepository.getTile(tileId)
-                    if (existing == null) {
-                        demTileRepository.registerTile(
-                            DemTile(
-                                tileId = tileId,
-                                filePath = demTileRepository.demFilePath(tileId),
-                                width = conversion.width,
-                                height = conversion.height,
-                                tileLat = tileLat,
-                                tileLon = tileLon,
-                                noDataValue = conversion.noDataValue,
-                                sizeBytes = conversion.sizeBytes,
-                                refCount = 0,
-                                lastAccessedAt = Instant.now()
-                            )
-                        )
-                    }
-                    demTileRepository.incrementRefCount(tileId)
-                    linkTileCoverage(regionId, tileId)
+                    upsertConvertedTile(
+                        tileId = tileId,
+                        tileLat = tileLat,
+                        tileLon = tileLon,
+                        conversion = conversion
+                    )
+                    acquireTileForRegion(regionId, tileId)
                     linkedTileIds.add(tileId)
                     val completedPct = 40 + ((index + 1) * 50 / tiles.size.coerceAtLeast(1))
                     persistProgress(completedPct)
@@ -396,13 +390,49 @@ constructor(
         }
     }
 
-    private suspend fun linkTileCoverage(regionId: UUID, tileId: String) {
-        tileCoverageDao.insert(
-            TileCoverageEntity(
-                regionId = regionId.toString(),
-                tileId = tileId
+    private suspend fun upsertConvertedTile(
+        tileId: String,
+        tileLat: Int,
+        tileLon: Int,
+        conversion: GeoTiffConversionResult
+    ) {
+        val existing = demTileRepository.getTile(tileId)
+        demTileRepository.registerTile(
+            DemTile(
+                tileId = tileId,
+                filePath = demTileRepository.demFilePath(tileId),
+                width = conversion.width,
+                height = conversion.height,
+                tileLat = tileLat,
+                tileLon = tileLon,
+                noDataValue = conversion.noDataValue,
+                sizeBytes = conversion.sizeBytes,
+                // Preserve refs held by other regions; this region's claim is added via acquire.
+                refCount = existing?.refCount ?: 0,
+                lastAccessedAt = Instant.now()
             )
         )
+    }
+
+    /**
+     * Links [tileId] to [regionId] and increments refCount only when the coverage row is new.
+     * Avoids inflating refs on retries / forced re-converts when the junction already exists.
+     */
+    private suspend fun acquireTileForRegion(regionId: UUID, tileId: String) {
+        if (linkTileCoverage(regionId, tileId)) {
+            demTileRepository.incrementRefCount(tileId)
+        }
+    }
+
+    private suspend fun linkTileCoverage(regionId: UUID, tileId: String): Boolean {
+        val rowId =
+            tileCoverageDao.insert(
+                TileCoverageEntity(
+                    regionId = regionId.toString(),
+                    tileId = tileId
+                )
+            )
+        return rowId != -1L
     }
 
     private fun updateProgress(

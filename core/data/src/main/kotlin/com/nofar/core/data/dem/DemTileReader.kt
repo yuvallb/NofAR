@@ -37,6 +37,43 @@ class DemTileReader private constructor(
         return if (isPlausibleElevation(value)) value else null
     }
 
+    /** Bilinear sample for map viewshed preview (not used on Explore hot path). */
+    fun elevationAtBilinear(lat: Double, lon: Double): Float? =
+        if (isInsideTile(lat, lon)) interpolateBilinear(lat, lon) else null
+
+    private fun interpolateBilinear(lat: Double, lon: Double): Float? {
+        val lon0 = tileLon.toDouble()
+        val lon1 = tileLon + 1.0
+        val lat0 = tileLat.toDouble()
+        val lat1 = tileLat + 1.0
+        val xFrac = ((lon - lon0) / (lon1 - lon0) * (width - 1)).coerceIn(0.0, (width - 1).toDouble())
+        val yFrac = ((lat1 - lat) / (lat1 - lat0) * (height - 1)).coerceIn(0.0, (height - 1).toDouble())
+        val x0 = floor(xFrac).toInt().coerceIn(0, width - 1)
+        val y0 = floor(yFrac).toInt().coerceIn(0, height - 1)
+        val x1 = (x0 + 1).coerceAtMost(width - 1)
+        val y1 = (y0 + 1).coerceAtMost(height - 1)
+        val tx = (xFrac - x0).toFloat()
+        val ty = (yFrac - y0).toFloat()
+        val v00 = samplePixel(x0, y0)
+        val v10 = samplePixel(x1, y0)
+        val v01 = samplePixel(x0, y1)
+        val v11 = samplePixel(x1, y1)
+        val cornersValid = v00 != null && v10 != null && v01 != null && v11 != null
+        return if (cornersValid) {
+            val top = v00 * (1f - tx) + v10 * tx
+            val bottom = v01 * (1f - tx) + v11 * tx
+            top * (1f - ty) + bottom * ty
+        } else {
+            null
+        }
+    }
+
+    private fun samplePixel(x: Int, y: Int): Float? {
+        val offset = y * width + x
+        val value = dataBuffer.getFloat(offset * Float.SIZE_BYTES)
+        return if (isPlausibleElevation(value)) value else null
+    }
+
     /**
      * Guards against no-data sentinels that never got normalised to [noDataValue] — notably Copernicus
      * GLO-30's `-32767`, which older tiles kept verbatim because the converter assumed `-9999`.
@@ -79,6 +116,17 @@ class DemTileReader private constructor(
 
         /** Above Everest (8849 m); rejects `32767` and similar positive sentinels. */
         private const val MAX_PLAUSIBLE_ELEVATION_M = 9_000f
+
+        fun hasCurrentFormat(file: File): Boolean {
+            if (!file.exists() || file.length() <= DemBinaryFormat.HEADER_SIZE_BYTES) return false
+            return runCatching {
+                RandomAccessFile(file, "r").use { input ->
+                    val magicBytes = ByteArray(DemBinaryFormat.MAGIC_SIZE_BYTES)
+                    input.readFully(magicBytes)
+                    magicBytes.toString(Charsets.US_ASCII) == DemBinaryFormat.MAGIC
+                }
+            }.getOrDefault(false)
+        }
 
         fun open(file: File): DemTileReader {
             val raf = RandomAccessFile(file, "r")

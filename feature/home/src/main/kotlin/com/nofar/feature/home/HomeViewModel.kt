@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.StatFs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.repository.HomeRegionMetadataRepository
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.repository.StorageRepository
@@ -12,6 +13,7 @@ import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
 import com.nofar.core.data.usecase.RegionDeletionUseCase
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
+import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.LocationAccessState
 import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
@@ -43,7 +45,9 @@ data class HomeUiState(
     val snackbarMessage: String? = null,
     val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED,
     val waitingForGpsFix: Boolean = false,
-    val loading: Boolean = true
+    val loading: Boolean = true,
+    val simpleModeEnabled: Boolean = true,
+    val exploreAnotherLocationEnabled: Boolean = false
 )
 
 @HiltViewModel
@@ -59,7 +63,8 @@ constructor(
     private val regionCoverageRepairUseCase: RegionCoverageRepairUseCase,
     private val locationRepository: LocationRepository,
     private val locationController: LocationController,
-    private val declinationCorrector: DeclinationCorrector
+    private val declinationCorrector: DeclinationCorrector,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
     private val currentLocation = MutableStateFlow<UserLocation?>(null)
     private val insideExploreRegions = MutableStateFlow<List<Region>>(emptyList())
@@ -95,12 +100,19 @@ constructor(
                     _uiState.update { state ->
                         val waitingForFix =
                             location == null && state.locationAccessState == LocationAccessState.GRANTED
+                        val exploreAnother =
+                            !state.simpleModeEnabled &&
+                                cards.any { card ->
+                                    card.region.downloadStatus == DownloadStatus.READY ||
+                                        card.region.downloadStatus == DownloadStatus.PARTIAL
+                                }
                         state.copy(
                             regions = cards,
                             loading = false,
                             insideRegionIds = insideExplore.map { it.id }.toSet(),
                             enterExploreEnabled = HomeRegionLogic.isEnterExploreEnabled(insideExplore),
-                            waitingForGpsFix = waitingForFix
+                            waitingForGpsFix = waitingForFix,
+                            exploreAnotherLocationEnabled = exploreAnother
                         )
                     }
                 }
@@ -124,6 +136,21 @@ constructor(
                 }
         }
         refreshStorageStats()
+        viewModelScope.launch {
+            userPreferencesRepository.simpleModeEnabled.collect { simpleMode ->
+                _uiState.update { state ->
+                    state.copy(
+                        simpleModeEnabled = simpleMode,
+                        exploreAnotherLocationEnabled =
+                        !simpleMode &&
+                            state.regions.any { card ->
+                                card.region.downloadStatus == DownloadStatus.READY ||
+                                    card.region.downloadStatus == DownloadStatus.PARTIAL
+                            }
+                    )
+                }
+            }
+        }
     }
 
     fun onLocationPermissionChanged(accessState: LocationAccessState) {

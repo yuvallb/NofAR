@@ -1,6 +1,7 @@
 package com.nofar.core.data.dem
 
 import com.google.common.truth.Truth.assertThat
+import java.io.RandomAccessFile
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -49,6 +50,21 @@ class DemTileBinaryTest {
             val value = reader.elevationAt(centerLat, centerLon)
             assertThat(value).isNotNull()
         }
+    }
+
+    @Test
+    fun currentFormatDetection_rejectsLegacyConverterOutput() {
+        val elevations = FloatArray(16) { 100f }
+        val currentFile = tempDir.newFile("current.bin")
+        DemTileWriter(tileLat = 32, tileLon = 35).write(currentFile, 4, 4, elevations)
+        val legacyFile = tempDir.newFile("legacy.bin")
+        currentFile.copyTo(legacyFile, overwrite = true)
+        RandomAccessFile(legacyFile, "rw").use { file ->
+            file.write("NOFAR_DEM".toByteArray(Charsets.US_ASCII))
+        }
+
+        assertThat(DemTileReader.hasCurrentFormat(currentFile)).isTrue()
+        assertThat(DemTileReader.hasCurrentFormat(legacyFile)).isFalse()
     }
 
     // Device regression: tiles converted before GDAL_NODATA was honoured still hold Copernicus'

@@ -1,4 +1,4 @@
-@file:Suppress("TooManyFunctions")
+@file:Suppress("TooManyFunctions", "LargeClass")
 
 package com.nofar.feature.explore
 
@@ -12,6 +12,7 @@ import com.nofar.core.data.prepare.PrepareDownloadScheduler
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.usecase.ExploreRegionResolution
 import com.nofar.core.data.usecase.ExploreRegionResolver
+import com.nofar.core.data.usecase.InsideRegionUseCase
 import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
 import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
 import com.nofar.core.designsystem.component.HorizonOutlinePoint
@@ -46,6 +47,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -65,6 +67,7 @@ constructor(
     private val displayAltitudeResolver: DisplayAltitudeResolver,
     private val regionRepository: RegionRepository,
     private val regionCoverageRepairUseCase: RegionCoverageRepairUseCase,
+    private val insideRegionUseCase: InsideRegionUseCase,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val quickRegionDownloadUseCase: QuickRegionDownloadUseCase,
     private val downloadScheduler: PrepareDownloadScheduler,
@@ -73,8 +76,19 @@ constructor(
     private val _uiState = MutableStateFlow(ExploreUiState())
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
 
+    private val virtualExploreSession: VirtualExploreSession? =
+        ExploreRouteBuilder.parseVirtualSession(
+            regionIdRaw = savedStateHandle.get<String>("regionId"),
+            virtualLatRaw = savedStateHandle.get<String>("virtualLat"),
+            virtualLonRaw = savedStateHandle.get<String>("virtualLon")
+        )
+
     private val requestedRegionId: UUID? =
-        savedStateHandle.get<String>("regionId")?.let { runCatching { UUID.fromString(it) }.getOrNull() }
+        virtualExploreSession?.primaryRegionId
+            ?: ExploreRouteBuilder.parseRegionId(savedStateHandle.get<String>("regionId"))
+
+    private val virtualObserverLocation: UserLocation? =
+        virtualExploreSession?.let(::virtualObserverLocation)
 
     private val regionBoundaryController = ExploreRegionBoundaryController()
     private val altitudeController =
@@ -103,9 +117,17 @@ constructor(
     private var lastCompassBearingDeg: Float = 0f
 
     init {
+        configureObserverLocationSource()
         locationController.acquire(EXPLORE_LOCATION_TOKEN)
         orientationController.acquire(EXPLORE_ORIENTATION_TOKEN)
         visibilityPassScheduler.start(viewModelScope)
+        virtualObserverLocation?.let(visibilityPassScheduler::seedObserverLocation)
+        _uiState.update {
+            it.copy(
+                virtualExploreSession = virtualExploreSession,
+                waitingForGpsFix = if (virtualExploreSession != null) false else it.waitingForGpsFix
+            )
+        }
         collectSimpleModePreference()
         collectHorizonOutlinePreference()
         viewModelScope.launch { resolveInitialRegion() }
@@ -113,6 +135,13 @@ constructor(
         collectLocation()
         collectVisibility()
         collectDebugPreferences()
+    }
+
+    private fun configureObserverLocationSource() {
+        val observerFlow =
+            virtualObserverLocation?.let { location -> flowOf(location) }
+                ?: locationRepository.locationFlow
+        visibilityPassScheduler.configureObserverLocation(observerFlow)
     }
 
     fun onLocationPermissionChanged(accessState: LocationAccessState) {
@@ -124,17 +153,21 @@ constructor(
             visibilityPassScheduler.setActiveRegions(emptyList())
         }
         _uiState.update { state ->
-            val waiting =
-                accessState == LocationAccessState.GRANTED &&
+            val waitingForDeviceFix =
+                virtualObserverLocation == null &&
+                    accessState == LocationAccessState.GRANTED &&
                     locationRepository.lastLocation == null
             state.copy(
                 altitude = if (accessState == LocationAccessState.GRANTED) state.altitude else null,
-                locationAccessState = if (waiting) LocationAccessState.WAITING_FOR_FIX else accessState,
-                waitingForGpsFix = waiting
+                locationAccessState =
+                if (waitingForDeviceFix) LocationAccessState.WAITING_FOR_FIX else accessState,
+                waitingForGpsFix = waitingForDeviceFix
             )
         }
         if (accessState == LocationAccessState.GRANTED) {
-            locationRepository.lastLocation?.let { location ->
+            virtualObserverLocation?.let { observer ->
+                altitudeController.scheduleResolve(observer, _uiState.value.activeRegions)
+            } ?: locationRepository.lastLocation?.let { location ->
                 altitudeController.scheduleResolve(location, _uiState.value.activeRegions)
             }
         } else {
@@ -259,6 +292,10 @@ constructor(
     }
 
     private suspend fun resolveInitialRegion() {
+        virtualObserverLocation?.let { observer ->
+            resolveVirtualExplore(observer)
+            return
+        }
         val location = locationRepository.lastLocation
         if (location != null) {
             applyRegionResolution(location)
@@ -269,6 +306,22 @@ constructor(
             val region = regionRepository.getRegion(requestedRegionId)
             applyActiveRegions(listOfNotNull(region))
         }
+    }
+
+    private suspend fun resolveVirtualExplore(observer: UserLocation) {
+        val session = virtualExploreSession ?: return
+        val eligible =
+            insideRegionUseCase.exploreEligibleRegionsContainingPoint(
+                observer.latitude,
+                observer.longitude
+            )
+        if (eligible.none { it.id == session.primaryRegionId }) {
+            applyActiveRegions(emptyList())
+            refreshGate()
+            return
+        }
+        applyRegionResolution(observer)
+        altitudeController.scheduleResolve(observer, _uiState.value.activeRegions)
     }
 
     private suspend fun applyRegionResolution(location: UserLocation) {
@@ -347,7 +400,9 @@ constructor(
                 partialRegionWarning = regions.any { region -> region.downloadStatus == DownloadStatus.PARTIAL }
             )
         }
-        locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it, regions) }
+        virtualObserverLocation?.let { observer ->
+            altitudeController.scheduleResolve(observer, regions)
+        } ?: locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it, regions) }
         viewModelScope.launch(Dispatchers.IO) {
             regions.forEach { active ->
                 runCatching { regionCoverageRepairUseCase.repairIfNeeded(active) }
@@ -403,6 +458,11 @@ constructor(
             )
         }
         reprojectOverlay()
+
+        if (virtualObserverLocation != null) {
+            refreshGate()
+            return
+        }
 
         viewModelScope.launch {
             val previousResolution = _uiState.value.regionResolution

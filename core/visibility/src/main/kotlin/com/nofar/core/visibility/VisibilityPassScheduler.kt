@@ -3,13 +3,13 @@ package com.nofar.core.visibility
 import android.util.Log
 import com.nofar.core.common.DispatcherProvider
 import com.nofar.core.data.preferences.UserPreferencesRepository
-import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,7 +22,6 @@ import kotlinx.coroutines.sync.withLock
 class VisibilityPassScheduler
 @Inject
 constructor(
-    private val locationRepository: LocationRepository,
     private val visibilityUseCase: RegionVisibilityComputer,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val dispatchers: DispatcherProvider
@@ -50,22 +49,36 @@ constructor(
     private var inFlightJob: Job? = null
     private var collectorJob: Job? = null
     private var scope: CoroutineScope? = null
+    private var observerLocationFlow: Flow<UserLocation>? = null
+    private var lastObserverLocation: UserLocation? = null
+
+    fun configureObserverLocation(observerFlow: Flow<UserLocation>) {
+        observerLocationFlow = observerFlow
+    }
 
     fun setActiveRegions(regions: List<Region>) {
         activeRegions = regions
         lastPassAtMillis = VisibilityPassPolicy.NO_PASS_YET
         lastPassLocation = null
-        locationRepository.lastLocation?.let { location ->
+        lastObserverLocation?.let { location ->
             triggerPass(force = true, location = location, regions = regions)
         }
     }
 
+    fun seedObserverLocation(location: UserLocation) {
+        lastObserverLocation = location
+    }
+
     fun start(scope: CoroutineScope) {
-        if (collectorJob != null) return
+        val flow = observerLocationFlow ?: error("configureObserverLocation before start")
+        collectorJob?.cancel()
+        inFlightJob?.cancel()
+        inFlightJob = null
         this.scope = scope
         collectorJob =
             scope.launch(dispatchers.default) {
-                locationRepository.locationFlow.collect { location ->
+                flow.collect { location ->
+                    lastObserverLocation = location
                     onLocationUpdate(location)
                 }
             }
@@ -85,6 +98,7 @@ constructor(
         activeRegions = emptyList()
         lastPassAtMillis = VisibilityPassPolicy.NO_PASS_YET
         lastPassLocation = null
+        lastObserverLocation = null
     }
 
     private fun onLocationUpdate(location: UserLocation) {
@@ -96,7 +110,7 @@ constructor(
 
     private fun triggerPass(
         force: Boolean,
-        location: UserLocation? = locationRepository.lastLocation,
+        location: UserLocation? = lastObserverLocation,
         regions: List<Region> = activeRegions
     ) {
         val currentRegions = regions

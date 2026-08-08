@@ -30,6 +30,7 @@ internal fun ExploreScreenRoot(
     permissionState: PermissionState,
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onChangeVirtualLocation: () -> Unit,
     onScreenSizeChanged: (Float, Float) -> Unit,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
     onHiddenCountClick: (Int) -> Unit,
@@ -66,7 +67,8 @@ internal fun ExploreScreenRoot(
             ExploreReadyChrome(
                 uiState = uiState,
                 onNavigateBack = onNavigateBack,
-                onNavigateToSettings = onNavigateToSettings
+                onNavigateToSettings = onNavigateToSettings,
+                onChangeVirtualLocation = onChangeVirtualLocation
             )
         } else {
             ExploreTopChrome(
@@ -232,10 +234,18 @@ private fun BoxScope.ExploreWaitingGpsGateContent(uiState: ExploreUiState, permi
 private fun BoxScope.ExploreReadyChrome(
     uiState: ExploreUiState,
     onNavigateBack: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onChangeVirtualLocation: () -> Unit
 ) {
     ExploreReadyTopChrome(uiState = uiState)
     ExploreReadyStatusBanners(uiState = uiState)
+    if (uiState.isVirtualExplore) {
+        ExploreVirtualLocationBanner(
+            session = uiState.virtualExploreSession,
+            onChangeLocation = onChangeVirtualLocation,
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 96.dp)
+        )
+    }
     if (uiState.showNoVisibleEntitiesHint) {
         ExploreNoVisibleEntitiesHint(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 128.dp)
@@ -283,7 +293,7 @@ private fun BoxScope.ExploreReadyStatusBanners(uiState: ExploreUiState) {
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 168.dp)
         )
     }
-    if (uiState.showRegionExitBanner) {
+    if (uiState.showRegionExitBanner && !uiState.isVirtualExplore) {
         ExploreRegionExitBanner(
             regionName = uiState.activeRegionName.orEmpty(),
             graceSecondsRemaining = uiState.regionExitGraceSecondsRemaining,

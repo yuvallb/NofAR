@@ -2,7 +2,6 @@ package com.nofar.core.data.repository
 
 import android.content.Context
 import android.util.Log
-import com.nofar.core.data.dem.DemBinaryFormat
 import com.nofar.core.data.dem.DemTileReader
 import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.model.asEntity
@@ -32,7 +31,7 @@ constructor(
 
     override fun isBinReadable(tileId: String): Boolean {
         val file = demFile(tileId)
-        return file.exists() && file.length() > DemBinaryFormat.HEADER_SIZE_BYTES
+        return DemTileReader.hasCurrentFormat(file)
     }
 
     override suspend fun ensureRegisteredFromBin(tileId: String): Boolean {

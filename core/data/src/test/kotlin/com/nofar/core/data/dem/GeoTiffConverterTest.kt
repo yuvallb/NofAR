@@ -58,6 +58,51 @@ class GeoTiffConverterTest {
         }
     }
 
+    @Test
+    fun convert_deflateTiledFloat32_preservesPaddedEdgeTileStride() {
+        val width = 10
+        val height = 6
+        val tileWidth = 4
+        val tileLength = 4
+        val samples = FloatArray(width * height) { index -> 300f + index }
+        val input = tempDir.newFile("padded-edge-tile.tif")
+        input.writeBytes(buildDeflateTiledTiff(width, height, tileWidth, tileLength, samples))
+
+        val output = tempDir.newFile("padded-edge-tile.bin")
+        DefaultGeoTiffConverter().convert(input, tileLat = 32, tileLon = 35, output)
+
+        assertThat(readBinElevations(output, width, height).asList())
+            .containsExactlyElementsIn(samples.asList())
+            .inOrder()
+    }
+
+    @Test
+    fun convert_deflateTiledFloat32_reversesFloatingPointPredictor() {
+        val width = 10
+        val height = 6
+        val tileWidth = 4
+        val tileLength = 4
+        val samples = FloatArray(width * height) { index -> -430f + index * 3.25f }
+        val input = tempDir.newFile("floating-point-predictor.tif")
+        input.writeBytes(
+            buildDeflateTiledTiff(
+                width = width,
+                height = height,
+                tileWidth = tileWidth,
+                tileLength = tileLength,
+                samples = samples,
+                predictor = 3
+            )
+        )
+
+        val output = tempDir.newFile("floating-point-predictor.bin")
+        DefaultGeoTiffConverter().convert(input, tileLat = 32, tileLon = 35, output)
+
+        assertThat(readBinElevations(output, width, height).asList())
+            .containsExactlyElementsIn(samples.asList())
+            .inOrder()
+    }
+
     // Copernicus GLO-30 declares its no-data as the ASCII GDAL_NODATA tag (-32767). The converter used to
     // ignore the tag and stamp the header with -9999, so the sentinel reached Explore as a real elevation.
     @Test
@@ -82,7 +127,8 @@ class GeoTiffConverterTest {
 
     @Test
     fun convert_realCopernicusTile_whenFixturePresent() {
-        val fixture = File(System.getProperty("copernicusDemFixture", "/tmp/copernicus_n32_e35.tif"))
+        val fixturePath = System.getProperty("copernicusDemFixture") ?: "/tmp/copernicus_n32_e35.tif"
+        val fixture = File(fixturePath)
         org.junit.Assume.assumeTrue("Copernicus fixture missing: ${fixture.absolutePath}", fixture.exists())
 
         val output = tempDir.newFile("copernicus.bin")
@@ -91,7 +137,15 @@ class GeoTiffConverterTest {
         assertThat(result.width).isEqualTo(3600)
         assertThat(result.height).isEqualTo(3600)
         DemTileReader.open(output).use { reader ->
-            assertThat(reader.elevationAt(32.5, 35.5)).isNotNull()
+            var validSamples = 0
+            for (row in 1..9) {
+                for (column in 1..9) {
+                    val lat = 32.0 + row / 10.0
+                    val lon = 35.0 + column / 10.0
+                    if (reader.elevationAt(lat, lon) != null) validSamples += 1
+                }
+            }
+            assertThat(validSamples).isAtLeast(75)
         }
     }
 
@@ -158,34 +212,18 @@ class GeoTiffConverterTest {
         height: Int,
         tileWidth: Int,
         tileLength: Int,
-        samples: FloatArray
+        samples: FloatArray,
+        predictor: Int = 1
     ): ByteArray {
         val tilesAcross = (width + tileWidth - 1) / tileWidth
         val tilesDown = (height + tileLength - 1) / tileLength
         val tileCount = tilesAcross * tilesDown
-        val compressedTiles = Array(tileCount) { index ->
-            val tileX = index % tilesAcross
-            val tileY = index / tilesAcross
-            val startX = tileX * tileWidth
-            val startY = tileY * tileLength
-            val tilePixelWidth = minOf(tileWidth, width - startX)
-            val tilePixelHeight = minOf(tileLength, height - startY)
-            val tileSamples = FloatArray(tilePixelWidth * tilePixelHeight)
-            for (row in 0 until tilePixelHeight) {
-                for (col in 0 until tilePixelWidth) {
-                    tileSamples[row * tileWidth + col] = samples[(startY + row) * width + (startX + col)]
-                }
-            }
-            val raw =
-                ByteBuffer.allocate(tileSamples.size * Float.SIZE_BYTES)
-                    .order(ByteOrder.LITTLE_ENDIAN)
-                    .apply { tileSamples.forEach { putFloat(it) } }
-                    .array()
-            deflate(raw)
-        }
+        val compressedTiles =
+            buildCompressedTiles(width, height, tileWidth, tileLength, samples, predictor)
 
+        val entryCount = if (predictor == 3) 11 else 10
         val ifdOffset = 8
-        val offsetsArrayOffset = ifdOffset + 2 + 10 * 12 + 4
+        val offsetsArrayOffset = ifdOffset + 2 + entryCount * 12 + 4
         val countsArrayOffset = offsetsArrayOffset + tileCount * 4
         var dataOffset = countsArrayOffset + tileCount * 4
         val tileOffsets = IntArray(tileCount)
@@ -201,12 +239,13 @@ class GeoTiffConverterTest {
         buffer.put('I'.code.toByte())
         buffer.putShort(42)
         buffer.putInt(ifdOffset)
-        buffer.putShort(10)
+        buffer.putShort(entryCount.toShort())
         writeIfdEntry(buffer, 256, 3, 1, width)
         writeIfdEntry(buffer, 257, 3, 1, height)
         writeIfdEntry(buffer, 258, 3, 1, 32)
         writeIfdEntry(buffer, 259, 3, 1, 8)
         writeIfdEntry(buffer, 277, 3, 1, 1)
+        if (predictor == 3) writeIfdEntry(buffer, 317, 3, 1, predictor)
         writeIfdEntry(buffer, 322, 3, 1, tileWidth)
         writeIfdEntry(buffer, 323, 3, 1, tileLength)
         writeIfdEntry(buffer, 324, 4, tileCount, offsetsArrayOffset)
@@ -217,6 +256,75 @@ class GeoTiffConverterTest {
         tileByteCounts.forEach { buffer.putInt(it) }
         compressedTiles.forEach { buffer.put(it) }
         return buffer.array()
+    }
+
+    private fun buildCompressedTiles(
+        width: Int,
+        height: Int,
+        tileWidth: Int,
+        tileLength: Int,
+        samples: FloatArray,
+        predictor: Int
+    ): Array<ByteArray> {
+        val tilesAcross = (width + tileWidth - 1) / tileWidth
+        val tilesDown = (height + tileLength - 1) / tileLength
+        return Array(tilesAcross * tilesDown) { index ->
+            val tileX = index % tilesAcross
+            val tileY = index / tilesAcross
+            val startX = tileX * tileWidth
+            val startY = tileY * tileLength
+            val tilePixelWidth = minOf(tileWidth, width - startX)
+            val tilePixelHeight = minOf(tileLength, height - startY)
+            // TIFF edge tiles retain the declared full tile dimensions and row stride. Pixels
+            // outside the image are padding and must not shift valid rows during conversion.
+            val tileSamples = FloatArray(tileWidth * tileLength) { DemBinaryFormat.DEFAULT_NO_DATA_VALUE }
+            for (row in 0 until tilePixelHeight) {
+                for (col in 0 until tilePixelWidth) {
+                    tileSamples[row * tileWidth + col] = samples[(startY + row) * width + (startX + col)]
+                }
+            }
+            val sampleBytes =
+                ByteBuffer.allocate(tileSamples.size * Float.SIZE_BYTES)
+                    .order(ByteOrder.LITTLE_ENDIAN)
+                    .apply { tileSamples.forEach { putFloat(it) } }
+                    .array()
+            val encodedBytes =
+                if (predictor == 3) {
+                    encodeFloatingPointPredictor(sampleBytes, rowSampleCount = tileWidth)
+                } else {
+                    sampleBytes
+                }
+            deflate(encodedBytes)
+        }
+    }
+
+    private fun encodeFloatingPointPredictor(input: ByteArray, rowSampleCount: Int): ByteArray {
+        val bytesPerSample = Float.SIZE_BYTES
+        val rowByteCount = rowSampleCount * bytesPerSample
+        val output = ByteArray(input.size)
+        var rowOffset = 0
+        while (rowOffset < input.size) {
+            for (sampleIndex in 0 until rowSampleCount) {
+                for (byteIndex in 0 until bytesPerSample) {
+                    val planeIndex = bytesPerSample - byteIndex - 1
+                    output[rowOffset + planeIndex * rowSampleCount + sampleIndex] =
+                        input[rowOffset + sampleIndex * bytesPerSample + byteIndex]
+                }
+            }
+            for (index in rowByteCount - 1 downTo 1) {
+                val difference = (output[rowOffset + index].toInt() and 0xFF) -
+                    (output[rowOffset + index - 1].toInt() and 0xFF)
+                output[rowOffset + index] = difference.toByte()
+            }
+            rowOffset += rowByteCount
+        }
+        return output
+    }
+
+    private fun readBinElevations(file: File, width: Int, height: Int): FloatArray {
+        val buffer = ByteBuffer.wrap(file.readBytes()).order(ByteOrder.LITTLE_ENDIAN)
+        buffer.position(DemBinaryFormat.HEADER_SIZE_BYTES)
+        return FloatArray(width * height) { buffer.float }
     }
 
     private fun writeIfdEntry(buffer: ByteBuffer, tag: Int, type: Int, count: Int, value: Int) {

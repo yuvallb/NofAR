@@ -28,6 +28,9 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         require(directory.sampleFormat == SAMPLE_FORMAT_FLOAT) {
             "Expected IEEE float samples, got format ${directory.sampleFormat}"
         }
+        require(directory.predictor == PREDICTOR_NONE || directory.predictor == PREDICTOR_FLOATING_POINT) {
+            "Unsupported TIFF predictor: ${directory.predictor}"
+        }
 
         val elevations =
             when {
@@ -88,7 +91,11 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                 decodeCompressedSamples(
                     compressed = compressed,
                     compression = directory.compression,
-                    sampleCount = tilePixelWidth * tilePixelHeight,
+                    // TIFF stores every tile at its declared dimensions. Edge tiles are padded;
+                    // their valid image area is smaller, but their row stride is still tileWidth.
+                    sampleCount = directory.tileWidth * directory.tileLength,
+                    rowSampleCount = directory.tileWidth,
+                    predictor = directory.predictor,
                     byteOrder = directory.byteOrder
                 )
             copyTileIntoRaster(
@@ -98,7 +105,7 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                 startY = startY,
                 tilePixelWidth = tilePixelWidth,
                 tilePixelHeight = tilePixelHeight,
-                tileStride = tilePixelWidth,
+                tileStride = directory.tileWidth,
                 tileSamples = tileSamples
             )
         }
@@ -121,6 +128,8 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                     compressed = compressed,
                     compression = directory.compression,
                     sampleCount = sampleCount,
+                    rowSampleCount = directory.width,
+                    predictor = directory.predictor,
                     byteOrder = directory.byteOrder
                 )
             for (stripRow in 0 until rowsInStrip) {
@@ -138,20 +147,72 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         compressed: ByteArray,
         compression: Int,
         sampleCount: Int,
+        rowSampleCount: Int,
+        predictor: Int,
         byteOrder: ByteOrder
     ): FloatArray {
-        val raw =
+        val decodedBytes =
             when (compression) {
                 COMPRESSION_NONE -> compressed
                 COMPRESSION_DEFLATE, COMPRESSION_ADOBE_DEFLATE -> inflateZlib(compressed)
                 else -> throw IOException("Unsupported TIFF compression: $compression")
             }
         val expectedBytes = sampleCount * Float.SIZE_BYTES
-        require(raw.size >= expectedBytes) {
-            "Expected at least $expectedBytes decoded bytes, got ${raw.size}"
+        require(decodedBytes.size >= expectedBytes) {
+            "Expected at least $expectedBytes decoded bytes, got ${decodedBytes.size}"
         }
-        val buffer = ByteBuffer.wrap(raw).order(byteOrder)
+        if (predictor == PREDICTOR_FLOATING_POINT) {
+            decodeFloatingPointPredictor(
+                bytes = decodedBytes,
+                byteCount = expectedBytes,
+                rowSampleCount = rowSampleCount,
+                byteOrder = byteOrder
+            )
+        }
+        val buffer = ByteBuffer.wrap(decodedBytes).order(byteOrder)
         return FloatArray(sampleCount) { buffer.float }
+    }
+
+    /**
+     * Reverses TIFF Predictor=3 for one-band float32 rows.
+     *
+     * The predictor stores significance-byte planes, then applies horizontal byte differencing to
+     * each complete row. Accumulation must happen before the planes are interleaved back into floats.
+     */
+    private fun decodeFloatingPointPredictor(
+        bytes: ByteArray,
+        byteCount: Int,
+        rowSampleCount: Int,
+        byteOrder: ByteOrder
+    ) {
+        val bytesPerSample = Float.SIZE_BYTES
+        val rowByteCount = rowSampleCount * bytesPerSample
+        require(rowByteCount > 0 && byteCount % rowByteCount == 0) {
+            "Predictor byte count $byteCount is not a whole number of $rowByteCount-byte rows"
+        }
+        val rowBuffer = ByteArray(rowByteCount)
+        var rowOffset = 0
+        while (rowOffset < byteCount) {
+            for (index in 1 until rowByteCount) {
+                val accumulated = (bytes[rowOffset + index].toInt() and 0xFF) +
+                    (bytes[rowOffset + index - 1].toInt() and 0xFF)
+                bytes[rowOffset + index] = accumulated.toByte()
+            }
+            bytes.copyInto(rowBuffer, startIndex = rowOffset, endIndex = rowOffset + rowByteCount)
+            for (sampleIndex in 0 until rowSampleCount) {
+                for (byteIndex in 0 until bytesPerSample) {
+                    val planeIndex =
+                        if (byteOrder == ByteOrder.BIG_ENDIAN) {
+                            byteIndex
+                        } else {
+                            bytesPerSample - byteIndex - 1
+                        }
+                    bytes[rowOffset + sampleIndex * bytesPerSample + byteIndex] =
+                        rowBuffer[planeIndex * rowSampleCount + sampleIndex]
+                }
+            }
+            rowOffset += rowByteCount
+        }
     }
 
     private fun copyTileIntoRaster(
@@ -200,6 +261,7 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         val bitsPerSample: Int,
         val sampleFormat: Int,
         val compression: Int,
+        val predictor: Int,
         val rowsPerStrip: Int,
         val tileWidth: Int,
         val tileLength: Int,
@@ -245,6 +307,7 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                 var bitsPerSample = 32
                 var sampleFormat = SAMPLE_FORMAT_FLOAT
                 var compression = COMPRESSION_NONE
+                var predictor = PREDICTOR_NONE
                 var rowsPerStrip = Int.MAX_VALUE
                 var tileWidth = 0
                 var tileLength = 0
@@ -274,7 +337,8 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                         TAG_IMAGE_LENGTH -> height = readTagScalarInt(bytes, byteOrder, entryOffset, type)
                         TAG_BITS_PER_SAMPLE -> bitsPerSample = readTagScalarInt(bytes, byteOrder, entryOffset, type)
                         TAG_SAMPLE_FORMAT -> sampleFormat = readTagScalarInt(bytes, byteOrder, entryOffset, type)
-                        TAG_COMPRESSION -> compression = readTagScalarInt(bytes, byteOrder, entryOffset, type)
+                        TAG_COMPRESSION, TAG_PREDICTOR ->
+                            applyEncodingTag(bytes, byteOrder, entryOffset, tag, type)
                         TAG_ROWS_PER_STRIP -> rowsPerStrip = readTagScalarInt(bytes, byteOrder, entryOffset, type)
                         TAG_TILE_WIDTH -> tileWidth = readTagScalarInt(bytes, byteOrder, entryOffset, type)
                         TAG_TILE_LENGTH -> tileLength = readTagScalarInt(bytes, byteOrder, entryOffset, type)
@@ -291,6 +355,20 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                     }
                 }
 
+                private fun applyEncodingTag(
+                    bytes: ByteArray,
+                    byteOrder: ByteOrder,
+                    entryOffset: Int,
+                    tag: Int,
+                    type: Int
+                ) {
+                    val value = readTagScalarInt(bytes, byteOrder, entryOffset, type)
+                    when (tag) {
+                        TAG_COMPRESSION -> compression = value
+                        TAG_PREDICTOR -> predictor = value
+                    }
+                }
+
                 fun toDirectory(byteOrder: ByteOrder): TiffDirectory = TiffDirectory(
                     byteOrder = byteOrder,
                     width = width,
@@ -298,6 +376,7 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
                     bitsPerSample = bitsPerSample,
                     sampleFormat = sampleFormat,
                     compression = compression,
+                    predictor = predictor,
                     rowsPerStrip = rowsPerStrip,
                     tileWidth = tileWidth,
                     tileLength = tileLength,
@@ -386,6 +465,8 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         private const val COMPRESSION_NONE = 1
         private const val COMPRESSION_DEFLATE = 8
         private const val COMPRESSION_ADOBE_DEFLATE = 32946
+        private const val PREDICTOR_NONE = 1
+        private const val PREDICTOR_FLOATING_POINT = 3
 
         private const val TAG_IMAGE_WIDTH = 256
         private const val TAG_IMAGE_LENGTH = 257
@@ -398,6 +479,7 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         private const val TAG_TILE_LENGTH = 323
         private const val TAG_TILE_OFFSETS = 324
         private const val TAG_TILE_BYTE_COUNTS = 325
+        private const val TAG_PREDICTOR = 317
         private const val TAG_SAMPLE_FORMAT = 339
         private const val TAG_GDAL_NODATA = 42113
 
