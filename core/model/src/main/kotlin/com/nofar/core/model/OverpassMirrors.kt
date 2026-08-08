@@ -3,7 +3,7 @@ package com.nofar.core.model
 /**
  * Ordered Overpass mirror URLs for Prepare downloads and Settings attribution display.
  *
- * Failover order matches Requirements §3.2: HPI → overpass-api.de → mail.ru.
+ * Failover order matches Requirements §3.2: HPI → overpass-api.de.
  */
 object OverpassMirrors {
     val baseUrls: List<String> =
