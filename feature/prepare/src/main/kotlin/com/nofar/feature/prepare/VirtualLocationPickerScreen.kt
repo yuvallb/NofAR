@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -114,7 +115,12 @@ private fun VirtualLocationPickerMapSection(
 
 @Composable
 private fun ColumnScope.VirtualLocationPickerFooter(uiState: VirtualLocationPickerUiState, onContinue: () -> Unit) {
-    Column(modifier = Modifier.padding(16.dp)) {
+    Column(
+        modifier =
+        Modifier
+            .windowInsetsPadding(bottomControlsInsets())
+            .padding(16.dp)
+    ) {
         uiState.helperMessage?.let { message ->
             Text(
                 text = message,

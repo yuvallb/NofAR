@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Help
@@ -239,6 +240,7 @@ private fun DefineRegionContent(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
+                .windowInsetsPadding(bottomControlsInsets())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -352,6 +354,7 @@ private fun DownloadingContent(uiState: PrepareUiState, onCancelDownload: () -> 
             modifier =
             Modifier
                 .fillMaxWidth()
+                .windowInsetsPadding(bottomControlsInsets())
                 .padding(16.dp)
         )
     }
