@@ -2,9 +2,19 @@
 
 **Point, explore, discover.**
 
+<p align="center">
+  <img src="fastlane/metadata/android/en-US/images/featureGraphic.png" alt="NofAR feature graphic" width="720"/>
+</p>
+
 NofAR is an offline-first Android app for hikers and travelers. Download map data for a circular area, then point your phone at the horizon to see terrain-aware labels for visible peaks, cities, towns, and villages — filtered by real line-of-sight over the landscape.
 
 No accounts. No backend. No tracking.
+
+<p align="center">
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/home.jpeg" alt="Home — saved regions" width="180"/>
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/tel.azeka.140.en.jpeg" alt="Explore — AR labels on the horizon" width="180"/>
+  <img src="fastlane/metadata/android/en-US/images/phoneScreenshots/tel.azeka.165.en.jpeg" alt="Explore — peaks and places labeled" width="180"/>
+</p>
 
 | | |
 |---|---|
