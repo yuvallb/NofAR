@@ -11,7 +11,7 @@ android {
 
     defaultConfig {
         buildConfigField("int", "VERSION_CODE", "1")
-        buildConfigField("String", "VERSION_NAME", "\"0.1.0\"")
+        buildConfigField("String", "VERSION_NAME", "\"1.0.0\"")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 }

@@ -6,7 +6,7 @@ package com.nofar.core.model
 object AppMetadata {
     const val APP_NAME: String = "NofAR"
     const val TAGLINE: String = "point, explore, discover"
-    const val VERSION_NAME: String = "0.1.0"
+    const val VERSION_NAME: String = "1.0.0"
     const val VERSION_CODE: Int = 1
 
     /** Public git repository (issues, source, license). */
