@@ -63,6 +63,12 @@ android {
     }
 }
 
+// Merged AndroidX baseline profiles are non-deterministic, and their startup ordering also
+// perturbs classes.dex, which breaks F-Droid reproducible-build verification.
+tasks.matching { it.name.contains("ArtProfile") }.configureEach {
+    enabled = false
+}
+
 dependencies {
     implementation(project(":core:common"))
     implementation(project(":core:model"))
