@@ -4,8 +4,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -13,8 +15,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.nofar.core.designsystem.icon.NofARIcons
 import com.nofar.core.designsystem.theme.NofARColors
 
 @Composable
@@ -29,7 +33,7 @@ fun NofARExploreHereChip(placeName: String?, peakName: String?, peakElevationM: 
         placeName?.let { name ->
             HereContextLine(
                 prefix = "HERE",
-                marker = "■",
+                marker = NofARIcons.PlaceMarker,
                 primaryText = name,
                 secondaryText = null
             )
@@ -38,7 +42,7 @@ fun NofARExploreHereChip(placeName: String?, peakName: String?, peakElevationM: 
             val elevationSuffix = peakElevationM?.let { elev -> " · ${elev}m" }.orEmpty()
             HereContextLine(
                 prefix = "AT",
-                marker = "▲",
+                marker = NofARIcons.PeakMarker,
                 primaryText = name,
                 secondaryText = elevationSuffix.takeIf { it.isNotEmpty() }
             )
@@ -47,7 +51,7 @@ fun NofARExploreHereChip(placeName: String?, peakName: String?, peakElevationM: 
 }
 
 @Composable
-private fun HereContextLine(prefix: String, marker: String, primaryText: String, secondaryText: String?) {
+private fun HereContextLine(prefix: String, marker: ImageVector, primaryText: String, secondaryText: String?) {
     Surface(
         shape = RoundedCornerShape(8.dp),
         color = NofARColors.ArOverlayBackground
@@ -63,10 +67,11 @@ private fun HereContextLine(prefix: String, marker: String, primaryText: String,
                 color = NofARColors.YouAreHere,
                 fontWeight = FontWeight.Bold
             )
-            Text(
-                text = marker,
-                style = MaterialTheme.typography.labelMedium,
-                color = NofARColors.YouAreHere
+            Icon(
+                imageVector = marker,
+                contentDescription = null,
+                tint = NofARColors.YouAreHere,
+                modifier = Modifier.size(ArLabelMarkerSize)
             )
             Text(
                 text = buildString {

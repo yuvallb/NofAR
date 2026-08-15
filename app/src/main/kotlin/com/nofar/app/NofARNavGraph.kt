@@ -4,7 +4,6 @@ import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import com.nofar.feature.explore.EXPLORE_ROUTE_WITH_ARGS
 import com.nofar.feature.explore.EXPLORE_START_ROUTE
-import com.nofar.feature.explore.ExplorePrepareNavigation
 import com.nofar.feature.explore.ExploreRouteBuilder
 import com.nofar.feature.explore.exploreScreen
 import com.nofar.feature.home.HOME_ROUTE
@@ -42,7 +41,6 @@ internal fun NavGraphBuilder.nofarNavGraph(navController: NavHostController) {
     exploreScreen(
         onNavigateBack = { navController.popBackStack() },
         onNavigateToSettings = { navController.navigate(SETTINGS_ROUTE) },
-        onNavigateToPrepare = { target -> navController.navigateToPrepareFromExplore(target) },
         onChangeVirtualLocation = { navController.navigateToChangeVirtualLocation() }
     )
     settingsScreen(
@@ -64,18 +62,6 @@ private fun NavHostController.navigateToVirtualExplore(selection: VirtualLocatio
         popUpTo(VIRTUAL_LOCATION_PICKER_ROUTE) { inclusive = true }
         launchSingleTop = true
     }
-}
-
-private fun NavHostController.navigateToPrepareFromExplore(target: ExplorePrepareNavigation) {
-    navigate(
-        PrepareRouteBuilder.build(
-            regionId = target.regionId,
-            centerLat = target.centerLat,
-            centerLon = target.centerLon,
-            radiusM = target.radiusM,
-            name = target.name
-        )
-    )
 }
 
 private fun NavHostController.navigateToChangeVirtualLocation() {

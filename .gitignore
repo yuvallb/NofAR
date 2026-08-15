@@ -27,3 +27,4 @@ Thumbs.db
 
 # DEM tile cache (runtime)
 dem_cache/
+/.icon-preview

@@ -15,7 +15,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -39,9 +41,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.nofar.core.designsystem.icon.NofARIcons
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.model.AltitudeReading
 import kotlin.math.roundToInt
+
+/** Marker glyph size on AR labels; matches the cap height of the label name text. */
+internal val ArLabelMarkerSize = 14.dp
 
 internal val arTextShadow =
     Shadow(
@@ -147,18 +153,29 @@ fun NofARArLabel(label: ArLabel, modifier: Modifier = Modifier, onHiddenCountCli
 
 @Composable
 private fun ArLabelTextBlock(label: ArLabel, onHiddenCountClick: ((Int) -> Unit)? = null) {
-    val marker = if (label.isPeak) "▲" else "■"
+    val markerColor = if (label.isPeak) NofARColors.ArAccent else Color.White
     Surface(
         shape = RoundedCornerShape(4.dp),
         color = NofARColors.ArOverlayBackground
     ) {
         Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)) {
-            Text(
-                text = "$marker ${label.name}",
-                style = MaterialTheme.typography.bodyMedium.copy(shadow = arTextShadow),
-                color = if (label.isPeak) NofARColors.ArAccent else Color.White,
-                fontWeight = FontWeight.Bold
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Icon(
+                    imageVector = if (label.isPeak) NofARIcons.PeakMarker else NofARIcons.PlaceMarker,
+                    contentDescription = null,
+                    tint = markerColor,
+                    modifier = Modifier.size(ArLabelMarkerSize)
+                )
+                Text(
+                    text = label.name,
+                    style = MaterialTheme.typography.bodyMedium.copy(shadow = arTextShadow),
+                    color = markerColor,
+                    fontWeight = FontWeight.Bold
+                )
+            }
             label.elevationM?.let { elevation ->
                 Text(
                     text = "$elevation m",

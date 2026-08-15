@@ -54,6 +54,24 @@ class ExplorePreconditionsTest {
     }
 
     @Test
+    fun simpleModeDownloading_returnsDownloadingGate() {
+        val gate =
+            ExplorePreconditions.resolveGate(
+                locationAccessState = LocationAccessState.GRANTED,
+                waitingForGpsFix = false,
+                cameraGranted = true,
+                calibrationState = CompassCalibrationState.OK,
+                activeRegion = null,
+                graceExpired = false,
+                simpleModeEnabled = true,
+                regionDownloadNeeded = true,
+                regionDownloading = true,
+                downloadPromptDismissed = false
+            )
+        assertThat(gate).isEqualTo(ExploreGate.REGION_DOWNLOADING)
+    }
+
+    @Test
     fun simpleModeDownloadNeeded_returnsDownloadNeededGate() {
         val gate =
             ExplorePreconditions.resolveGate(
