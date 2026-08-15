@@ -263,6 +263,7 @@ class VisibilityPassSchedulerTest {
         override val simpleModeDefaultsApplied: Flow<Boolean> = MutableStateFlow(false)
         override val preferredLabelLanguage: Flow<LabelLanguage> = MutableStateFlow(LabelLanguage.DEFAULT)
         override val showHorizonOutline: Flow<Boolean> = MutableStateFlow(showHorizon)
+        override val showLabelElevation: Flow<Boolean> = MutableStateFlow(false)
 
         override suspend fun setWifiOnlyDownloads(enabled: Boolean) = Unit
 
@@ -281,5 +282,7 @@ class VisibilityPassSchedulerTest {
         override suspend fun ensurePreferredLabelLanguageInitialized(detected: LabelLanguage) = Unit
 
         override suspend fun setShowHorizonOutline(enabled: Boolean) = Unit
+
+        override suspend fun setShowLabelElevation(enabled: Boolean) = Unit
     }
 }

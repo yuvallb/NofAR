@@ -37,6 +37,8 @@ interface UserPreferencesRepository {
 
     val showHorizonOutline: Flow<Boolean>
 
+    val showLabelElevation: Flow<Boolean>
+
     suspend fun setWifiOnlyDownloads(enabled: Boolean)
 
     suspend fun setDemCacheLimitBytes(bytes: Long)
@@ -58,6 +60,8 @@ interface UserPreferencesRepository {
     suspend fun ensurePreferredLabelLanguageInitialized(detected: LabelLanguage)
 
     suspend fun setShowHorizonOutline(enabled: Boolean)
+
+    suspend fun setShowLabelElevation(enabled: Boolean)
 }
 
 @Singleton
@@ -105,6 +109,11 @@ constructor(@ApplicationContext context: Context) :
     override val showHorizonOutline: Flow<Boolean> =
         dataStore.data.map { prefs ->
             prefs[SHOW_HORIZON_OUTLINE_KEY] ?: true
+        }
+
+    override val showLabelElevation: Flow<Boolean> =
+        dataStore.data.map { prefs ->
+            prefs[SHOW_LABEL_ELEVATION_KEY] ?: false
         }
 
     override suspend fun setWifiOnlyDownloads(enabled: Boolean) {
@@ -163,6 +172,12 @@ constructor(@ApplicationContext context: Context) :
         }
     }
 
+    override suspend fun setShowLabelElevation(enabled: Boolean) {
+        dataStore.edit { prefs ->
+            prefs[SHOW_LABEL_ELEVATION_KEY] = enabled
+        }
+    }
+
     companion object {
         private val WIFI_ONLY_KEY = booleanPreferencesKey("wifi_only_downloads")
         private val DEM_CACHE_LIMIT_KEY = longPreferencesKey("dem_cache_limit_bytes")
@@ -172,5 +187,6 @@ constructor(@ApplicationContext context: Context) :
         private val SIMPLE_MODE_DEFAULTS_APPLIED_KEY = booleanPreferencesKey("simple_mode_defaults_applied")
         private val PREFERRED_LABEL_LANGUAGE_KEY = stringPreferencesKey("preferred_label_language")
         private val SHOW_HORIZON_OUTLINE_KEY = booleanPreferencesKey("show_horizon_outline")
+        private val SHOW_LABEL_ELEVATION_KEY = booleanPreferencesKey("show_label_elevation")
     }
 }

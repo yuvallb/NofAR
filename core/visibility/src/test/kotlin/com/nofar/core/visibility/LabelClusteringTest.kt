@@ -2,6 +2,11 @@ package com.nofar.core.visibility
 
 import com.google.common.truth.Truth.assertThat
 import com.nofar.core.model.AppConfig
+import com.nofar.core.model.ElevationSource
+import com.nofar.core.model.GeoEntity
+import com.nofar.core.model.GeoEntityType
+import com.nofar.core.model.OsmType
+import java.time.Instant
 import org.junit.Test
 
 class LabelClusteringTest {
@@ -68,6 +73,75 @@ class LabelClusteringTest {
                 assertThat(rectsOverlap(placed[i], placed[j])).isFalse()
             }
         }
+    }
+
+    @Test
+    fun defaultShelfCount_usesAvailableSpaceAboveFifthShelf() {
+        val projected =
+            (0 until 8).map { index ->
+                labelAt(
+                    distanceM = 1_000.0 + index * 100.0,
+                    name = "Peak$index",
+                    terrainX = 100f,
+                    terrainY = 1_200f
+                )
+            }
+
+        val placed =
+            LabelClustering.cluster(
+                projected = projected,
+                screenWidthPx = 1_080f,
+                screenHeightPx = 1_920f
+            ).flatMap { it.labels }
+
+        assertThat(placed).hasSize(8)
+        assertThat(placed.minOf { it.cardYPx }).isLessThan(500f)
+    }
+
+    @Test
+    fun renderer_hidesElevationUnlessExplicitlyEnabled() {
+        val entity =
+            VisibleEntity(
+                bearingDeg = 0.0,
+                distanceM = 1_000.0,
+                elevationAngleDeg = 0.0,
+                entity =
+                GeoEntity(
+                    id = "peak",
+                    osmType = OsmType.NODE,
+                    name = "Peak",
+                    type = GeoEntityType.PEAK,
+                    lat = 0.0,
+                    lon = 0.0,
+                    elevation = 1_234,
+                    elevationSource = ElevationSource.OSM_TAG,
+                    lastSeenAt = Instant.EPOCH
+                )
+            )
+
+        val hiddenByDefault =
+            ExploreLabelRenderer.projectAndCluster(
+                entities = listOf(entity),
+                trueAzimuthDeg = 0f,
+                cameraElevationDeg = 0f,
+                fov = CameraFieldOfView.fallback(),
+                screenWidthPx = 1_080f,
+                screenHeightPx = 1_920f
+            ).single().labels.single()
+        val shown =
+            ExploreLabelRenderer.projectAndCluster(
+                entities = listOf(entity),
+                trueAzimuthDeg = 0f,
+                cameraElevationDeg = 0f,
+                fov = CameraFieldOfView.fallback(),
+                screenWidthPx = 1_080f,
+                screenHeightPx = 1_920f,
+                showElevation = true
+            ).single().labels.single()
+
+        assertThat(hiddenByDefault.elevationM).isNull()
+        assertThat(shown.elevationM).isEqualTo(1_234)
+        assertThat(hiddenByDefault.estimatedHeightPx).isLessThan(shown.estimatedHeightPx)
     }
 
     @Test

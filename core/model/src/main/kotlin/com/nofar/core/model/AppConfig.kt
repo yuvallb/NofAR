@@ -123,8 +123,8 @@ object AppConfig {
     /** Horizontal bucket width for Explore label group ids (pixels). */
     const val EXPLORE_CLUSTER_BUCKET_WIDTH_PX: Int = 50
 
-    /** Number of vertical shelves for the 1D label collision resolver. */
-    const val EXPLORE_LABEL_SHELF_COUNT: Int = 5
+    /** Maximum vertical shelves; off-screen shelves are discarded by the collision resolver. */
+    const val EXPLORE_LABEL_SHELF_COUNT: Int = 8
 
     /** Vertical pitch between successive label shelves (pixels). Must exceed card height + pads. */
     const val EXPLORE_LABEL_SHELF_PITCH_PX: Int = 128

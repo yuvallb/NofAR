@@ -382,6 +382,7 @@ object ExploreLabelRenderer {
         fov: CameraFieldOfView,
         screenWidthPx: Float,
         screenHeightPx: Float,
+        showElevation: Boolean = false,
         expandedBucketIndex: Int? = null
     ): List<ClusteredLabel> {
         val orientedFov = fov.orientedForScreen(screenWidthPx, screenHeightPx)
@@ -394,7 +395,8 @@ object ExploreLabelRenderer {
                     horizontalFovDeg = orientedFov.horizontalDeg,
                     verticalFovDeg = orientedFov.verticalDeg,
                     screenWidthPx = screenWidthPx,
-                    screenHeightPx = screenHeightPx
+                    screenHeightPx = screenHeightPx,
+                    showElevation = showElevation
                 )
             }
 
@@ -413,7 +415,8 @@ object ExploreLabelRenderer {
         horizontalFovDeg: Float,
         verticalFovDeg: Float,
         screenWidthPx: Float,
-        screenHeightPx: Float
+        screenHeightPx: Float,
+        showElevation: Boolean
     ): ProjectedLabel? {
         val anchorYPx =
             ScreenProjector.elevationToScreenY(
@@ -423,7 +426,14 @@ object ExploreLabelRenderer {
                 screenHeightPx = screenHeightPx
             ) ?: return null
 
-        return projectFootprintLabel(entity, trueAzimuthDeg, horizontalFovDeg, screenWidthPx, anchorYPx)
+        return projectFootprintLabel(
+            entity,
+            trueAzimuthDeg,
+            horizontalFovDeg,
+            screenWidthPx,
+            anchorYPx,
+            showElevation
+        )
             ?: ScreenProjector.projectEntityToScreen(
                 bearingDeg = entity.bearingDeg,
                 elevationAngleDeg = entity.elevationAngleDeg,
@@ -437,7 +447,8 @@ object ExploreLabelRenderer {
                 buildProjectedLabel(
                     entity = entity,
                     anchorXPx = projection.anchorXPx,
-                    anchorYPx = anchorYPx
+                    anchorYPx = anchorYPx,
+                    showElevation = showElevation
                 )
             }
     }
@@ -447,7 +458,8 @@ object ExploreLabelRenderer {
         trueAzimuthDeg: Float,
         horizontalFovDeg: Float,
         screenWidthPx: Float,
-        anchorYPx: Float
+        anchorYPx: Float,
+        showElevation: Boolean
     ): ProjectedLabel? {
         val footprintRadiusM = entity.entity.footprintRadiusM
         if (entity.entity.type == GeoEntityType.PEAK || footprintRadiusM == null) return null
@@ -469,7 +481,8 @@ object ExploreLabelRenderer {
                 anchorXPx = span.anchorXPx,
                 anchorYPx = anchorYPx,
                 footprintLeftXPx = span.leftXPx,
-                footprintRightXPx = span.rightXPx
+                footprintRightXPx = span.rightXPx,
+                showElevation = showElevation
             )
         }
     }
@@ -479,12 +492,13 @@ object ExploreLabelRenderer {
         anchorXPx: Float,
         anchorYPx: Float,
         footprintLeftXPx: Float? = null,
-        footprintRightXPx: Float? = null
+        footprintRightXPx: Float? = null,
+        showElevation: Boolean
     ): ProjectedLabel = ProjectedLabel(
         entityId = entity.entity.id,
         name = entity.entity.name,
         isPeak = entity.entity.type == GeoEntityType.PEAK,
-        elevationM = entity.entity.elevation,
+        elevationM = entity.entity.elevation.takeIf { showElevation },
         distanceM = entity.nearEdgeDistanceM,
         distanceDisplay = ExploreDistanceFormatter.format(entity.nearEdgeDistanceM),
         terrainAnchorXPx = anchorXPx,

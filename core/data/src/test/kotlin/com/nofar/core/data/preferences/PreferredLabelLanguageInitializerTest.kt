@@ -57,6 +57,7 @@ class PreferredLabelLanguageInitializerTest {
         override val preferredLabelLanguage: Flow<LabelLanguage> =
             storedLanguage.map { it ?: LabelLanguage.DEFAULT }
         override val showHorizonOutline: Flow<Boolean> = MutableStateFlow(true)
+        override val showLabelElevation: Flow<Boolean> = MutableStateFlow(false)
 
         override suspend fun setWifiOnlyDownloads(enabled: Boolean) = Unit
 
@@ -81,5 +82,7 @@ class PreferredLabelLanguageInitializerTest {
         }
 
         override suspend fun setShowHorizonOutline(enabled: Boolean) = Unit
+
+        override suspend fun setShowLabelElevation(enabled: Boolean) = Unit
     }
 }

@@ -130,6 +130,7 @@ constructor(
         }
         collectSimpleModePreference()
         collectHorizonOutlinePreference()
+        collectLabelElevationPreference()
         viewModelScope.launch { resolveInitialRegion() }
         collectOrientation()
         collectLocation()
@@ -292,6 +293,15 @@ constructor(
             userPreferencesRepository.simpleModeEnabled.collect { enabled ->
                 _uiState.update { it.copy(simpleModeEnabled = enabled) }
                 refreshGate()
+            }
+        }
+    }
+
+    private fun collectLabelElevationPreference() {
+        viewModelScope.launch {
+            userPreferencesRepository.showLabelElevation.collect { enabled ->
+                _uiState.update { it.copy(showLabelElevation = enabled) }
+                reprojectOverlay()
             }
         }
     }
@@ -691,6 +701,7 @@ constructor(
                 fov = state.cameraFov,
                 screenWidthPx = state.screenWidthPx,
                 screenHeightPx = state.screenHeightPx,
+                showElevation = state.showLabelElevation,
                 expandedBucketIndex = state.expandedBucketIndex
             )
         val horizonSegments = projectHorizonLineSegments(state, projectedOrientation)

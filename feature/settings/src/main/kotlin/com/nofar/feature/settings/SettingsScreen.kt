@@ -75,6 +75,7 @@ fun SettingsScreen(
                     viewModel.onSimpleModeChanged(enabled, onSimpleModeChanged)
                 },
                 onShowHorizonOutlineChanged = viewModel::onShowHorizonOutlineChanged,
+                onShowLabelElevationChanged = viewModel::onShowLabelElevationChanged,
                 onPreferredLabelLanguageChanged = viewModel::onPreferredLabelLanguageChanged,
                 onEvictionThresholdChanged = viewModel::onEvictionThresholdChanged,
                 onShowPurgeConfirm = viewModel::showPurgeConfirm,

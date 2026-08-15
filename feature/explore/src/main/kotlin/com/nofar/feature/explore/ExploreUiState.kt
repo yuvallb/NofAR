@@ -37,6 +37,7 @@ data class ExploreUiState(
     val arLabels: List<ArLabel> = emptyList(),
     val horizonLineSegments: List<List<HorizonOutlinePoint>> = emptyList(),
     val showHorizonOutline: Boolean = true,
+    val showLabelElevation: Boolean = false,
     val expandedBucketIndex: Int? = null,
     val expandedCluster: ClusteredLabel? = null,
     val showRegionExitBanner: Boolean = false,

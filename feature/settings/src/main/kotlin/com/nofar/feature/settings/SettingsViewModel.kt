@@ -33,6 +33,7 @@ data class SettingsUiState(
     val preferredLabelLanguage: LabelLanguage = LabelLanguage.DEFAULT,
     val showRawSensorOverlay: Boolean = false,
     val showHorizonOutline: Boolean = true,
+    val showLabelElevation: Boolean = false,
     val keepRawGeoTiff: Boolean = false,
     val prepareDownloadActive: Boolean = false,
     val showPurgeConfirm: Boolean = false,
@@ -76,13 +77,20 @@ constructor(
                     showRaw = showRaw,
                     keepTif = keepTif
                 )
-            }.combine(userPreferencesRepository.showHorizonOutline) { core, showHorizon ->
+            }.combine(
+                combine(
+                    userPreferencesRepository.showHorizonOutline,
+                    userPreferencesRepository.showLabelElevation,
+                    ::DisplayPreferenceSnapshot
+                )
+            ) { core, display ->
                 PreferenceSnapshot(
                     wifiOnly = core.wifiOnly,
                     simpleMode = core.simpleMode,
                     cacheLimitMb = core.cacheLimitMb,
                     showRaw = core.showRaw,
-                    showHorizon = showHorizon,
+                    showHorizon = display.showHorizon,
+                    showElevation = display.showElevation,
                     keepTif = core.keepTif
                 )
             }.collect { snapshot ->
@@ -93,6 +101,7 @@ constructor(
                         evictionThresholdMb = snapshot.cacheLimitMb,
                         showRawSensorOverlay = snapshot.showRaw,
                         showHorizonOutline = snapshot.showHorizon,
+                        showLabelElevation = snapshot.showElevation,
                         keepRawGeoTiff = snapshot.keepTif
                     )
                 }
@@ -161,6 +170,12 @@ constructor(
     fun onShowHorizonOutlineChanged(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setShowHorizonOutline(enabled)
+        }
+    }
+
+    fun onShowLabelElevationChanged(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setShowLabelElevation(enabled)
         }
     }
 
@@ -243,7 +258,7 @@ constructor(
         }
     }
 
-    /** The five preferences that fit in a single [combine]; the sixth (horizon) is added downstream. */
+    /** The five preferences that fit in a single [combine]; display preferences are added downstream. */
     private data class CorePreferenceSnapshot(
         val wifiOnly: Boolean,
         val simpleMode: Boolean,
@@ -258,6 +273,9 @@ constructor(
         val cacheLimitMb: Float,
         val showRaw: Boolean,
         val showHorizon: Boolean,
+        val showElevation: Boolean,
         val keepTif: Boolean
     )
+
+    private data class DisplayPreferenceSnapshot(val showHorizon: Boolean, val showElevation: Boolean)
 }

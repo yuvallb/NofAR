@@ -14,6 +14,7 @@ internal object ExploreLabelProjector {
         fov: CameraFieldOfView,
         screenWidthPx: Float,
         screenHeightPx: Float,
+        showElevation: Boolean,
         expandedBucketIndex: Int?
     ): Pair<List<ClusteredLabel>, List<ArLabel>> {
         val clusters =
@@ -24,6 +25,7 @@ internal object ExploreLabelProjector {
                 fov = fov,
                 screenWidthPx = screenWidthPx,
                 screenHeightPx = screenHeightPx,
+                showElevation = showElevation,
                 expandedBucketIndex = expandedBucketIndex
             )
 
