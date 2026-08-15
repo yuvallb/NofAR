@@ -21,7 +21,7 @@ No accounts. No backend. No tracking.
 | **Platform** | Android 8.0+ (API 26) |
 | **Package** | `com.nofar.app` |
 | **License** | [Apache 2.0](LICENSE) |
-| **Status** | Beta — functionality complete; store listing in progress |
+| **Status** | v1.0.0 Initial Release |
 | **Privacy** | [Policy](https://yuvallb.github.io/NofAR/privacy/) · [source](docs/privacy.md) |
 
 ---
