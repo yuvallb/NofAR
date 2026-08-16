@@ -32,6 +32,13 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // AGP adds an opaque "Dependency metadata" signing block that F-Droid's scanner rejects.
+    // Play still receives it via the app bundle.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = true
+    }
+
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {
