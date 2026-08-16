@@ -47,6 +47,8 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Avoid baking a dirty-tree / wrong-commit revision into the APK (F-Droid RB).
+            vcsInfo.include = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
