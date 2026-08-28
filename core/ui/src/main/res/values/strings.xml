@@ -38,6 +38,9 @@
     <string name="explore_download_progress">%1$d%% complete</string>
     <string name="explore_open_settings_gear">Settings</string>
     <string name="explore_download_map_data_action">Download map data</string>
+    <string name="explore_zoom_in">Zoom in</string>
+    <string name="explore_zoom_out">Zoom out</string>
+    <string name="explore_zoom_reset">Reset zoom</string>
     <string name="settings_simple_mode_title">Simple mode</string>
     <string name="settings_simple_mode_subtitle">Explore-first; map data downloads automatically nearby</string>
     <string name="settings_wifi_only_subtitle">Block map downloads on cellular data</string>

@@ -21,6 +21,91 @@ class ScreenProjectionTest {
     }
 
     @Test
+    fun zoomed_oneX_isIdentity() {
+        val fov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
+        val zoomed = fov.zoomed(1f)
+        assertThat(zoomed.horizontalDeg).isWithin(0.001f).of(60f)
+        assertThat(zoomed.verticalDeg).isWithin(0.001f).of(45f)
+    }
+
+    @Test
+    fun zoomed_twoX_narrowsHorizontalFov() {
+        val fov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
+        val zoomed = fov.zoomed(2f)
+        assertThat(zoomed.horizontalDeg).isWithin(0.1f).of(32.2f)
+        assertThat(zoomed.verticalDeg).isWithin(0.1f).of(23.5f)
+    }
+
+    @Test
+    fun zoomed_belowOneX_widensFov() {
+        val fov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
+        val zoomed = fov.zoomed(0.5f)
+        assertThat(zoomed.horizontalDeg).isGreaterThan(60f)
+    }
+
+    @Test
+    fun zoomed_compositionWithOrientedForScreen_isOrderIndependent() {
+        val fov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
+        val zoomThenOrient =
+            fov.zoomed(2f).orientedForScreen(screenWidthPx = 1920f, screenHeightPx = 1080f)
+        val orientThenZoom =
+            fov.orientedForScreen(screenWidthPx = 1920f, screenHeightPx = 1080f).zoomed(2f)
+        assertThat(zoomThenOrient.horizontalDeg).isWithin(0.001f).of(orientThenZoom.horizontalDeg)
+        assertThat(zoomThenOrient.verticalDeg).isWithin(0.001f).of(orientThenZoom.verticalDeg)
+    }
+
+    @Test
+    fun zoomedFov_movesLabelFurtherFromCenter() {
+        val baseFov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
+        val at1x =
+            ScreenProjector.projectEntityToScreen(
+                bearingDeg = 10.0,
+                elevationAngleDeg = 0.0,
+                trueAzimuthDeg = 0f,
+                cameraElevationDeg = 0f,
+                horizontalFovDeg = baseFov.horizontalDeg,
+                verticalFovDeg = baseFov.verticalDeg,
+                screenWidthPx = 1080f,
+                screenHeightPx = 1920f
+            )
+        val zoomedFov = baseFov.zoomed(3f)
+        val at3x =
+            ScreenProjector.projectEntityToScreen(
+                bearingDeg = 10.0,
+                elevationAngleDeg = 0.0,
+                trueAzimuthDeg = 0f,
+                cameraElevationDeg = 0f,
+                horizontalFovDeg = zoomedFov.horizontalDeg,
+                verticalFovDeg = zoomedFov.verticalDeg,
+                screenWidthPx = 1080f,
+                screenHeightPx = 1920f
+            )
+
+        assertThat(at1x).isNotNull()
+        assertThat(at3x).isNotNull()
+        assertThat(kotlin.math.abs(at3x!!.anchorXPx - 540f)).isGreaterThan(kotlin.math.abs(at1x!!.anchorXPx - 540f))
+    }
+
+    @Test
+    fun zoomedFov_cullsEntitiesOutsideNarrowedFrustum() {
+        val baseFov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
+        val zoomedFov = baseFov.zoomed(3f)
+        val projection =
+            ScreenProjector.projectEntityToScreen(
+                bearingDeg = 20.0,
+                elevationAngleDeg = 0.0,
+                trueAzimuthDeg = 0f,
+                cameraElevationDeg = 0f,
+                horizontalFovDeg = zoomedFov.horizontalDeg,
+                verticalFovDeg = zoomedFov.verticalDeg,
+                screenWidthPx = 1080f,
+                screenHeightPx = 1920f
+            )
+
+        assertThat(projection).isNull()
+    }
+
+    @Test
     fun entityAtBearingZeroWithDeviceFacingNorth_isCenteredOnX() {
         val projection =
             ScreenProjector.projectEntityToScreen(

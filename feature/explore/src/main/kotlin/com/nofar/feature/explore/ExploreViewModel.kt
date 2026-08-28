@@ -19,6 +19,7 @@ import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
 import com.nofar.core.designsystem.component.HorizonOutlinePoint
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
+import com.nofar.core.model.AppConfig
 import com.nofar.core.model.CompassCalibrationState
 import com.nofar.core.model.DeviceOrientation
 import com.nofar.core.model.DownloadStatus
@@ -195,7 +196,61 @@ constructor(
     }
 
     fun onCameraFieldOfViewChanged(fov: CameraFieldOfView) {
-        _uiState.update { it.copy(cameraFov = fov) }
+        _uiState.update { it.copy(cameraBaseFov = fov).withZoomAdjustedFov() }
+        reprojectOverlay()
+    }
+
+    fun onCameraZoomRangeChanged(minZoomRatio: Float, maxZoomRatio: Float) {
+        val cappedMax = minOf(maxZoomRatio, AppConfig.EXPLORE_MAX_ZOOM_RATIO)
+        _uiState.update { state ->
+            val clampedRatio = state.zoomRatio.coerceIn(minZoomRatio, cappedMax)
+            state.copy(
+                minZoomRatio = minZoomRatio,
+                maxZoomRatio = cappedMax,
+                zoomRatio = clampedRatio
+            ).withZoomAdjustedFov()
+        }
+        reprojectOverlay()
+    }
+
+    fun onZoomGesture(scaleFactor: Float) {
+        if (scaleFactor == 1f) return
+        _uiState.update { state ->
+            if (state.maxZoomRatio <= state.minZoomRatio) return@update state
+            val newRatio = clampZoom(
+                current = state.zoomRatio,
+                scaleFactor = scaleFactor,
+                min = state.minZoomRatio,
+                max = state.maxZoomRatio
+            )
+            if (newRatio == state.zoomRatio) return@update state
+            state.copy(zoomRatio = newRatio).withZoomAdjustedFov()
+        }
+        reprojectOverlay()
+    }
+
+    fun onZoomStep(direction: ZoomStepDirection) {
+        _uiState.update { state ->
+            if (state.maxZoomRatio <= state.minZoomRatio) return@update state
+            val step = AppConfig.EXPLORE_ZOOM_BUTTON_STEP
+            val newRatio =
+                when (direction) {
+                    ZoomStepDirection.IN ->
+                        (state.zoomRatio * step).coerceAtMost(state.maxZoomRatio)
+                    ZoomStepDirection.OUT ->
+                        (state.zoomRatio / step).coerceAtLeast(state.minZoomRatio)
+                }
+            if (newRatio == state.zoomRatio) return@update state
+            state.copy(zoomRatio = newRatio).withZoomAdjustedFov()
+        }
+        reprojectOverlay()
+    }
+
+    fun onZoomReset() {
+        _uiState.update { state ->
+            if (state.zoomRatio == state.minZoomRatio) return@update state
+            state.copy(zoomRatio = state.minZoomRatio).withZoomAdjustedFov()
+        }
         reprojectOverlay()
     }
 
@@ -775,3 +830,5 @@ constructor(
         private const val COMPASS_DISPLAY_PITCH_LIMIT_DEG = 60f
     }
 }
+
+private fun ExploreUiState.withZoomAdjustedFov(): ExploreUiState = copy(cameraFov = cameraBaseFov.zoomed(zoomRatio))

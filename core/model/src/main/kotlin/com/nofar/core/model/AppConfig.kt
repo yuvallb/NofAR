@@ -165,6 +165,12 @@ object AppConfig {
     /** Fallback vertical FOV when camera characteristics are unavailable (degrees). */
     const val CAMERA_VERTICAL_FOV_FALLBACK_DEG: Float = 45f
 
+    /** Maximum Explore pinch/button zoom ratio; intersected with the camera hardware cap. */
+    const val EXPLORE_MAX_ZOOM_RATIO: Float = 5f
+
+    /** Multiplier applied by each discrete Explore zoom button step. */
+    const val EXPLORE_ZOOM_BUTTON_STEP: Float = 2f
+
     /** Azimuth step for the Explore horizon skyline sweep (degrees). Sweep cost ≈ 360/step rays. */
     const val HORIZON_AZIMUTH_STEP_DEG: Float = 2f
 

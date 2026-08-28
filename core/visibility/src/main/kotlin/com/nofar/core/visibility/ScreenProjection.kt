@@ -2,7 +2,9 @@ package com.nofar.core.visibility
 
 import kotlin.math.abs
 import kotlin.math.asin
+import kotlin.math.atan
 import kotlin.math.min
+import kotlin.math.tan
 
 data class CameraFieldOfView(val horizontalDeg: Float, val verticalDeg: Float, val isFallback: Boolean = false) {
     /**
@@ -14,6 +16,15 @@ data class CameraFieldOfView(val horizontalDeg: Float, val verticalDeg: Float, v
         return copy(horizontalDeg = verticalDeg, verticalDeg = horizontalDeg)
     }
 
+    /** Narrows the FOV for a camera zoom ratio (crop factor relative to the 1.0x view). */
+    fun zoomed(zoomRatio: Float): CameraFieldOfView {
+        if (zoomRatio <= 0f || zoomRatio == 1f) return this
+        return copy(
+            horizontalDeg = narrowFovForZoom(horizontalDeg, zoomRatio),
+            verticalDeg = narrowFovForZoom(verticalDeg, zoomRatio)
+        )
+    }
+
     companion object {
         fun fallback(): CameraFieldOfView = CameraFieldOfView(
             horizontalDeg = com.nofar.core.model.AppConfig.CAMERA_HORIZONTAL_FOV_FALLBACK_DEG,
@@ -21,6 +32,11 @@ data class CameraFieldOfView(val horizontalDeg: Float, val verticalDeg: Float, v
             isFallback = true
         )
     }
+}
+
+internal fun narrowFovForZoom(fovDeg: Float, zoomRatio: Float): Float {
+    val halfFovRad = Math.toRadians(fovDeg / 2.0)
+    return Math.toDegrees(2.0 * atan(tan(halfFovRad) / zoomRatio)).toFloat()
 }
 
 data class ScreenPoint(val anchorXPx: Float, val anchorYPx: Float, val headingDeltaDeg: Double)

@@ -11,13 +11,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.nofar.core.designsystem.component.NofARExploreAltitudeReadout
 import com.nofar.core.designsystem.component.NofARExploreBottomHud
+import com.nofar.core.designsystem.component.NofARExploreBottomHudHeight
 import com.nofar.core.designsystem.component.NofARExploreHereChip
 import com.nofar.core.designsystem.component.NofARLocationAccuracyBadge
+import com.nofar.core.designsystem.component.NofARZoomControl
 import com.nofar.core.designsystem.util.NofARFormatters
 import com.nofar.core.model.AppConfig
+import com.nofar.core.ui.R
 import com.nofar.core.ui.compass.CompassCalibrationHint
 import com.nofar.core.ui.location.LocationPermissionBanner
 import com.nofar.core.ui.permission.PermissionState
@@ -33,6 +37,10 @@ internal fun ExploreScreenRoot(
     onChangeVirtualLocation: () -> Unit,
     onScreenSizeChanged: (Float, Float) -> Unit,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
+    onZoomRangeChanged: (Float, Float) -> Unit,
+    onZoomGesture: (Float) -> Unit,
+    onZoomStep: (ZoomStepDirection) -> Unit,
+    onZoomReset: () -> Unit,
     onHiddenCountClick: (Int) -> Unit,
     onDismissExpandedBucket: () -> Unit,
     onDownloadRetry: () -> Unit,
@@ -41,10 +49,19 @@ internal fun ExploreScreenRoot(
     onDismissWifiOnlyBlocked: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val zoomGesturesEnabled =
+        uiState.exploreGate == ExploreGate.READY &&
+            permissionState.cameraGranted &&
+            uiState.maxZoomRatio > uiState.minZoomRatio
+
     Box(
         modifier =
         modifier
             .fillMaxSize()
+            .exploreZoomGestures(
+                enabled = zoomGesturesEnabled,
+                onZoomGesture = onZoomGesture
+            )
             .onSizeChanged { size ->
                 onScreenSizeChanged(size.width.toFloat(), size.height.toFloat())
             }
@@ -55,6 +72,7 @@ internal fun ExploreScreenRoot(
             permissionState = permissionState,
             onNavigateBack = onNavigateBack,
             onFieldOfViewChanged = onFieldOfViewChanged,
+            onZoomRangeChanged = onZoomRangeChanged,
             onHiddenCountClick = onHiddenCountClick,
             onDownloadRetry = onDownloadRetry
         )
@@ -64,7 +82,9 @@ internal fun ExploreScreenRoot(
                 uiState = uiState,
                 onNavigateBack = onNavigateBack,
                 onNavigateToSettings = onNavigateToSettings,
-                onChangeVirtualLocation = onChangeVirtualLocation
+                onChangeVirtualLocation = onChangeVirtualLocation,
+                onZoomStep = onZoomStep,
+                onZoomReset = onZoomReset
             )
         } else {
             ExploreTopChrome(
@@ -74,33 +94,52 @@ internal fun ExploreScreenRoot(
             )
         }
 
-        if (uiState.exploreGate == ExploreGate.GRACE_EXPIRED) {
-            ExploreGraceExpiredDialog(
-                regionName = uiState.activeRegionName.orEmpty(),
-                onExit = onNavigateBack
-            )
-        }
+        ExploreScreenModalLayer(
+            uiState = uiState,
+            onNavigateBack = onNavigateBack,
+            onDismissExpandedBucket = onDismissExpandedBucket,
+            onConfirmCellularDownload = onConfirmCellularDownload,
+            onDismissCellularWarning = onDismissCellularWarning,
+            onDismissWifiOnlyBlocked = onDismissWifiOnlyBlocked
+        )
+    }
+}
 
-        uiState.expandedCluster?.let { cluster ->
-            ExploreExpandedBucketDialog(cluster = cluster, onDismiss = onDismissExpandedBucket)
-        }
+@Composable
+private fun BoxScope.ExploreScreenModalLayer(
+    uiState: ExploreUiState,
+    onNavigateBack: () -> Unit,
+    onDismissExpandedBucket: () -> Unit,
+    onConfirmCellularDownload: () -> Unit,
+    onDismissCellularWarning: () -> Unit,
+    onDismissWifiOnlyBlocked: () -> Unit
+) {
+    if (uiState.exploreGate == ExploreGate.GRACE_EXPIRED) {
+        ExploreGraceExpiredDialog(
+            regionName = uiState.activeRegionName.orEmpty(),
+            onExit = onNavigateBack
+        )
+    }
 
-        if (uiState.showCellularWarning && uiState.downloadPrompt != null) {
-            ExploreCellularWarningDialog(
-                demTileCount = uiState.downloadPrompt.demTileCount,
-                estimateDisplay = NofARFormatters.formatMegabytes(uiState.downloadPrompt.estimateBytes),
-                onDownloadAnyway = onConfirmCellularDownload,
-                onDismiss = onDismissCellularWarning
-            )
-        }
+    uiState.expandedCluster?.let { cluster ->
+        ExploreExpandedBucketDialog(cluster = cluster, onDismiss = onDismissExpandedBucket)
+    }
 
-        if (uiState.showWifiOnlyBlocked) {
-            ExploreWifiOnlyBlockedDialog(onDismiss = onDismissWifiOnlyBlocked)
-        }
+    if (uiState.showCellularWarning && uiState.downloadPrompt != null) {
+        ExploreCellularWarningDialog(
+            demTileCount = uiState.downloadPrompt.demTileCount,
+            estimateDisplay = NofARFormatters.formatMegabytes(uiState.downloadPrompt.estimateBytes),
+            onDownloadAnyway = onConfirmCellularDownload,
+            onDismiss = onDismissCellularWarning
+        )
+    }
 
-        if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
-            ExploreOsmWatermark(modifier = Modifier.align(Alignment.BottomEnd))
-        }
+    if (uiState.showWifiOnlyBlocked) {
+        ExploreWifiOnlyBlockedDialog(onDismiss = onDismissWifiOnlyBlocked)
+    }
+
+    if (uiState.exploreGate != ExploreGate.GRACE_EXPIRED) {
+        ExploreOsmWatermark(modifier = Modifier.align(Alignment.BottomEnd))
     }
 }
 
@@ -124,6 +163,7 @@ private fun BoxScope.ExploreGateContent(
     permissionState: PermissionState,
     onNavigateBack: () -> Unit,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
+    onZoomRangeChanged: (Float, Float) -> Unit,
     onHiddenCountClick: (Int) -> Unit,
     onDownloadRetry: () -> Unit
 ) {
@@ -132,6 +172,7 @@ private fun BoxScope.ExploreGateContent(
             uiState = uiState,
             permissionState = permissionState,
             onFieldOfViewChanged = onFieldOfViewChanged,
+            onZoomRangeChanged = onZoomRangeChanged,
             onHiddenCountClick = onHiddenCountClick
         )
         ExploreGate.REGION_DOWNLOAD_NEEDED -> ExploreSimpleModeCameraGate(
@@ -178,12 +219,15 @@ private fun BoxScope.ExploreReadyGateContent(
     uiState: ExploreUiState,
     permissionState: PermissionState,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
+    onZoomRangeChanged: (Float, Float) -> Unit,
     onHiddenCountClick: (Int) -> Unit
 ) {
     if (permissionState.cameraGranted) {
         ExploreCameraPreview(
             modifier = Modifier.fillMaxSize(),
-            onFieldOfViewChanged = onFieldOfViewChanged
+            zoomRatio = uiState.zoomRatio,
+            onFieldOfViewChanged = onFieldOfViewChanged,
+            onZoomRangeChanged = onZoomRangeChanged
         )
     }
     ExploreArOverlay(uiState = uiState, onHiddenCountClick = onHiddenCountClick)
@@ -219,7 +263,9 @@ private fun BoxScope.ExploreReadyChrome(
     uiState: ExploreUiState,
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onChangeVirtualLocation: () -> Unit
+    onChangeVirtualLocation: () -> Unit,
+    onZoomStep: (ZoomStepDirection) -> Unit,
+    onZoomReset: () -> Unit
 ) {
     ExploreReadyTopChrome(uiState = uiState)
     ExploreReadyStatusBanners(uiState = uiState)
@@ -238,7 +284,9 @@ private fun BoxScope.ExploreReadyChrome(
     ExploreReadyBottomChrome(
         uiState = uiState,
         onNavigateBack = onNavigateBack,
-        onNavigateToSettings = onNavigateToSettings
+        onNavigateToSettings = onNavigateToSettings,
+        onZoomStep = onZoomStep,
+        onZoomReset = onZoomReset
     )
 }
 
@@ -290,8 +338,28 @@ private fun BoxScope.ExploreReadyStatusBanners(uiState: ExploreUiState) {
 private fun BoxScope.ExploreReadyBottomChrome(
     uiState: ExploreUiState,
     onNavigateBack: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onZoomStep: (ZoomStepDirection) -> Unit,
+    onZoomReset: () -> Unit
 ) {
+    if (uiState.maxZoomRatio > uiState.minZoomRatio) {
+        NofARZoomControl(
+            zoomDisplay = formatZoom(uiState.zoomRatio),
+            canZoomIn = uiState.zoomRatio < uiState.maxZoomRatio,
+            canZoomOut = uiState.zoomRatio > uiState.minZoomRatio,
+            onZoomIn = { onZoomStep(ZoomStepDirection.IN) },
+            onZoomOut = { onZoomStep(ZoomStepDirection.OUT) },
+            onReset = onZoomReset,
+            zoomInContentDescription = stringResource(R.string.explore_zoom_in),
+            zoomOutContentDescription = stringResource(R.string.explore_zoom_out),
+            resetContentDescription = stringResource(R.string.explore_zoom_reset),
+            modifier =
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = NofARExploreBottomHudHeight + 8.dp)
+        )
+    }
+
     if (uiState.simpleModeEnabled) {
         Row(
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp),

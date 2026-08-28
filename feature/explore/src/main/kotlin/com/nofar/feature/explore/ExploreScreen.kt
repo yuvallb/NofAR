@@ -60,6 +60,10 @@ fun ExploreScreen(
         onChangeVirtualLocation = onChangeVirtualLocation,
         onScreenSizeChanged = viewModel::onScreenSizeChanged,
         onFieldOfViewChanged = viewModel::onCameraFieldOfViewChanged,
+        onZoomRangeChanged = viewModel::onCameraZoomRangeChanged,
+        onZoomGesture = viewModel::onZoomGesture,
+        onZoomStep = viewModel::onZoomStep,
+        onZoomReset = viewModel::onZoomReset,
         onHiddenCountClick = viewModel::onHiddenCountClicked,
         onDismissExpandedBucket = viewModel::onDismissExpandedBucket,
         onDownloadRetry = viewModel::onDownloadRetry,
@@ -177,6 +181,7 @@ private fun ExploreDebugReadout(uiState: ExploreUiState) {
             Text(text = "Az: ${"%.1f".format(azimuth)}°", color = NofARColors.ArAccent)
         }
         Text(text = "FOV: ${"%.1f".format(hFov)}° × ${"%.1f".format(vFov)}°", color = Color.White)
+        Text(text = "Zoom: ${formatZoom(uiState.zoomRatio)}", color = Color.White)
         if (uiState.visibleEntityCount > 0) {
             Text(text = "Visible: ${uiState.visibleEntityCount}", color = NofARColors.ArAccent)
         }

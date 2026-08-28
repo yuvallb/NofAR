@@ -257,6 +257,56 @@ class LabelClusteringTest {
         }
     }
 
+    @Test
+    fun zoomedFov_spreadsCrowdedLabelsAndReducesHiddenCount() {
+        val entities =
+            (0 until 8).map { index ->
+                visibleEntityAt(bearingDeg = index * 1.0)
+            }
+        val baseFov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
+        val at1x =
+            ExploreLabelRenderer.projectAndCluster(
+                entities = entities,
+                trueAzimuthDeg = 0f,
+                cameraElevationDeg = 0f,
+                fov = baseFov,
+                screenWidthPx = 1_080f,
+                screenHeightPx = 1_920f
+            )
+        val at3x =
+            ExploreLabelRenderer.projectAndCluster(
+                entities = entities,
+                trueAzimuthDeg = 0f,
+                cameraElevationDeg = 0f,
+                fov = baseFov.zoomed(3f),
+                screenWidthPx = 1_080f,
+                screenHeightPx = 1_920f
+            )
+
+        val hiddenAt1x = at1x.sumOf { it.hiddenCount }
+        val hiddenAt3x = at3x.sumOf { it.hiddenCount }
+        assertThat(hiddenAt1x).isGreaterThan(0)
+        assertThat(hiddenAt3x).isLessThan(hiddenAt1x)
+    }
+
+    private fun visibleEntityAt(bearingDeg: Double): VisibleEntity = VisibleEntity(
+        bearingDeg = bearingDeg,
+        distanceM = 1_000.0 + bearingDeg * 100.0,
+        elevationAngleDeg = 0.0,
+        entity =
+        GeoEntity(
+            id = "entity-$bearingDeg",
+            osmType = OsmType.NODE,
+            name = "Peak$bearingDeg",
+            type = GeoEntityType.PEAK,
+            lat = 0.0,
+            lon = 0.0,
+            elevation = 1_000,
+            elevationSource = ElevationSource.OSM_TAG,
+            lastSeenAt = Instant.EPOCH
+        )
+    )
+
     private fun labelAt(
         distanceM: Double,
         name: String,
