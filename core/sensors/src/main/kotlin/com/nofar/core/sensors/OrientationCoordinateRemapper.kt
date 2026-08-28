@@ -6,8 +6,8 @@ import kotlin.math.atan2
 import kotlin.math.hypot
 
 /**
- * Remaps the rotation vector matrix for the current display rotation so azimuth and pitch
- * match the on-screen camera view (portrait vs landscape).
+ * Remaps the rotation vector matrix for the current display rotation so pitch and roll
+ * match the on-screen camera view. Camera heading and elevation use the un-remapped look vector.
  */
 internal object OrientationCoordinateRemapper {
     fun remapForDisplayRotation(rotationMatrix: FloatArray, displayRotation: Int): FloatArray {
@@ -55,11 +55,22 @@ internal object OrientationCoordinateRemapper {
     }
 
     /**
+     * Heading of the back-camera look direction (device -Z) in the world ENU frame, degrees
+     * clockwise from north. Independent of display rotation — the camera is fixed on the device.
+     */
+    fun backCameraAzimuthDeg(rotationMatrix: FloatArray): Float {
+        val lookEast = -rotationMatrix[2].toDouble()
+        val lookNorth = -rotationMatrix[5].toDouble()
+        val azimuthDeg = Math.toDegrees(atan2(lookEast, lookNorth)).toFloat()
+        return if (azimuthDeg < 0f) azimuthDeg + 360f else azimuthDeg
+    }
+
+    /**
      * Elevation of the back-camera look direction above the horizontal plane.
      * Device +Z points toward the user; the back camera looks along device -Z.
      *
      * Uses the raw [SensorManager.getRotationMatrixFromVector] output — display remapping
-     * is for compass azimuth only and must not be applied here.
+     * must not be applied here. Azimuth uses the same un-remapped look vector.
      */
     fun backCameraElevationDeg(rotationMatrix: FloatArray): Float {
         val lookX = -rotationMatrix[2].toDouble()

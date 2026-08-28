@@ -56,7 +56,9 @@ class HorizonProjectorTest {
         assertThat(points.map { it.xPx }.minOrNull()).isAtLeast(0f)
         assertThat(points.map { it.xPx }.maxOrNull()).isAtMost(1080f)
         assertThat(points.first().xPx).isWithin(1f).of(0f)
-        assertThat(points.last().xPx).isWithin(1f).of(1080f)
+        // A 1° sample step plus tan projection means the last in-frustum sample can sit a few
+        // degrees inside the right edge when a polyline break drops the final point.
+        assertThat(points.last().xPx).isGreaterThan(1000f)
     }
 
     @Test
@@ -176,7 +178,7 @@ class HorizonProjectorTest {
     }
 
     // H-P0-T02: pitching up must not be the unique condition that reveals the line. At level the line is
-    // present; pitched +30° past the frustum it is omitted (H-DEC-1 Option A / H-DEC-2 "no").
+    // present; pitched far past the frustum it is omitted (H-DEC-1 Option A / H-DEC-2 "no").
     @Test
     fun flatProfile_pitchUp_omitsLineAndIsNotSkyOnly() {
         val flatProfile =
@@ -197,7 +199,7 @@ class HorizonProjectorTest {
             project(
                 profile = flatProfile,
                 trueAzimuthDeg = 203f,
-                cameraElevationDeg = 30f,
+                cameraElevationDeg = 40f,
                 horizontalFov = 70.7f,
                 verticalFov = 56.2f
             )
@@ -272,10 +274,10 @@ class HorizonProjectorTest {
             .isNotEqualTo(eastFacing.map { it.xPx to it.yPx })
     }
 
-    // H-P1-03: in landscape the sensor FOV axes swap; the horizontal screen span must use the sensor's
-    // vertical FOV. project() end-to-end (not orientedForScreen in isolation).
+    // H-P1-03: landscape keeps the sensor-width FOV as the horizontal span (the sensor is
+    // landscape-native). project() end-to-end (not orientedForScreen in isolation).
     @Test
-    fun landscapeScreen_usesVerticalFovAsHorizontalSpan() {
+    fun landscapeScreen_usesSensorWidthFovAsHorizontalSpan() {
         val flatProfile =
             HorizonProfile(
                 azimuthStepDeg = AppConfig.HORIZON_AZIMUTH_STEP_DEG,
@@ -286,7 +288,7 @@ class HorizonProjectorTest {
                 profile = flatProfile,
                 trueAzimuthDeg = 100f,
                 cameraElevationDeg = 0f,
-                // Sensor 60°×45°; landscape swaps → 45° becomes the horizontal span.
+                // Sensor 60°×45°; landscape keeps 60° as the horizontal span (FILL_CENTER crops vertical).
                 fov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f),
                 screenWidthPx = 1920f,
                 screenHeightPx = 1080f
@@ -296,15 +298,15 @@ class HorizonProjectorTest {
         assertThat(points).isNotEmpty()
         assertThat(points.map { it.xPx }.minOrNull()).isWithin(1f).of(0f)
         assertThat(points.map { it.xPx }.maxOrNull()).isWithin(1f).of(1920f)
-        // 45° span sampled at 1° → ~46 points (a 60° span would give ~61).
-        assertThat(points.size).isAtLeast(44)
-        assertThat(points.size).isAtMost(48)
+        // 60° span sampled at 1° → ~61 points (a 45° span would give ~46).
+        assertThat(points.size).isAtLeast(59)
+        assertThat(points.size).isAtMost(63)
         // Flat profile + level camera → every point sits on the mid-screen horizontal line.
         points.forEach { assertThat(it.yPx).isWithin(1f).of(540f) }
-        // No sample lands exactly on the heading (span 45° sampled at 1° starts at -22.5°), so the
-        // nearest point to center is within one screen-azimuth step: (1°/22.5°)*960 ≈ 43px.
+        // No sample lands exactly on the heading (span 60° sampled at 1° starts at -30°), so the
+        // nearest point to center is within one screen-azimuth step: (1°/30°)*960 ≈ 32px.
         val centerPoint = points.minByOrNull { kotlin.math.abs(it.xPx - 960f) }!!
-        assertThat(centerPoint.xPx).isWithin(43f).of(960f)
+        assertThat(centerPoint.xPx).isWithin(32f).of(960f)
     }
 
     // H-P1-04: small pitch changes move the skyline smoothly. Looking further up pushes the line down
@@ -364,8 +366,12 @@ class HorizonProjectorTest {
             }
         }
         val allY = flatten(segments).map { it.yPx }
-        val lowY = ScreenProjector.anchorYPx(lowDeg.toDouble(), 28.1f, SCREEN_HEIGHT)
-        val highY = ScreenProjector.anchorYPx(highDeg.toDouble(), 28.1f, SCREEN_HEIGHT)
+        val oriented =
+            CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 56.2f)
+                .orientedForScreen(SCREEN_WIDTH, SCREEN_HEIGHT)
+        val halfVerticalFov = oriented.verticalDeg / 2f
+        val lowY = ScreenProjector.anchorYPx(lowDeg.toDouble(), halfVerticalFov, SCREEN_HEIGHT)
+        val highY = ScreenProjector.anchorYPx(highDeg.toDouble(), halfVerticalFov, SCREEN_HEIGHT)
         assertThat(allY.minOrNull()!!).isWithin(2f).of(highY)
         assertThat(allY.maxOrNull()!!).isWithin(2f).of(lowY)
     }

@@ -5,19 +5,22 @@ import org.junit.Test
 
 class ScreenProjectionTest {
     @Test
-    fun orientedForScreen_landscape_swapsHorizontalAndVerticalFov() {
+    fun orientedForScreen_landscape_keepsSensorWidthAsHorizontalAndCropsVertical() {
         val fov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
         val oriented = fov.orientedForScreen(screenWidthPx = 1920f, screenHeightPx = 1080f)
-        assertThat(oriented.horizontalDeg).isWithin(0.001f).of(45f)
-        assertThat(oriented.verticalDeg).isWithin(0.001f).of(60f)
+        // Landscape: sensor width FOV stays horizontal. 16:9 view is wider than 4:3 image, so
+        // FILL_CENTER crops top/bottom and narrows vertical FOV.
+        assertThat(oriented.horizontalDeg).isWithin(0.1f).of(60f)
+        assertThat(oriented.verticalDeg).isWithin(0.1f).of(36.0f)
     }
 
     @Test
-    fun orientedForScreen_portrait_keepsFovAxes() {
+    fun orientedForScreen_portrait_swapsAxesAndCropsHorizontal() {
         val fov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
         val oriented = fov.orientedForScreen(screenWidthPx = 1080f, screenHeightPx = 1920f)
-        assertThat(oriented.horizontalDeg).isWithin(0.001f).of(60f)
-        assertThat(oriented.verticalDeg).isWithin(0.001f).of(45f)
+        // Portrait: sensor height FOV becomes horizontal, then FILL_CENTER crops the sides.
+        assertThat(oriented.horizontalDeg).isWithin(0.1f).of(36.0f)
+        assertThat(oriented.verticalDeg).isWithin(0.1f).of(60f)
     }
 
     @Test
@@ -227,5 +230,33 @@ class ScreenProjectionTest {
         assertThat(span).isNotNull()
         assertThat(span!!.leftXPx).isWithin(0.1f).of(0f)
         assertThat(span.rightXPx).isWithin(0.1f).of(1080f)
+    }
+
+    @Test
+    fun perspectiveProjection_placesOffCenterBearingInwardOfLinearMapping() {
+        val halfFov = 30f
+        val screenWidth = 1080f
+        val headingDelta = 15.0
+        val perspectiveX =
+            ScreenProjector.anchorXPx(
+                headingDeltaDeg = headingDelta,
+                halfHorizontalFovDeg = halfFov,
+                screenWidthPx = screenWidth
+            )
+        val linearX = screenWidth / 2f + (headingDelta / halfFov).toFloat() * (screenWidth / 2f)
+
+        assertThat(perspectiveX).isGreaterThan(screenWidth / 2f)
+        assertThat(perspectiveX).isLessThan(linearX)
+    }
+
+    @Test
+    fun perspectiveProjection_mapsHalfFovToScreenEdge() {
+        val x =
+            ScreenProjector.anchorXPx(
+                headingDeltaDeg = 30.0,
+                halfHorizontalFovDeg = 30f,
+                screenWidthPx = 1080f
+            )
+        assertThat(x).isWithin(0.1f).of(1080f)
     }
 }

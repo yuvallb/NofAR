@@ -8,12 +8,22 @@ import kotlin.math.tan
 
 data class CameraFieldOfView(val horizontalDeg: Float, val verticalDeg: Float, val isFallback: Boolean = false) {
     /**
-     * Maps sensor-space horizontal/vertical FOV to the current screen axes.
-     * In landscape the camera sensor axes swap relative to screen width/height.
+     * Maps sensor-space FOV onto the current screen for a FILL_CENTER camera preview.
+     *
+     * Camera2 sensor physical size is landscape-native (width > height) on phones, and CameraX
+     * rotates the buffer to the display: portrait must swap axes, landscape must not. FILL_CENTER
+     * then crops the rotated image to the view aspect, which narrows the visible FOV on the cropped
+     * axis.
      */
     fun orientedForScreen(screenWidthPx: Float, screenHeightPx: Float): CameraFieldOfView {
-        if (screenWidthPx <= screenHeightPx) return this
-        return copy(horizontalDeg = verticalDeg, verticalDeg = horizontalDeg)
+        if (screenWidthPx <= 0f || screenHeightPx <= 0f) return this
+        val axisAligned =
+            if (screenWidthPx <= screenHeightPx) {
+                copy(horizontalDeg = verticalDeg, verticalDeg = horizontalDeg)
+            } else {
+                this
+            }
+        return axisAligned.croppedToFillView(screenWidthPx / screenHeightPx)
     }
 
     /** Narrows the FOV for a camera zoom ratio (crop factor relative to the 1.0x view). */
@@ -37,6 +47,24 @@ data class CameraFieldOfView(val horizontalDeg: Float, val verticalDeg: Float, v
 internal fun narrowFovForZoom(fovDeg: Float, zoomRatio: Float): Float {
     val halfFovRad = Math.toRadians(fovDeg / 2.0)
     return Math.toDegrees(2.0 * atan(tan(halfFovRad) / zoomRatio)).toFloat()
+}
+
+/**
+ * FILL_CENTER crop: the preview image covers the view and overflow is clipped. The visible FOV
+ * shrinks on the clipped axis; the unclipped axis keeps the full image FOV.
+ */
+internal fun CameraFieldOfView.croppedToFillView(viewAspect: Float): CameraFieldOfView {
+    val tanHalfHorizontal = tan(Math.toRadians(horizontalDeg / 2.0))
+    val tanHalfVertical = tan(Math.toRadians(verticalDeg / 2.0))
+    if (tanHalfHorizontal <= 0.0 || tanHalfVertical <= 0.0 || viewAspect <= 0f) return this
+    val imageAspect = (tanHalfHorizontal / tanHalfVertical).toFloat()
+    return when {
+        viewAspect > imageAspect ->
+            copy(verticalDeg = narrowFovForZoom(verticalDeg, viewAspect / imageAspect))
+        viewAspect < imageAspect ->
+            copy(horizontalDeg = narrowFovForZoom(horizontalDeg, imageAspect / viewAspect))
+        else -> this
+    }
 }
 
 data class ScreenPoint(val anchorXPx: Float, val anchorYPx: Float, val headingDeltaDeg: Double)
@@ -103,11 +131,11 @@ object ScreenProjector {
 
     fun anchorXPx(headingDeltaDeg: Double, halfHorizontalFovDeg: Float, screenWidthPx: Float): Float =
         screenWidthPx / 2f +
-            (headingDeltaDeg / halfHorizontalFovDeg).toFloat() * (screenWidthPx / 2f)
+            perspectiveOffsetFraction(headingDeltaDeg, halfHorizontalFovDeg) * (screenWidthPx / 2f)
 
     fun anchorYPx(relativeElevationDeg: Double, halfVerticalFovDeg: Float, screenHeightPx: Float): Float =
         screenHeightPx / 2f -
-            (relativeElevationDeg / halfVerticalFovDeg).toFloat() * (screenHeightPx / 2f)
+            perspectiveOffsetFraction(relativeElevationDeg, halfVerticalFovDeg) * (screenHeightPx / 2f)
 
     fun projectFootprintSpan(
         bearingDeg: Double,
@@ -164,5 +192,15 @@ object ScreenProjector {
         } else {
             anchorYPx(relativeElevation, halfVerticalFov, screenHeightPx)
         }
+    }
+
+    /**
+     * Perspective mapping: screen offset / half-extent = tan(angle) / tan(halfFov).
+     * Linear angle/FOV mapping compresses off-center bearings toward the middle of the frame.
+     */
+    internal fun perspectiveOffsetFraction(angleDeg: Double, halfFovDeg: Float): Float {
+        val tanHalfFov = tan(Math.toRadians(halfFovDeg.toDouble()))
+        if (tanHalfFov == 0.0) return 0f
+        return (tan(Math.toRadians(angleDeg)) / tanHalfFov).toFloat()
     }
 }

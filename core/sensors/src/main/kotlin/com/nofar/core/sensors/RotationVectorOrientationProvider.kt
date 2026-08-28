@@ -77,16 +77,13 @@ constructor(
                 displayRotation = displayRotation
             )
 
-        val azimuthRad = orientationAngles[0]
         val pitchRad = orientationAngles[1]
         val rollRad = orientationAngles[2]
-
-        val magneticAzimuthDeg = Math.toDegrees(azimuthRad.toDouble()).toFloat()
-        val normalizedAzimuth =
-            if (magneticAzimuthDeg < 0f) magneticAzimuthDeg + 360f else magneticAzimuthDeg
+        val magneticAzimuthDeg =
+            OrientationCoordinateRemapper.backCameraAzimuthDeg(rotationMatrix)
 
         return DeviceOrientation(
-            trueAzimuthDeg = normalizedAzimuth,
+            trueAzimuthDeg = magneticAzimuthDeg,
             pitchDeg = Math.toDegrees(pitchRad.toDouble()).toFloat(),
             rollDeg = Math.toDegrees(rollRad.toDouble()).toFloat(),
             cameraElevationDeg =

@@ -45,7 +45,7 @@ fun ExploreCameraPreview(
         modifier = modifier,
         factory = { ctx ->
             PreviewView(ctx).also { view ->
-                view.scaleType = PreviewView.ScaleType.FIT_CENTER
+                view.scaleType = PreviewView.ScaleType.FILL_CENTER
                 previewView = view
             }
         }

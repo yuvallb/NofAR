@@ -260,8 +260,8 @@ class LabelClusteringTest {
     @Test
     fun zoomedFov_spreadsCrowdedLabelsAndReducesHiddenCount() {
         val entities =
-            (0 until 8).map { index ->
-                visibleEntityAt(bearingDeg = index * 1.0)
+            (0 until 12).map { index ->
+                visibleEntityAt(bearingDeg = index * 0.25)
             }
         val baseFov = CameraFieldOfView(horizontalDeg = 60f, verticalDeg = 45f)
         val at1x =
