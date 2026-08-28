@@ -35,9 +35,7 @@ internal fun ExploreScreenRoot(
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
     onHiddenCountClick: (Int) -> Unit,
     onDismissExpandedBucket: () -> Unit,
-    onDownloadRegionConfirmed: () -> Unit,
-    onDownloadPromptDismissed: () -> Unit,
-    onShowDownloadPrompt: () -> Unit,
+    onDownloadRetry: () -> Unit,
     onConfirmCellularDownload: () -> Unit,
     onDismissCellularWarning: () -> Unit,
     onDismissWifiOnlyBlocked: () -> Unit,
@@ -58,9 +56,7 @@ internal fun ExploreScreenRoot(
             onNavigateBack = onNavigateBack,
             onFieldOfViewChanged = onFieldOfViewChanged,
             onHiddenCountClick = onHiddenCountClick,
-            onDownloadRegionConfirmed = onDownloadRegionConfirmed,
-            onDownloadPromptDismissed = onDownloadPromptDismissed,
-            onShowDownloadPrompt = onShowDownloadPrompt
+            onDownloadRetry = onDownloadRetry
         )
 
         if (uiState.exploreGate == ExploreGate.READY) {
@@ -129,9 +125,7 @@ private fun BoxScope.ExploreGateContent(
     onNavigateBack: () -> Unit,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
     onHiddenCountClick: (Int) -> Unit,
-    onDownloadRegionConfirmed: () -> Unit,
-    onDownloadPromptDismissed: () -> Unit,
-    onShowDownloadPrompt: () -> Unit
+    onDownloadRetry: () -> Unit
 ) {
     when (gate) {
         ExploreGate.READY -> ExploreReadyGateContent(
@@ -140,27 +134,18 @@ private fun BoxScope.ExploreGateContent(
             onFieldOfViewChanged = onFieldOfViewChanged,
             onHiddenCountClick = onHiddenCountClick
         )
-        ExploreGate.REGION_DOWNLOAD_DISMISSED -> ExploreSimpleModeCameraGate(
-            permissionState = permissionState,
-            onFieldOfViewChanged = onFieldOfViewChanged
-        ) {
-            ExploreDownloadDismissedBanner(
-                onShowDownloadPrompt = onShowDownloadPrompt,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp)
-            )
-        }
         ExploreGate.REGION_DOWNLOAD_NEEDED -> ExploreSimpleModeCameraGate(
             permissionState = permissionState,
             onFieldOfViewChanged = onFieldOfViewChanged
         ) {
             uiState.downloadPrompt?.let { proposal ->
-                ExploreDownloadPromptOverlay(
+                ExploreDownloadStatusOverlay(
                     proposalName = proposal.name,
                     estimateDisplay = NofARFormatters.formatMegabytes(proposal.estimateBytes),
                     demTileCount = proposal.demTileCount,
                     errorMessage = uiState.downloadUiMessage,
-                    onDownload = onDownloadRegionConfirmed,
-                    onDismiss = onDownloadPromptDismissed
+                    showRetry = uiState.downloadUiMessage != null,
+                    onRetry = onDownloadRetry
                 )
             }
         }

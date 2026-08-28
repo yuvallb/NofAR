@@ -28,7 +28,6 @@ data class ExploreUiState(
     val partialRegionWarning: Boolean = false,
     val regionResolution: ExploreRegionResolution? = null,
     val downloadPrompt: QuickRegionProposal? = null,
-    val downloadPromptDismissed: Boolean = false,
     val downloadProgressPct: Int = 0,
     val downloadUiMessage: String? = null,
     val showCellularWarning: Boolean = false,

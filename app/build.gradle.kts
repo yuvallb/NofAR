@@ -9,7 +9,7 @@ plugins {
 }
 
 // applicationId is the public store identity — do not change after first Play/F-Droid upload.
-val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystorePropertiesFile = layout.settingsDirectory.file("keystore.properties").asFile
 val keystoreProperties =
     Properties().apply {
         if (keystorePropertiesFile.exists()) {
@@ -42,7 +42,7 @@ android {
     signingConfigs {
         if (hasReleaseKeystore) {
             create("release") {
-                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storeFile = layout.settingsDirectory.file(keystoreProperties.getProperty("storeFile")).asFile
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")

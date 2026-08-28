@@ -35,8 +35,7 @@ class ExploreCameraPermissionInstrumentedTest {
                 graceExpired = false,
                 simpleModeEnabled = false,
                 regionDownloadNeeded = false,
-                regionDownloading = false,
-                downloadPromptDismissed = false
+                regionDownloading = false
             )
         if (granted) {
             assertThat(gate).isEqualTo(ExploreGate.REGION_MISSING)

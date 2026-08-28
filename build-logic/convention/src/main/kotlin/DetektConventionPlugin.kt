@@ -14,7 +14,7 @@ class DetektConventionPlugin : Plugin<Project> {
 
             extensions.configure<DetektExtension> {
                 toolVersion.set("2.0.0-alpha.5")
-                config.setFrom(files("${rootProject.projectDir}/config/detekt/detekt.yml"))
+                config.setFrom(layout.settingsDirectory.file("config/detekt/detekt.yml"))
                 buildUponDefaultConfig.set(true)
                 allRules.set(false)
             }

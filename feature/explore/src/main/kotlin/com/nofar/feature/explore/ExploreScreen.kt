@@ -62,9 +62,7 @@ fun ExploreScreen(
         onFieldOfViewChanged = viewModel::onCameraFieldOfViewChanged,
         onHiddenCountClick = viewModel::onHiddenCountClicked,
         onDismissExpandedBucket = viewModel::onDismissExpandedBucket,
-        onDownloadRegionConfirmed = viewModel::onDownloadRegionConfirmed,
-        onDownloadPromptDismissed = viewModel::onDownloadPromptDismissed,
-        onShowDownloadPrompt = viewModel::onShowDownloadPrompt,
+        onDownloadRetry = viewModel::onDownloadRetry,
         onConfirmCellularDownload = viewModel::confirmCellularDownload,
         onDismissCellularWarning = viewModel::dismissCellularWarning,
         onDismissWifiOnlyBlocked = viewModel::dismissWifiOnlyBlocked

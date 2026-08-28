@@ -14,6 +14,7 @@ import com.nofar.core.data.usecase.ExploreRegionResolution
 import com.nofar.core.data.usecase.ExploreRegionResolver
 import com.nofar.core.data.usecase.InsideRegionUseCase
 import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
+import com.nofar.core.data.usecase.QuickRegionProposal
 import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
 import com.nofar.core.designsystem.component.HorizonOutlinePoint
 import com.nofar.core.location.LocationController
@@ -108,6 +109,7 @@ constructor(
             onDownloadComplete = { region -> applyActiveRegions(listOf(region)) },
             onRefreshGate = { refreshGate() }
         )
+    private val autoDownloadGuard = ExploreAutoDownloadGuard()
     private var cachedVisibleEntities: List<VisibleEntity> = emptyList()
     private var cachedHereContext: HereContext = HereContext()
     private var cachedHorizonProfile: HorizonProfile? = null
@@ -206,51 +208,26 @@ constructor(
         reprojectOverlay()
     }
 
-    fun onDownloadRegionConfirmed() {
+    fun onDownloadRetry() {
         val proposal = _uiState.value.downloadPrompt ?: return
-        if (!networkConnectivityMonitor.isNetworkAvailable()) {
-            _uiState.update {
-                it.copy(downloadUiMessage = "No network connection. Connect to Wi-Fi or mobile data to download.")
-            }
-            return
-        }
-        viewModelScope.launch {
-            val wifiOnly = userPreferencesRepository.wifiOnlyDownloads.first()
-            val onCellular = networkConnectivityMonitor.isCellularNetwork()
-            when (
-                val gate =
-                    DownloadPolicy.evaluateStart(
-                        networkAvailable = true,
-                        wifiOnlyDownloads = wifiOnly,
-                        onCellularNetwork = onCellular,
-                        estimateBytes = proposal.estimateBytes
-                    )
-            ) {
-                is DownloadPolicy.GateResult.Blocked -> {
-                    if (wifiOnly && onCellular) {
-                        _uiState.update { it.copy(showWifiOnlyBlocked = true) }
-                    } else {
-                        _uiState.update { it.copy(downloadUiMessage = gate.message) }
-                    }
-                }
-                DownloadPolicy.GateResult.CellularWarning -> {
-                    downloadController.pendingCellularProposal = proposal
-                    _uiState.update { it.copy(showCellularWarning = true) }
-                }
-                DownloadPolicy.GateResult.Proceed -> downloadController.startDownload(proposal)
-            }
-        }
+        autoDownloadGuard.clearForRetry(proposal)
+        viewModelScope.launch { startDownloadWithPolicy(proposal, forceRetry = true) }
     }
 
     fun confirmCellularDownload() {
         val proposal = downloadController.pendingCellularProposal ?: _uiState.value.downloadPrompt ?: return
         downloadController.pendingCellularProposal = null
         _uiState.update { it.copy(showCellularWarning = false) }
-        viewModelScope.launch { downloadController.startDownload(proposal) }
+        viewModelScope.launch {
+            autoDownloadGuard.clearOnSuccess(proposal)
+            downloadController.startDownload(proposal)
+        }
     }
 
     fun dismissCellularWarning() {
+        val proposal = downloadController.pendingCellularProposal ?: _uiState.value.downloadPrompt
         downloadController.pendingCellularProposal = null
+        proposal?.let { autoDownloadGuard.markCellularDeclined(it) }
         _uiState.update { it.copy(showCellularWarning = false) }
     }
 
@@ -258,14 +235,56 @@ constructor(
         _uiState.update { it.copy(showWifiOnlyBlocked = false) }
     }
 
-    fun onDownloadPromptDismissed() {
-        _uiState.update { it.copy(downloadPromptDismissed = true) }
-        refreshGate()
+    private fun maybeAutoStartDownload(proposal: QuickRegionProposal) {
+        val state = _uiState.value
+        val canAutoStart =
+            state.simpleModeEnabled &&
+                state.regionResolution !is ExploreRegionResolution.Downloading &&
+                !state.showCellularWarning &&
+                autoDownloadGuard.shouldAttempt(proposal, forceRetry = false)
+        if (canAutoStart) {
+            viewModelScope.launch { startDownloadWithPolicy(proposal) }
+        }
     }
 
-    fun onShowDownloadPrompt() {
-        _uiState.update { it.copy(downloadPromptDismissed = false) }
-        refreshGate()
+    private suspend fun startDownloadWithPolicy(proposal: QuickRegionProposal, forceRetry: Boolean = false) {
+        if (!forceRetry && !autoDownloadGuard.shouldAttempt(proposal, forceRetry = false)) return
+        if (!networkConnectivityMonitor.isNetworkAvailable()) {
+            autoDownloadGuard.markAttempted(proposal)
+            _uiState.update {
+                it.copy(downloadUiMessage = "No network connection. Connect to Wi-Fi or mobile data to download.")
+            }
+            return
+        }
+        val wifiOnly = userPreferencesRepository.wifiOnlyDownloads.first()
+        val onCellular = networkConnectivityMonitor.isCellularNetwork()
+        when (
+            val gate =
+                DownloadPolicy.evaluateStart(
+                    networkAvailable = true,
+                    wifiOnlyDownloads = wifiOnly,
+                    onCellularNetwork = onCellular,
+                    estimateBytes = proposal.estimateBytes
+                )
+        ) {
+            is DownloadPolicy.GateResult.Blocked -> {
+                autoDownloadGuard.markAttempted(proposal)
+                if (wifiOnly && onCellular) {
+                    _uiState.update { it.copy(showWifiOnlyBlocked = true) }
+                } else {
+                    _uiState.update { it.copy(downloadUiMessage = gate.message) }
+                }
+            }
+            DownloadPolicy.GateResult.CellularWarning -> {
+                autoDownloadGuard.markAttempted(proposal)
+                downloadController.pendingCellularProposal = proposal
+                _uiState.update { it.copy(showCellularWarning = true) }
+            }
+            DownloadPolicy.GateResult.Proceed -> {
+                autoDownloadGuard.clearOnSuccess(proposal)
+                downloadController.startDownload(proposal)
+            }
+        }
     }
 
     override fun onCleared() {
@@ -371,14 +390,14 @@ constructor(
                         it.copy(
                             regionResolution = resolution,
                             downloadPrompt = null,
-                            downloadProgressPct = resolution.region.downloadProgressPct,
-                            downloadPromptDismissed = false
+                            downloadProgressPct = resolution.region.downloadProgressPct
                         )
                     }
                     downloadController.observeProgress(resolution.region.id)
                 }
                 is ExploreRegionResolution.NeedsDownload -> {
                     applyActiveRegions(emptyList())
+                    autoDownloadGuard.onProposalChanged(resolution.proposal)
                     _uiState.update {
                         it.copy(
                             regionResolution = resolution,
@@ -388,6 +407,7 @@ constructor(
                         )
                     }
                     downloadController.stopObservation()
+                    maybeAutoStartDownload(resolution.proposal)
                 }
             }
         } else {
@@ -480,17 +500,10 @@ constructor(
         }
 
         viewModelScope.launch {
-            val previousResolution = _uiState.value.regionResolution
             applyRegionResolution(location)
-            val regions = _uiState.value.activeRegions
-            if (previousResolution != _uiState.value.regionResolution &&
-                _uiState.value.regionResolution is ExploreRegionResolution.NeedsDownload
-            ) {
-                _uiState.update { it.copy(downloadPromptDismissed = false) }
-            }
-            applyRegionBoundary(location, regions)
+            applyRegionBoundary(location, _uiState.value.activeRegions)
             refreshGate()
-            altitudeController.scheduleResolve(location, regions)
+            altitudeController.scheduleResolve(location, _uiState.value.activeRegions)
         }
     }
 
@@ -535,8 +548,7 @@ constructor(
                 activeRegionName = null,
                 showRegionExitBanner = false,
                 showGraceExpiredDialog = false,
-                regionExitGraceSecondsRemaining = 0,
-                downloadPromptDismissed = false
+                regionExitGraceSecondsRemaining = 0
             )
         }
         viewModelScope.launch {
@@ -645,8 +657,7 @@ constructor(
                 graceExpired = state.showGraceExpiredDialog,
                 simpleModeEnabled = state.simpleModeEnabled,
                 regionDownloadNeeded = regionDownloadNeeded,
-                regionDownloading = state.regionResolution is ExploreRegionResolution.Downloading,
-                downloadPromptDismissed = state.downloadPromptDismissed
+                regionDownloading = state.regionResolution is ExploreRegionResolution.Downloading
             )
         _uiState.update {
             it.copy(

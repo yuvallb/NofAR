@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,18 +23,17 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.nofar.core.designsystem.component.NofARPrimaryButton
-import com.nofar.core.designsystem.component.NofARSecondaryOutlinedButton
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.ui.R
 
 @Composable
-fun ExploreDownloadPromptOverlay(
+fun ExploreDownloadStatusOverlay(
     proposalName: String,
     estimateDisplay: String,
     demTileCount: Int,
     errorMessage: String?,
-    onDownload: () -> Unit,
-    onDismiss: () -> Unit,
+    showRetry: Boolean,
+    onRetry: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -51,7 +49,7 @@ fun ExploreDownloadPromptOverlay(
             modifier = Modifier.padding(24.dp)
         ) {
             Text(
-                text = stringResource(R.string.explore_download_prompt_title),
+                text = stringResource(R.string.explore_download_status_title),
                 style = MaterialTheme.typography.titleMedium,
                 color = NofARColors.TextPrimary,
                 textAlign = TextAlign.Center,
@@ -77,16 +75,13 @@ fun ExploreDownloadPromptOverlay(
                     textAlign = TextAlign.Center
                 )
             }
-            NofARPrimaryButton(
-                text = stringResource(R.string.explore_download_map_data),
-                onClick = onDownload,
-                modifier = Modifier.fillMaxWidth()
-            )
-            NofARSecondaryOutlinedButton(
-                text = stringResource(R.string.explore_download_not_now),
-                onClick = onDismiss,
-                modifier = Modifier.fillMaxWidth()
-            )
+            if (showRetry) {
+                NofARPrimaryButton(
+                    text = stringResource(R.string.explore_download_retry),
+                    onClick = onRetry,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }
@@ -133,30 +128,6 @@ fun ExploreDownloadProgressOverlay(progressPct: Int, modifier: Modifier = Modifi
                 style = MaterialTheme.typography.bodyMedium,
                 color = NofARColors.TextSecondary,
                 textAlign = TextAlign.Center
-            )
-        }
-    }
-}
-
-@Composable
-fun ExploreDownloadDismissedBanner(onShowDownloadPrompt: () -> Unit, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = NofARColors.SurfaceVariant.copy(alpha = 0.92f)
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Text(
-                text = stringResource(R.string.explore_download_prompt_title),
-                style = MaterialTheme.typography.bodyMedium,
-                color = NofARColors.TextPrimary
-            )
-            NofARPrimaryButton(
-                text = stringResource(R.string.explore_download_map_data_action),
-                onClick = onShowDownloadPrompt,
-                modifier = Modifier.fillMaxWidth()
             )
         }
     }

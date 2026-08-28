@@ -14,7 +14,6 @@ enum class ExploreGate {
     REGION_MISSING,
     REGION_DOWNLOAD_NEEDED,
     REGION_DOWNLOADING,
-    REGION_DOWNLOAD_DISMISSED,
     GRACE_EXPIRED
 }
 
@@ -28,8 +27,7 @@ object ExplorePreconditions {
         graceExpired: Boolean,
         simpleModeEnabled: Boolean,
         regionDownloadNeeded: Boolean,
-        regionDownloading: Boolean,
-        downloadPromptDismissed: Boolean
+        regionDownloading: Boolean
     ): ExploreGate {
         val permissionGate =
             resolvePermissionGate(
@@ -42,7 +40,7 @@ object ExplorePreconditions {
             graceExpired && !simpleModeEnabled -> ExploreGate.GRACE_EXPIRED
             permissionGate != null -> permissionGate
             simpleModeEnabled ->
-                resolveSimpleModeGate(regionDownloadNeeded, regionDownloading, downloadPromptDismissed)
+                resolveSimpleModeGate(regionDownloadNeeded, regionDownloading)
             else -> resolveAdvancedRegionGate(activeRegion)
         }
     }
@@ -80,14 +78,9 @@ object ExplorePreconditions {
         else -> null
     }
 
-    private fun resolveSimpleModeGate(
-        regionDownloadNeeded: Boolean,
-        regionDownloading: Boolean,
-        downloadPromptDismissed: Boolean
-    ): ExploreGate = when {
+    private fun resolveSimpleModeGate(regionDownloadNeeded: Boolean, regionDownloading: Boolean): ExploreGate = when {
         regionDownloading -> ExploreGate.REGION_DOWNLOADING
-        regionDownloadNeeded && !downloadPromptDismissed -> ExploreGate.REGION_DOWNLOAD_NEEDED
-        regionDownloadNeeded && downloadPromptDismissed -> ExploreGate.REGION_DOWNLOAD_DISMISSED
+        regionDownloadNeeded -> ExploreGate.REGION_DOWNLOAD_NEEDED
         else -> ExploreGate.READY
     }
 

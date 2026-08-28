@@ -29,7 +29,7 @@ class AppConfigTest {
         assertEquals(20.0, AppConfig.VISIBILITY_REFRESH_DISTANCE_METERS, 0.001)
         assertEquals(5.0, AppConfig.REGION_RADIUS_MIN_KM, 0.001)
         assertEquals(20.0, AppConfig.REGION_RADIUS_MAX_KM, 0.001)
-        assertEquals(50L * 1024 * 1024, AppConfig.CELLULAR_DOWNLOAD_WARNING_BYTES)
+        assertEquals(100L * 1024 * 1024, AppConfig.CELLULAR_DOWNLOAD_WARNING_BYTES)
         assertEquals(500L * 1024 * 1024, AppConfig.DEM_CACHE_DEFAULT_LIMIT_BYTES)
         assertEquals(2.seconds, AppConfig.visibilityRefreshMaxInterval)
         assertEquals(2.minutes, AppConfig.exploreRegionExitGracePeriod)

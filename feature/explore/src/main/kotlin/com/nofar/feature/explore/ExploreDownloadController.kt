@@ -35,7 +35,6 @@ internal class ExploreDownloadController(
     suspend fun startDownload(proposal: QuickRegionProposal) {
         uiState.update {
             it.copy(
-                downloadPromptDismissed = false,
                 downloadUiMessage = null,
                 downloadProgressPct = 0
             )

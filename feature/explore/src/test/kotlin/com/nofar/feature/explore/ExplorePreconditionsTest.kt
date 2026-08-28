@@ -29,8 +29,7 @@ class ExplorePreconditionsTest {
                 graceExpired = false,
                 simpleModeEnabled = false,
                 regionDownloadNeeded = false,
-                regionDownloading = false,
-                downloadPromptDismissed = false
+                regionDownloading = false
             )
         assertThat(gate).isEqualTo(ExploreGate.CAMERA_DENIED)
     }
@@ -47,8 +46,7 @@ class ExplorePreconditionsTest {
                 graceExpired = true,
                 simpleModeEnabled = false,
                 regionDownloadNeeded = false,
-                regionDownloading = false,
-                downloadPromptDismissed = false
+                regionDownloading = false
             )
         assertThat(gate).isEqualTo(ExploreGate.GRACE_EXPIRED)
     }
@@ -65,8 +63,7 @@ class ExplorePreconditionsTest {
                 graceExpired = false,
                 simpleModeEnabled = true,
                 regionDownloadNeeded = true,
-                regionDownloading = true,
-                downloadPromptDismissed = false
+                regionDownloading = true
             )
         assertThat(gate).isEqualTo(ExploreGate.REGION_DOWNLOADING)
     }
@@ -83,28 +80,9 @@ class ExplorePreconditionsTest {
                 graceExpired = false,
                 simpleModeEnabled = true,
                 regionDownloadNeeded = true,
-                regionDownloading = false,
-                downloadPromptDismissed = false
+                regionDownloading = false
             )
         assertThat(gate).isEqualTo(ExploreGate.REGION_DOWNLOAD_NEEDED)
-    }
-
-    @Test
-    fun simpleModeDismissedPrompt_returnsDismissedGate() {
-        val gate =
-            ExplorePreconditions.resolveGate(
-                locationAccessState = LocationAccessState.GRANTED,
-                waitingForGpsFix = false,
-                cameraGranted = true,
-                calibrationState = CompassCalibrationState.OK,
-                activeRegion = null,
-                graceExpired = false,
-                simpleModeEnabled = true,
-                regionDownloadNeeded = true,
-                regionDownloading = false,
-                downloadPromptDismissed = true
-            )
-        assertThat(gate).isEqualTo(ExploreGate.REGION_DOWNLOAD_DISMISSED)
     }
 
     @Test
@@ -135,8 +113,7 @@ class ExplorePreconditionsTest {
         graceExpired = false,
         simpleModeEnabled = false,
         regionDownloadNeeded = false,
-        regionDownloading = false,
-        downloadPromptDismissed = false
+        regionDownloading = false
     )
 
     private fun sampleRegion(status: DownloadStatus): Region = Region(

@@ -47,7 +47,7 @@ object AppConfig {
     const val DATA_COLLECTION_RADIUS_PADDING_M: Double = 5_000.0
 
     /** Warn before cellular download when estimated size exceeds this (bytes). */
-    const val CELLULAR_DOWNLOAD_WARNING_BYTES: Long = 50L * 1024 * 1024
+    const val CELLULAR_DOWNLOAD_WARNING_BYTES: Long = 100L * 1024 * 1024
 
     /** Default DEM tile cache size limit (bytes). */
     const val DEM_CACHE_DEFAULT_LIMIT_BYTES: Long = 500L * 1024 * 1024
