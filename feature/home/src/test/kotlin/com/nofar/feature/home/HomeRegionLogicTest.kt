@@ -148,7 +148,7 @@ class HomeRegionLogicTest {
     }
 
     @Test
-    fun resolveExploreNavigation_multipleRegions_showsPickerSortedByUpdatedAt() {
+    fun resolveExploreNavigation_multipleReadyRegions_selectsLatestUpdated() {
         val older = sampleRegion(updatedAt = Instant.parse("2024-01-01T00:00:00Z"))
         val newer =
             sampleRegion(
@@ -156,10 +156,41 @@ class HomeRegionLogicTest {
                 updatedAt = Instant.parse("2024-06-01T00:00:00Z")
             )
         val decision = HomeRegionLogic.resolveExploreNavigation(listOf(older, newer))
-        assertEquals(
-            ExploreNavigationDecision.Pick(listOf(newer, older)),
-            decision
-        )
+        assertEquals(ExploreNavigationDecision.Direct(newer.id), decision)
+    }
+
+    @Test
+    fun resolveExploreNavigation_prefersReadyOverNewerPartial() {
+        val readyOlder =
+            sampleRegion(
+                updatedAt = Instant.parse("2024-01-01T00:00:00Z"),
+                downloadStatus = DownloadStatus.READY
+            )
+        val partialNewer =
+            sampleRegion(
+                id = UUID.randomUUID(),
+                updatedAt = Instant.parse("2024-06-01T00:00:00Z"),
+                downloadStatus = DownloadStatus.PARTIAL
+            )
+        val decision = HomeRegionLogic.resolveExploreNavigation(listOf(partialNewer, readyOlder))
+        assertEquals(ExploreNavigationDecision.Direct(readyOlder.id), decision)
+    }
+
+    @Test
+    fun resolveExploreNavigation_onlyPartial_selectsLatestUpdated() {
+        val olderPartial =
+            sampleRegion(
+                updatedAt = Instant.parse("2024-01-01T00:00:00Z"),
+                downloadStatus = DownloadStatus.PARTIAL
+            )
+        val newerPartial =
+            sampleRegion(
+                id = UUID.randomUUID(),
+                updatedAt = Instant.parse("2024-06-01T00:00:00Z"),
+                downloadStatus = DownloadStatus.PARTIAL
+            )
+        val decision = HomeRegionLogic.resolveExploreNavigation(listOf(olderPartial, newerPartial))
+        assertEquals(ExploreNavigationDecision.Direct(newerPartial.id), decision)
     }
 
     @Test

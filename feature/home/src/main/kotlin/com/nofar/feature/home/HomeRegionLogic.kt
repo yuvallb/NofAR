@@ -8,12 +8,14 @@ import java.util.UUID
 
 private val EXPLORE_ELIGIBLE_STATUSES = setOf(DownloadStatus.READY, DownloadStatus.PARTIAL)
 
+private val EXPLORE_REGION_PREFERENCE: Comparator<Region> =
+    compareBy<Region> { it.downloadStatus == DownloadStatus.READY }
+        .thenBy { it.updatedAt }
+
 sealed interface ExploreNavigationDecision {
     data object Disabled : ExploreNavigationDecision
 
     data class Direct(val regionId: UUID) : ExploreNavigationDecision
-
-    data class Pick(val regions: List<Region>) : ExploreNavigationDecision
 }
 
 internal object HomeRegionLogic {
@@ -46,13 +48,10 @@ internal object HomeRegionLogic {
 
     fun isEnterExploreEnabled(insideExploreRegions: List<Region>): Boolean = insideExploreRegions.isNotEmpty()
 
-    fun resolveExploreNavigation(insideExploreRegions: List<Region>): ExploreNavigationDecision = when {
-        insideExploreRegions.isEmpty() -> ExploreNavigationDecision.Disabled
-        insideExploreRegions.size == 1 ->
-            ExploreNavigationDecision.Direct(insideExploreRegions.single().id)
-        else ->
-            ExploreNavigationDecision.Pick(
-                insideExploreRegions.sortedByDescending { it.updatedAt }
-            )
+    fun resolveExploreNavigation(insideExploreRegions: List<Region>): ExploreNavigationDecision {
+        val selected =
+            insideExploreRegions.maxWithOrNull(EXPLORE_REGION_PREFERENCE)
+                ?: return ExploreNavigationDecision.Disabled
+        return ExploreNavigationDecision.Direct(selected.id)
     }
 }

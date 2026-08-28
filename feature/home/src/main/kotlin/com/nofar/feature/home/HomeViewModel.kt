@@ -42,8 +42,6 @@ data class HomeUiState(
     val freeSpaceBytes: Long = 0L,
     val deleteConfirmRegion: Region? = null,
     val navigateToExploreRegionId: UUID? = null,
-    val showOverlapPicker: Boolean = false,
-    val overlapRegions: List<Region> = emptyList(),
     val snackbarMessage: String? = null,
     val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED,
     val waitingForGpsFix: Boolean = false,
@@ -199,13 +197,8 @@ constructor(
         exploreNavigation.onGlobalEnterExplore(insideExploreRegions.value)
     }
 
-    fun onExploreUiAction(action: ExploreUiAction) {
-        when (action) {
-            ExploreUiAction.NavigationHandled -> exploreNavigation.onExploreNavigationHandled()
-            is ExploreUiAction.OverlapRegionSelected ->
-                exploreNavigation.onOverlapRegionSelected(action.regionId)
-            ExploreUiAction.OverlapPickerDismissed -> exploreNavigation.dismissOverlapPicker()
-        }
+    fun onExploreNavigationHandled() {
+        exploreNavigation.onExploreNavigationHandled()
     }
 
     fun onDeleteClicked(regionId: UUID) {

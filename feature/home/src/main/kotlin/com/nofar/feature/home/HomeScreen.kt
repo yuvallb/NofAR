@@ -65,7 +65,7 @@ fun HomeScreen(
     LaunchedEffect(uiState.navigateToExploreRegionId) {
         uiState.navigateToExploreRegionId?.let { regionId ->
             onNavigateToExplore(regionId)
-            viewModel.onExploreUiAction(ExploreUiAction.NavigationHandled)
+            viewModel.onExploreNavigationHandled()
         }
     }
 
@@ -250,45 +250,6 @@ private fun HomeScreenDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
             onDismiss = viewModel::dismissDeleteRegion
         )
     }
-    if (uiState.showOverlapPicker && uiState.overlapRegions.isNotEmpty()) {
-        OverlapRegionPickerDialog(
-            regions = uiState.overlapRegions,
-            onSelect = { regionId ->
-                viewModel.onExploreUiAction(ExploreUiAction.OverlapRegionSelected(regionId))
-            },
-            onDismiss = {
-                viewModel.onExploreUiAction(ExploreUiAction.OverlapPickerDismissed)
-            }
-        )
-    }
-}
-
-@Composable
-private fun OverlapRegionPickerDialog(regions: List<Region>, onSelect: (UUID) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Choose region") },
-        text = {
-            Column {
-                Text("You are inside more than one explore-ready region. Pick which one to enter.")
-                Spacer(modifier = Modifier.height(12.dp))
-                regions.forEach { region ->
-                    TextButton(
-                        onClick = { onSelect(region.id) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(region.name)
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("CANCEL")
-            }
-        }
-    )
 }
 
 @Composable
