@@ -7,58 +7,77 @@ import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
  * Resolves altitude for the Explore HUD.
  *
- * Priority: GPS altitude → sticky last-known GPS → DEM ground sample. No sea-level fallback.
+ * Virtual Explore: DEM ground only. Live Explore: GPS (or sticky last-known GPS) as the primary
+ * value, with DEM attached when the rounded values differ by more than
+ * [AppConfig.ALTITUDE_GPS_DEM_DISAGREE_METERS]. Falls back to DEM when no GPS altitude is
+ * available. No sea-level fallback.
  */
 @Singleton
 class DisplayAltitudeResolver
 @Inject
 constructor(private val pointDemElevationLookup: DemPointElevationSource) {
-    suspend fun resolve(location: UserLocation, lastKnownGpsAltitudeM: Double?, region: Region?): AltitudeReading? =
-        resolve(location, lastKnownGpsAltitudeM, listOfNotNull(region))
+    suspend fun resolve(
+        location: UserLocation,
+        lastKnownGpsAltitudeM: Double?,
+        region: Region?,
+        isVirtual: Boolean = false
+    ): AltitudeReading? = resolve(location, lastKnownGpsAltitudeM, listOfNotNull(region), isVirtual)
 
     suspend fun resolve(
         location: UserLocation,
         lastKnownGpsAltitudeM: Double?,
-        regions: List<Region>
-    ): AltitudeReading? = when {
-        location.altitudeMeters != null -> gpsReading(location)
-        lastKnownGpsAltitudeM != null -> cachedGpsReading(location, lastKnownGpsAltitudeM)
-        else -> regions.firstNotNullOfOrNull { demReading(location, it) }
+        regions: List<Region>,
+        isVirtual: Boolean = false
+    ): AltitudeReading? {
+        val demMeters = sampleDemMeters(location, regions)
+        val liveGps = location.altitudeMeters
+        return when {
+            isVirtual -> demMeters?.let(::demOnlyReading)
+            liveGps != null -> gpsBackedReading(location, liveGps, AltitudeSource.GPS, demMeters)
+            lastKnownGpsAltitudeM != null ->
+                gpsBackedReading(location, lastKnownGpsAltitudeM, AltitudeSource.LAST_KNOWN_GPS, demMeters)
+            else -> demMeters?.let(::demOnlyReading)
+        }
     }
 
-    private fun gpsReading(location: UserLocation): AltitudeReading = AltitudeReading(
-        meters = location.altitudeMeters!!.roundToInt(),
-        source = AltitudeSource.GPS,
-        isEstimate = isGpsAltitudeEstimate(location),
-        accuracyMeters = gpsAccuracyMeters(location),
-        accuracyIsVertical = location.verticalAccuracyMeters != null
-    )
+    private suspend fun sampleDemMeters(location: UserLocation, regions: List<Region>): Int? =
+        regions.firstNotNullOfOrNull { region ->
+            pointDemElevationLookup.elevationAt(location.latitude, location.longitude, region)?.roundToInt()
+        }
 
-    private fun cachedGpsReading(location: UserLocation, cachedAltitudeM: Double): AltitudeReading = AltitudeReading(
-        meters = cachedAltitudeM.roundToInt(),
-        source = AltitudeSource.LAST_KNOWN_GPS,
-        isEstimate = true,
-        accuracyMeters = horizontalAccuracyMeters(location),
+    private fun demOnlyReading(demMeters: Int): AltitudeReading = AltitudeReading(
+        meters = demMeters,
+        source = AltitudeSource.DEM,
+        isEstimate = false,
+        accuracyMeters = null,
         accuracyIsVertical = false
     )
 
-    private suspend fun demReading(location: UserLocation, region: Region?): AltitudeReading? {
-        val demElevationM =
-            pointDemElevationLookup.elevationAt(location.latitude, location.longitude, region)
-        return demElevationM?.let { demElevation ->
-            AltitudeReading(
-                meters = demElevation.roundToInt(),
-                source = AltitudeSource.DEM,
-                isEstimate = true,
-                accuracyMeters = horizontalAccuracyMeters(location),
-                accuracyIsVertical = false
-            )
-        }
+    private fun gpsBackedReading(
+        location: UserLocation,
+        gpsAltitudeM: Double,
+        source: AltitudeSource,
+        demMeters: Int?
+    ): AltitudeReading {
+        val gpsMeters = gpsAltitudeM.roundToInt()
+        val delta = demMeters?.let { gpsMeters - it }
+        val showDem = delta != null && abs(delta) > AppConfig.ALTITUDE_GPS_DEM_DISAGREE_METERS
+        val liveGps = source == AltitudeSource.GPS
+        return AltitudeReading(
+            meters = gpsMeters,
+            source = source,
+            isEstimate = if (liveGps) isGpsAltitudeEstimate(location) else true,
+            accuracyMeters = if (liveGps) gpsAccuracyMeters(location) else horizontalAccuracyMeters(location),
+            accuracyIsVertical = liveGps && location.verticalAccuracyMeters != null,
+            demMeters = if (showDem) demMeters else null,
+            demDeltaMeters = if (showDem) delta else null
+        )
     }
 
     private fun isGpsAltitudeEstimate(location: UserLocation): Boolean {

@@ -10,11 +10,17 @@ import com.nofar.core.model.UserLocation
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.test.runTest
+import org.junit.Before
 import org.junit.Test
 
 class DisplayAltitudeResolverTest {
     private val lookup = FakeDemPointElevationSource()
     private val resolver = DisplayAltitudeResolver(lookup)
+
+    @Before
+    fun resetLookup() {
+        lookup.nextElevationM = null
+    }
 
     @Test
     fun resolve_gpsWithGoodVerticalAccuracy_returnsConfirmedGps() = runTest {
@@ -28,6 +34,8 @@ class DisplayAltitudeResolverTest {
         assertThat(reading.isEstimate).isFalse()
         assertThat(reading.accuracyMeters).isEqualTo(20)
         assertThat(reading.accuracyIsVertical).isTrue()
+        assertThat(reading.demMeters).isNull()
+        assertThat(reading.demDeltaMeters).isNull()
     }
 
     @Test
@@ -68,6 +76,7 @@ class DisplayAltitudeResolverTest {
         assertThat(reading.source).isEqualTo(AltitudeSource.LAST_KNOWN_GPS)
         assertThat(reading.isEstimate).isTrue()
         assertThat(reading.accuracyMeters).isEqualTo(12)
+        assertThat(reading.demMeters).isNull()
     }
 
     @Test
@@ -80,8 +89,10 @@ class DisplayAltitudeResolverTest {
         assertThat(reading).isNotNull()
         assertThat(reading!!.meters).isEqualTo(1180)
         assertThat(reading.source).isEqualTo(AltitudeSource.DEM)
-        assertThat(reading.isEstimate).isTrue()
-        assertThat(reading.accuracyMeters).isEqualTo(6)
+        assertThat(reading.isEstimate).isFalse()
+        assertThat(reading.accuracyMeters).isNull()
+        assertThat(reading.demMeters).isNull()
+        assertThat(reading.demDeltaMeters).isNull()
     }
 
     @Test
@@ -92,6 +103,128 @@ class DisplayAltitudeResolverTest {
         val reading = resolver.resolve(location, lastKnownGpsAltitudeM = null, region = testRegion())
 
         assertThat(reading).isNull()
+    }
+
+    @Test
+    fun resolve_virtual_returnsDemWithoutAccuracy() = runTest {
+        lookup.nextElevationM = 140.4f
+        val location = userLocation(altitudeMeters = null, accuracyMeters = 5f)
+
+        val reading =
+            resolver.resolve(
+                location,
+                lastKnownGpsAltitudeM = 159.0,
+                region = testRegion(),
+                isVirtual = true
+            )
+
+        assertThat(reading).isNotNull()
+        assertThat(reading!!.meters).isEqualTo(140)
+        assertThat(reading.source).isEqualTo(AltitudeSource.DEM)
+        assertThat(reading.accuracyMeters).isNull()
+        assertThat(reading.demMeters).isNull()
+        assertThat(reading.demDeltaMeters).isNull()
+        assertThat(reading.demDisagreementText).isNull()
+    }
+
+    @Test
+    fun resolve_virtual_demMissing_returnsNull() = runTest {
+        val location = userLocation(altitudeMeters = 200.0)
+
+        val reading =
+            resolver.resolve(
+                location,
+                lastKnownGpsAltitudeM = 200.0,
+                region = testRegion(),
+                isVirtual = true
+            )
+
+        assertThat(reading).isNull()
+    }
+
+    @Test
+    fun resolve_gpsAndDemAgree_omitsDem() = runTest {
+        lookup.nextElevationM = 157f
+        val location = userLocation(altitudeMeters = 159.0, verticalAccuracyMeters = 3f)
+
+        val reading = resolver.resolve(location, lastKnownGpsAltitudeM = null, region = testRegion())
+
+        assertThat(reading).isNotNull()
+        assertThat(reading!!.meters).isEqualTo(159)
+        assertThat(reading.source).isEqualTo(AltitudeSource.GPS)
+        assertThat(reading.accuracyMeters).isEqualTo(3)
+        assertThat(reading.demMeters).isNull()
+        assertThat(reading.demDeltaMeters).isNull()
+    }
+
+    @Test
+    fun resolve_gpsAndDemDifferByThreshold_omitsDem() = runTest {
+        lookup.nextElevationM = 154f
+        val location = userLocation(altitudeMeters = 159.0, verticalAccuracyMeters = 3f)
+
+        val reading = resolver.resolve(location, lastKnownGpsAltitudeM = null, region = testRegion())
+
+        assertThat(reading).isNotNull()
+        assertThat(reading!!.demMeters).isNull()
+        assertThat(reading.demDeltaMeters).isNull()
+    }
+
+    @Test
+    fun resolve_gpsAboveDem_attachesPositiveDelta() = runTest {
+        lookup.nextElevationM = 140f
+        val location = userLocation(altitudeMeters = 159.0, verticalAccuracyMeters = 3f)
+
+        val reading = resolver.resolve(location, lastKnownGpsAltitudeM = null, region = testRegion())
+
+        assertThat(reading).isNotNull()
+        assertThat(reading!!.meters).isEqualTo(159)
+        assertThat(reading.source).isEqualTo(AltitudeSource.GPS)
+        assertThat(reading.accuracyMeters).isEqualTo(3)
+        assertThat(reading.demMeters).isEqualTo(140)
+        assertThat(reading.demDeltaMeters).isEqualTo(19)
+        assertThat(reading.demDisagreementText).isEqualTo("(140+19m)")
+    }
+
+    @Test
+    fun resolve_gpsBelowDem_attachesNegativeDelta() = runTest {
+        lookup.nextElevationM = 159f
+        val location = userLocation(altitudeMeters = 140.0, verticalAccuracyMeters = 3f)
+
+        val reading = resolver.resolve(location, lastKnownGpsAltitudeM = null, region = testRegion())
+
+        assertThat(reading).isNotNull()
+        assertThat(reading!!.meters).isEqualTo(140)
+        assertThat(reading.demMeters).isEqualTo(159)
+        assertThat(reading.demDeltaMeters).isEqualTo(-19)
+        assertThat(reading.demDisagreementText).isEqualTo("(159-19m)")
+    }
+
+    @Test
+    fun resolve_lastKnownGpsDisagreesWithDem_attachesDelta() = runTest {
+        lookup.nextElevationM = 140f
+        val location = userLocation(altitudeMeters = null, accuracyMeters = 12f)
+
+        val reading = resolver.resolve(location, lastKnownGpsAltitudeM = 159.0, region = testRegion())
+
+        assertThat(reading).isNotNull()
+        assertThat(reading!!.source).isEqualTo(AltitudeSource.LAST_KNOWN_GPS)
+        assertThat(reading.meters).isEqualTo(159)
+        assertThat(reading.demMeters).isEqualTo(140)
+        assertThat(reading.demDeltaMeters).isEqualTo(19)
+        assertThat(reading.demDisagreementText).isEqualTo("(140+19m)")
+    }
+
+    @Test
+    fun resolve_gpsWithoutDem_omitsDem() = runTest {
+        val location = userLocation(altitudeMeters = 159.0, verticalAccuracyMeters = 3f)
+
+        val reading = resolver.resolve(location, lastKnownGpsAltitudeM = null, region = testRegion())
+
+        assertThat(reading).isNotNull()
+        assertThat(reading!!.meters).isEqualTo(159)
+        assertThat(reading.source).isEqualTo(AltitudeSource.GPS)
+        assertThat(reading.demMeters).isNull()
+        assertThat(reading.demDeltaMeters).isNull()
     }
 
     private fun userLocation(

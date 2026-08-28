@@ -155,10 +155,12 @@ internal fun BoxScope.ExploreExpertBottomControls(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             NofARExploreAltitudeReadout(altitude = uiState.altitude)
-            NofARLocationAccuracyBadge(
-                accuracyMeters = uiState.locationAccuracyMeters,
-                isDegraded = uiState.locationAccuracyDegraded
-            )
+            if (!uiState.isVirtualExplore) {
+                NofARLocationAccuracyBadge(
+                    accuracyMeters = uiState.locationAccuracyMeters,
+                    isDegraded = uiState.locationAccuracyDegraded
+                )
+            }
         }
         NofARIconActionButton(onClick = onNavigateBack) {
             Icon(Icons.Default.Close, contentDescription = "Exit Explore", tint = Color.White)

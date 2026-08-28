@@ -270,7 +270,7 @@ private fun BoxScope.ExploreReadyStatusBanners(uiState: ExploreUiState) {
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp)
         )
     }
-    if (uiState.locationAccuracyDegraded) {
+    if (uiState.locationAccuracyDegraded && !uiState.isVirtualExplore) {
         ExploreLocationAccuracyBanner(
             accuracyMeters = uiState.locationAccuracyMeters?.roundToInt() ?: 0,
             thresholdMeters = AppConfig.EXPLORE_LOCATION_ACCURACY_THRESHOLD_METERS.roundToInt(),
@@ -299,10 +299,12 @@ private fun BoxScope.ExploreReadyBottomChrome(
             verticalAlignment = Alignment.CenterVertically
         ) {
             NofARExploreAltitudeReadout(altitude = uiState.altitude)
-            NofARLocationAccuracyBadge(
-                accuracyMeters = uiState.locationAccuracyMeters,
-                isDegraded = uiState.locationAccuracyDegraded
-            )
+            if (!uiState.isVirtualExplore) {
+                NofARLocationAccuracyBadge(
+                    accuracyMeters = uiState.locationAccuracyMeters,
+                    isDegraded = uiState.locationAccuracyDegraded
+                )
+            }
         }
         ExploreSettingsButton(onNavigateToSettings = onNavigateToSettings)
     } else {

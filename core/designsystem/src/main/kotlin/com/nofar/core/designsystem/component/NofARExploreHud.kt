@@ -226,9 +226,8 @@ fun NofARExploreAltitudeReadout(altitude: AltitudeReading?, modifier: Modifier =
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val prefix = altitude?.takeIf { it.isEstimate }?.let { "~" }.orEmpty()
         val valueText =
-            altitude?.let { reading -> "ALT $prefix${reading.meters} m" } ?: "ALT — m"
+            altitude?.let { reading -> "ALT ${reading.meters} m" } ?: "ALT — m"
         Text(
             text = valueText,
             style = MaterialTheme.typography.titleMedium.copy(shadow = arTextShadow),
@@ -238,6 +237,14 @@ fun NofARExploreAltitudeReadout(altitude: AltitudeReading?, modifier: Modifier =
         altitude?.accuracyMeters?.let { accuracy ->
             Text(
                 text = " ±${accuracy}m",
+                modifier = Modifier.padding(start = 4.dp),
+                style = MaterialTheme.typography.labelSmall.copy(shadow = arTextShadow),
+                color = Color.White
+            )
+        }
+        altitude?.demDisagreementText?.let { demText ->
+            Text(
+                text = " $demText",
                 modifier = Modifier.padding(start = 4.dp),
                 style = MaterialTheme.typography.labelSmall.copy(shadow = arTextShadow),
                 color = Color.White

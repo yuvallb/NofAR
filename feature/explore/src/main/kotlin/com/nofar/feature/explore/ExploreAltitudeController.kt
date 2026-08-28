@@ -14,7 +14,8 @@ internal class ExploreAltitudeController(
     private val scope: CoroutineScope,
     private val displayAltitudeResolver: DisplayAltitudeResolver,
     private val uiState: MutableStateFlow<ExploreUiState>,
-    private val activeRegion: () -> Region?
+    private val activeRegion: () -> Region?,
+    private val isVirtual: Boolean = false
 ) {
     private var lastKnownGpsAltitudeM: Double? = null
     private var resolveJob: Job? = null
@@ -24,7 +25,7 @@ internal class ExploreAltitudeController(
     }
 
     fun scheduleResolve(location: UserLocation, regions: List<Region>) {
-        if (location.altitudeMeters != null) {
+        if (!isVirtual && location.altitudeMeters != null) {
             lastKnownGpsAltitudeM = location.altitudeMeters
         }
         resolveJob?.cancel()
@@ -34,8 +35,9 @@ internal class ExploreAltitudeController(
                 val reading =
                     displayAltitudeResolver.resolve(
                         location = location,
-                        lastKnownGpsAltitudeM = lastKnownGpsAltitudeM,
-                        regions = regionsToTry
+                        lastKnownGpsAltitudeM = if (isVirtual) null else lastKnownGpsAltitudeM,
+                        regions = regionsToTry,
+                        isVirtual = isVirtual
                     )
                 uiState.update { it.copy(altitude = reading) }
             }

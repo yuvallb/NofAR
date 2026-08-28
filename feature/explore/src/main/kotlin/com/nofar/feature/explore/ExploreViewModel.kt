@@ -97,7 +97,8 @@ constructor(
             scope = viewModelScope,
             displayAltitudeResolver = displayAltitudeResolver,
             uiState = _uiState,
-            activeRegion = { _uiState.value.activeRegion }
+            activeRegion = { _uiState.value.activeRegion },
+            isVirtual = virtualExploreSession != null
         )
     private val downloadController =
         ExploreDownloadController(
@@ -478,11 +479,17 @@ constructor(
     }
 
     private fun onLocation(location: UserLocation) {
-        val accuracyDegraded = ExploreLocationAccuracy.isDegraded(location.accuracyMeters)
+        val isVirtual = virtualObserverLocation != null
+        val accuracyDegraded =
+            if (isVirtual) {
+                false
+            } else {
+                ExploreLocationAccuracy.isDegraded(location.accuracyMeters)
+            }
         _uiState.update {
             it.copy(
                 waitingForGpsFix = false,
-                locationAccuracyMeters = location.accuracyMeters,
+                locationAccuracyMeters = if (isVirtual) null else location.accuracyMeters,
                 locationAccuracyDegraded = accuracyDegraded,
                 locationAccessState =
                 if (it.locationAccessState == LocationAccessState.WAITING_FOR_FIX) {
@@ -494,7 +501,7 @@ constructor(
         }
         reprojectOverlay()
 
-        if (virtualObserverLocation != null) {
+        if (isVirtual) {
             refreshGate()
             return
         }

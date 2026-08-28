@@ -102,6 +102,12 @@ object AppConfig {
     /** GPS altitude is used when vertical accuracy is at or below this threshold (meters). */
     const val GPS_ALTITUDE_ACCURACY_THRESHOLD_METERS: Float = 50f
 
+    /**
+     * Explore HUD shows DEM beside GPS when the rounded GPS and DEM altitudes differ by more
+     * than this many meters.
+     */
+    const val ALTITUDE_GPS_DEM_DISAGREE_METERS: Int = 5
+
     /** AR labels are hidden when horizontal GPS accuracy exceeds this (meters). */
     const val EXPLORE_LOCATION_ACCURACY_THRESHOLD_METERS: Float = 30f
 
