@@ -44,6 +44,7 @@ internal fun SettingsContent(
     onSimpleModeChanged: (Boolean) -> Unit,
     onShowHorizonOutlineChanged: (Boolean) -> Unit,
     onShowLabelElevationChanged: (Boolean) -> Unit,
+    onResetHorizonAlignment: () -> Unit,
     onPreferredLabelLanguageChanged: (LabelLanguage) -> Unit,
     onEvictionThresholdChanged: (Float) -> Unit,
     onShowPurgeConfirm: () -> Unit,
@@ -63,11 +64,14 @@ internal fun SettingsContent(
             wifiOnlyDownloads = uiState.wifiOnlyDownloads,
             showHorizonOutline = uiState.showHorizonOutline,
             showLabelElevation = uiState.showLabelElevation,
+            horizonAzimuthOffsetDeg = uiState.horizonAzimuthOffsetDeg,
+            horizonPitchOffsetDeg = uiState.horizonPitchOffsetDeg,
             preferredLabelLanguage = uiState.preferredLabelLanguage,
             onSimpleModeChanged = onSimpleModeChanged,
             onWifiOnlyChanged = onWifiOnlyChanged,
             onShowHorizonOutlineChanged = onShowHorizonOutlineChanged,
             onShowLabelElevationChanged = onShowLabelElevationChanged,
+            onResetHorizonAlignment = onResetHorizonAlignment,
             onPreferredLabelLanguageChanged = onPreferredLabelLanguageChanged
         )
         SettingsSectionDivider()
@@ -116,11 +120,14 @@ private fun SettingsGeneralSection(
     wifiOnlyDownloads: Boolean,
     showHorizonOutline: Boolean,
     showLabelElevation: Boolean,
+    horizonAzimuthOffsetDeg: Float,
+    horizonPitchOffsetDeg: Float,
     preferredLabelLanguage: LabelLanguage,
     onSimpleModeChanged: (Boolean) -> Unit,
     onWifiOnlyChanged: (Boolean) -> Unit,
     onShowHorizonOutlineChanged: (Boolean) -> Unit,
     onShowLabelElevationChanged: (Boolean) -> Unit,
+    onResetHorizonAlignment: () -> Unit,
     onPreferredLabelLanguageChanged: (LabelLanguage) -> Unit
 ) {
     SettingsSectionTitle("GENERAL")
@@ -143,8 +150,11 @@ private fun SettingsGeneralSection(
     SettingsExploreDisplayToggles(
         showHorizonOutline = showHorizonOutline,
         showLabelElevation = showLabelElevation,
+        horizonAzimuthOffsetDeg = horizonAzimuthOffsetDeg,
+        horizonPitchOffsetDeg = horizonPitchOffsetDeg,
         onShowHorizonOutlineChanged = onShowHorizonOutlineChanged,
-        onShowLabelElevationChanged = onShowLabelElevationChanged
+        onShowLabelElevationChanged = onShowLabelElevationChanged,
+        onResetHorizonAlignment = onResetHorizonAlignment
     )
     Spacer(modifier = Modifier.height(8.dp))
     Text(
@@ -179,8 +189,11 @@ private fun SettingsGeneralSection(
 private fun SettingsExploreDisplayToggles(
     showHorizonOutline: Boolean,
     showLabelElevation: Boolean,
+    horizonAzimuthOffsetDeg: Float,
+    horizonPitchOffsetDeg: Float,
     onShowHorizonOutlineChanged: (Boolean) -> Unit,
-    onShowLabelElevationChanged: (Boolean) -> Unit
+    onShowLabelElevationChanged: (Boolean) -> Unit,
+    onResetHorizonAlignment: () -> Unit
 ) {
     SettingsToggleRow(
         title = "Horizon outline",
@@ -189,6 +202,42 @@ private fun SettingsExploreDisplayToggles(
         onCheckedChange = onShowHorizonOutlineChanged,
         testTag = "horizon_outline_toggle"
     )
+    Spacer(modifier = Modifier.height(8.dp))
+    Text(
+        text = stringResource(com.nofar.core.ui.R.string.settings_horizon_alignment_title),
+        style = MaterialTheme.typography.bodyLarge,
+        color = NofARColors.TextPrimary
+    )
+    Text(
+        text = stringResource(com.nofar.core.ui.R.string.settings_horizon_alignment_subtitle),
+        style = MaterialTheme.typography.bodySmall,
+        color = NofARColors.TextSecondary
+    )
+    val hasAlignment = horizonAzimuthOffsetDeg != 0f || horizonPitchOffsetDeg != 0f
+    Text(
+        text =
+        if (hasAlignment) {
+            stringResource(
+                com.nofar.core.ui.R.string.settings_horizon_alignment_readout,
+                horizonAzimuthOffsetDeg,
+                horizonPitchOffsetDeg
+            )
+        } else {
+            stringResource(com.nofar.core.ui.R.string.settings_horizon_alignment_none)
+        },
+        style = MaterialTheme.typography.bodySmall,
+        color = NofARColors.TextCaption
+    )
+    TextButton(
+        onClick = onResetHorizonAlignment,
+        enabled = hasAlignment,
+        modifier = Modifier.testTag("reset_horizon_alignment_button")
+    ) {
+        Text(
+            stringResource(com.nofar.core.ui.R.string.settings_horizon_alignment_reset),
+            color = NofARColors.PrimaryYellow
+        )
+    }
     Spacer(modifier = Modifier.height(8.dp))
     SettingsToggleRow(
         title = "Show elevation",

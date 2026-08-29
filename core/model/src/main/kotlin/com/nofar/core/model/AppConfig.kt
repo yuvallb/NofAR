@@ -239,4 +239,43 @@ object AppConfig {
 
     /** Square mask raster size for map viewshed overlay (pixels). */
     const val MAP_PREVIEW_MASK_SIZE_PX: Int = 512
+
+    /** Maximum azimuth/pitch offset applied automatically after skyline matching (degrees). */
+    const val HORIZON_ALIGN_MAX_AUTO_DEG: Float = 8f
+
+    /** Grid-search half-range for azimuth offset during skyline matching (degrees). */
+    const val HORIZON_ALIGN_AZIMUTH_SEARCH_DEG: Float = 12f
+
+    /** Grid-search half-range for pitch offset during skyline matching (degrees). */
+    const val HORIZON_ALIGN_PITCH_SEARCH_DEG: Float = 8f
+
+    /** Grid-search step for azimuth and pitch offsets (degrees). */
+    const val HORIZON_ALIGN_SEARCH_STEP_DEG: Float = 0.25f
+
+    /** Number of horizontal samples when comparing camera and DEM skylines. */
+    const val HORIZON_ALIGN_PROFILE_COLUMNS: Int = 160
+
+    /** Minimum fraction of columns with valid camera and DEM samples to attempt matching. */
+    const val HORIZON_ALIGN_MIN_VALID_COLUMN_FRACTION: Float = 0.5f
+
+    /** Minimum normalized Y variance in the DEM profile (flat sea/plain rejection). */
+    const val HORIZON_ALIGN_MIN_DEM_Y_VARIANCE: Float = 0.0005f
+
+    /** Best match must beat the zero-offset baseline by at least this fraction. */
+    const val HORIZON_ALIGN_MIN_IMPROVEMENT_FRACTION: Float = 0.15f
+
+    /** |cameraElevationDeg| must be below this to attempt automatic alignment. */
+    const val HORIZON_ALIGN_MAX_CAMERA_ELEVATION_DEG: Float = 20f
+
+    /** Orientation must stay within these deltas (degrees) for this long before matching. */
+    const val HORIZON_ALIGN_STILL_AZIMUTH_DEG: Float = 1.5f
+    const val HORIZON_ALIGN_STILL_PITCH_DEG: Float = 1.5f
+    const val HORIZON_ALIGN_STILL_ROLL_DEG: Float = 3f
+    const val HORIZON_ALIGN_STILL_DWELL_MS: Long = 1_000L
+
+    /** Minimum interval between automatic alignment attempts (milliseconds). */
+    const val HORIZON_ALIGN_ATTEMPT_COOLDOWN_MS: Long = 10_000L
+
+    /** Minimum vertical luminance step to treat a camera column as having a skyline edge. */
+    const val HORIZON_ALIGN_MIN_EDGE_CONTRAST: Int = 12
 }

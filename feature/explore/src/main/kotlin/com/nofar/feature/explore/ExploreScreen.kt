@@ -69,7 +69,9 @@ fun ExploreScreen(
         onDownloadRetry = viewModel::onDownloadRetry,
         onConfirmCellularDownload = viewModel::confirmCellularDownload,
         onDismissCellularWarning = viewModel::dismissCellularWarning,
-        onDismissWifiOnlyBlocked = viewModel::dismissWifiOnlyBlocked
+        onDismissWifiOnlyBlocked = viewModel::dismissWifiOnlyBlocked,
+        onDismissHorizonAlignmentWarning = viewModel::onDismissHorizonAlignmentWarning,
+        cameraFrameStore = viewModel.exploreCameraFrameStore
     )
 }
 

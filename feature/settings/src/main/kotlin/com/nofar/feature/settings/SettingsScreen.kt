@@ -76,6 +76,7 @@ fun SettingsScreen(
                 },
                 onShowHorizonOutlineChanged = viewModel::onShowHorizonOutlineChanged,
                 onShowLabelElevationChanged = viewModel::onShowLabelElevationChanged,
+                onResetHorizonAlignment = viewModel::onResetHorizonAlignment,
                 onPreferredLabelLanguageChanged = viewModel::onPreferredLabelLanguageChanged,
                 onEvictionThresholdChanged = viewModel::onEvictionThresholdChanged,
                 onShowPurgeConfirm = viewModel::showPurgeConfirm,

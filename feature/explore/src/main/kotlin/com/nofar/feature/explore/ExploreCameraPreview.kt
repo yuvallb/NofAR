@@ -1,10 +1,12 @@
 package com.nofar.feature.explore
 
 import android.util.Log
+import android.view.Surface
 import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -24,6 +26,8 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.nofar.core.model.AppConfig
 import com.nofar.core.visibility.CameraFieldOfView
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.math.atan
 
 private const val TAG = "ExploreCamera"
@@ -33,6 +37,7 @@ private const val TAG = "ExploreCamera"
 fun ExploreCameraPreview(
     modifier: Modifier = Modifier,
     zoomRatio: Float = 1f,
+    frameStore: ExploreCameraFrameStore? = null,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit = {},
     onZoomRangeChanged: (minZoomRatio: Float, maxZoomRatio: Float) -> Unit = { _, _ -> }
 ) {
@@ -55,13 +60,14 @@ fun ExploreCameraPreview(
         boundCamera?.cameraControl?.setZoomRatio(zoomRatio)
     }
 
-    DisposableEffect(lifecycleOwner, previewView) {
+    DisposableEffect(lifecycleOwner, previewView, frameStore) {
         val view = previewView
         if (view == null) {
             onDispose { }
         } else {
             val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
             val zoomObserver = exploreZoomObserver(onZoomRangeChanged)
+            val analysisExecutor = frameStore?.let { Executors.newSingleThreadExecutor() }
             val listener =
                 Runnable {
                     bindExploreCameraPreview(
@@ -69,6 +75,9 @@ fun ExploreCameraPreview(
                         previewView = view,
                         cameraProviderFuture = cameraProviderFuture,
                         zoomObserver = zoomObserver,
+                        frameStore = frameStore,
+                        analysisExecutor = analysisExecutor,
+                        displayRotation = view.display?.rotation ?: Surface.ROTATION_0,
                         onCameraBound = { camera -> boundCamera = camera },
                         onFieldOfViewChanged = onFieldOfViewChanged,
                         onBindFailed = {
@@ -82,6 +91,8 @@ fun ExploreCameraPreview(
             onDispose {
                 boundCamera?.cameraInfo?.zoomState?.removeObserver(zoomObserver)
                 boundCamera = null
+                frameStore?.clear()
+                analysisExecutor?.shutdown()
                 runCatching {
                     cameraProviderFuture.get().unbindAll()
                 }
@@ -96,6 +107,9 @@ private fun bindExploreCameraPreview(
     previewView: PreviewView,
     cameraProviderFuture: com.google.common.util.concurrent.ListenableFuture<ProcessCameraProvider>,
     zoomObserver: Observer<androidx.camera.core.ZoomState>,
+    frameStore: ExploreCameraFrameStore?,
+    analysisExecutor: ExecutorService?,
+    displayRotation: Int,
     onCameraBound: (Camera) -> Unit,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
     onBindFailed: () -> Unit
@@ -105,13 +119,30 @@ private fun bindExploreCameraPreview(
         val preview = Preview.Builder().build()
         preview.setSurfaceProvider(previewView.surfaceProvider)
 
+        val imageAnalysis: ImageAnalysis? =
+            if (frameStore != null && analysisExecutor != null) {
+                buildExploreImageAnalysis(
+                    targetRotation = displayRotation,
+                    executor = analysisExecutor,
+                    frameStore = frameStore
+                )
+            } else {
+                null
+            }
+
         val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
         cameraProvider.unbindAll()
+        val useCases =
+            if (imageAnalysis != null) {
+                arrayOf(preview, imageAnalysis)
+            } else {
+                arrayOf(preview)
+            }
         val camera =
             cameraProvider.bindToLifecycle(
                 lifecycleOwner,
                 cameraSelector,
-                preview
+                *useCases
             )
         onCameraBound(camera)
         camera.cameraInfo.zoomState.observe(lifecycleOwner, zoomObserver)

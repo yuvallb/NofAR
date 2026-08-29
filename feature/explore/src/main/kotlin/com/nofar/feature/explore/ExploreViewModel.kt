@@ -34,6 +34,8 @@ import com.nofar.core.sensors.di.UnsmoothedOrientation
 import com.nofar.core.visibility.CameraFieldOfView
 import com.nofar.core.visibility.DisplayAltitudeResolver
 import com.nofar.core.visibility.HereContext
+import com.nofar.core.visibility.HorizonAlignmentRejectReason
+import com.nofar.core.visibility.HorizonAlignmentResult
 import com.nofar.core.visibility.HorizonProfile
 import com.nofar.core.visibility.HorizonProjector
 import com.nofar.core.visibility.VisibilityPassScheduler
@@ -73,7 +75,9 @@ constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val quickRegionDownloadUseCase: QuickRegionDownloadUseCase,
     private val downloadScheduler: PrepareDownloadScheduler,
-    private val networkConnectivityMonitor: NetworkConnectivityMonitor
+    private val networkConnectivityMonitor: NetworkConnectivityMonitor,
+    private val horizonAlignmentEngine: ExploreHorizonAlignmentEngine,
+    private val cameraFrameStore: ExploreCameraFrameStore
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(ExploreUiState())
     val uiState: StateFlow<ExploreUiState> = _uiState.asStateFlow()
@@ -119,6 +123,11 @@ constructor(
     private var currentRawOrientation: DeviceOrientation? = null
     private var hasReceivedOrientation: Boolean = false
     private var lastCompassBearingDeg: Float = 0f
+    private val horizonAlignmentScheduler = ExploreHorizonAlignmentScheduler()
+    private var horizonAlignmentInProgress = false
+    private var horizonAlignmentWarningShownThisSession = false
+
+    val exploreCameraFrameStore: ExploreCameraFrameStore = cameraFrameStore
 
     init {
         configureObserverLocationSource()
@@ -134,6 +143,7 @@ constructor(
         }
         collectSimpleModePreference()
         collectHorizonOutlinePreference()
+        collectHorizonAlignmentOffsets()
         collectLabelElevationPreference()
         viewModelScope.launch { resolveInitialRegion() }
         collectOrientation()
@@ -352,6 +362,25 @@ constructor(
         super.onCleared()
     }
 
+    fun onDismissHorizonAlignmentWarning() {
+        _uiState.update { it.copy(showHorizonAlignmentWarning = false) }
+    }
+
+    private fun collectHorizonAlignmentOffsets() {
+        viewModelScope.launch {
+            userPreferencesRepository.horizonAzimuthOffsetDeg.collect { azimuthOffset ->
+                _uiState.update { it.copy(horizonAzimuthOffsetDeg = azimuthOffset) }
+                reprojectOverlay()
+            }
+        }
+        viewModelScope.launch {
+            userPreferencesRepository.horizonPitchOffsetDeg.collect { pitchOffset ->
+                _uiState.update { it.copy(horizonPitchOffsetDeg = pitchOffset) }
+                reprojectOverlay()
+            }
+        }
+    }
+
     private fun collectHorizonOutlinePreference() {
         viewModelScope.launch {
             userPreferencesRepository.showHorizonOutline.collect { enabled ->
@@ -509,7 +538,8 @@ constructor(
     }
 
     private fun onOrientation(orientation: DeviceOrientation) {
-        val compassBearingDeg = resolveCompassDisplayBearing(orientation)
+        val alignedOrientation = orientationWithStoredOffsets(orientation, _uiState.value)
+        val compassBearingDeg = resolveCompassDisplayBearing(alignedOrientation)
         _uiState.update {
             it.copy(
                 compassBearingDeg = compassBearingDeg,
@@ -517,6 +547,7 @@ constructor(
                 debugSmoothedAzimuthDeg = orientation.trueAzimuthDeg
             )
         }
+        maybeAttemptHorizonAlignment(orientation)
         refreshGate()
     }
 
@@ -795,12 +826,60 @@ constructor(
         }
     }
 
-    private fun resolveProjectedOrientation(state: ExploreUiState, orientation: DeviceOrientation): DeviceOrientation =
-        if (state.useRawSensorOverlay) {
-            currentRawOrientation ?: orientation
-        } else {
-            orientation
+    private fun resolveProjectedOrientation(state: ExploreUiState, orientation: DeviceOrientation): DeviceOrientation {
+        val baseOrientation =
+            if (state.useRawSensorOverlay) {
+                currentRawOrientation ?: orientation
+            } else {
+                orientation
+            }
+        return orientationWithStoredOffsets(baseOrientation, state)
+    }
+
+    private fun orientationWithStoredOffsets(orientation: DeviceOrientation, state: ExploreUiState): DeviceOrientation =
+        orientation.copy(
+            trueAzimuthDeg = normalizeAzimuthDeg(orientation.trueAzimuthDeg + state.horizonAzimuthOffsetDeg),
+            cameraElevationDeg = orientation.cameraElevationDeg + state.horizonPitchOffsetDeg
+        )
+
+    private fun canAttemptHorizonAlignment(state: ExploreUiState): Boolean {
+        val exploreReady =
+            state.exploreGate == ExploreGate.READY &&
+                state.cameraGranted &&
+                state.showHorizonOutline
+        return exploreReady && !horizonAlignmentInProgress && cachedHorizonProfile != null
+    }
+
+    private fun maybeAttemptHorizonAlignment(orientation: DeviceOrientation) {
+        if (!canAttemptHorizonAlignment(_uiState.value)) return
+        if (horizonAlignmentScheduler.onOrientation(orientation) != HorizonAlignmentAttemptGate.AttemptNow) return
+
+        horizonAlignmentInProgress = true
+        viewModelScope.launch(Dispatchers.Default) {
+            val attemptState = _uiState.value
+            val outcome =
+                horizonAlignmentEngine.attemptAlignment(
+                    orientation = orientation,
+                    horizonProfile = cachedHorizonProfile!!,
+                    fov = attemptState.cameraFov,
+                    screenWidthPx = attemptState.screenWidthPx,
+                    screenHeightPx = attemptState.screenHeightPx
+                )
+            horizonAlignmentInProgress = false
+            if (
+                !outcome.offsetsApplied &&
+                !horizonAlignmentWarningShownThisSession &&
+                shouldWarnAboutSkippedAlignment(outcome.result)
+            ) {
+                horizonAlignmentWarningShownThisSession = true
+                _uiState.update { it.copy(showHorizonAlignmentWarning = true) }
+            }
         }
+    }
+
+    private fun shouldWarnAboutSkippedAlignment(result: HorizonAlignmentResult): Boolean =
+        result.rejectReason == HorizonAlignmentRejectReason.OVER_THRESHOLD ||
+            result.rejectReason == HorizonAlignmentRejectReason.LOW_CONFIDENCE
 
     private fun projectHorizonLineSegments(
         state: ExploreUiState,

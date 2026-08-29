@@ -47,6 +47,8 @@ internal fun ExploreScreenRoot(
     onConfirmCellularDownload: () -> Unit,
     onDismissCellularWarning: () -> Unit,
     onDismissWifiOnlyBlocked: () -> Unit,
+    onDismissHorizonAlignmentWarning: () -> Unit,
+    cameraFrameStore: ExploreCameraFrameStore,
     modifier: Modifier = Modifier
 ) {
     val zoomGesturesEnabled =
@@ -70,6 +72,7 @@ internal fun ExploreScreenRoot(
             gate = uiState.exploreGate,
             uiState = uiState,
             permissionState = permissionState,
+            cameraFrameStore = cameraFrameStore,
             onNavigateBack = onNavigateBack,
             onFieldOfViewChanged = onFieldOfViewChanged,
             onZoomRangeChanged = onZoomRangeChanged,
@@ -83,6 +86,7 @@ internal fun ExploreScreenRoot(
                 onNavigateBack = onNavigateBack,
                 onNavigateToSettings = onNavigateToSettings,
                 onChangeVirtualLocation = onChangeVirtualLocation,
+                onDismissHorizonAlignmentWarning = onDismissHorizonAlignmentWarning,
                 onZoomStep = onZoomStep,
                 onZoomReset = onZoomReset
             )
@@ -161,6 +165,7 @@ private fun BoxScope.ExploreGateContent(
     gate: ExploreGate,
     uiState: ExploreUiState,
     permissionState: PermissionState,
+    cameraFrameStore: ExploreCameraFrameStore,
     onNavigateBack: () -> Unit,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
     onZoomRangeChanged: (Float, Float) -> Unit,
@@ -171,6 +176,7 @@ private fun BoxScope.ExploreGateContent(
         ExploreGate.READY -> ExploreReadyGateContent(
             uiState = uiState,
             permissionState = permissionState,
+            cameraFrameStore = cameraFrameStore,
             onFieldOfViewChanged = onFieldOfViewChanged,
             onZoomRangeChanged = onZoomRangeChanged,
             onHiddenCountClick = onHiddenCountClick
@@ -218,6 +224,7 @@ private fun BoxScope.ExploreGateContent(
 private fun BoxScope.ExploreReadyGateContent(
     uiState: ExploreUiState,
     permissionState: PermissionState,
+    cameraFrameStore: ExploreCameraFrameStore,
     onFieldOfViewChanged: (CameraFieldOfView) -> Unit,
     onZoomRangeChanged: (Float, Float) -> Unit,
     onHiddenCountClick: (Int) -> Unit
@@ -226,6 +233,7 @@ private fun BoxScope.ExploreReadyGateContent(
         ExploreCameraPreview(
             modifier = Modifier.fillMaxSize(),
             zoomRatio = uiState.zoomRatio,
+            frameStore = cameraFrameStore,
             onFieldOfViewChanged = onFieldOfViewChanged,
             onZoomRangeChanged = onZoomRangeChanged
         )
@@ -264,11 +272,15 @@ private fun BoxScope.ExploreReadyChrome(
     onNavigateBack: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onChangeVirtualLocation: () -> Unit,
+    onDismissHorizonAlignmentWarning: () -> Unit,
     onZoomStep: (ZoomStepDirection) -> Unit,
     onZoomReset: () -> Unit
 ) {
     ExploreReadyTopChrome(uiState = uiState)
-    ExploreReadyStatusBanners(uiState = uiState)
+    ExploreReadyStatusBanners(
+        uiState = uiState,
+        onDismissHorizonAlignmentWarning = onDismissHorizonAlignmentWarning
+    )
     if (uiState.isVirtualExplore) {
         ExploreVirtualLocationBanner(
             session = uiState.virtualExploreSession,
@@ -312,7 +324,13 @@ private fun BoxScope.ExploreReadyTopChrome(uiState: ExploreUiState) {
 }
 
 @Composable
-private fun BoxScope.ExploreReadyStatusBanners(uiState: ExploreUiState) {
+private fun BoxScope.ExploreReadyStatusBanners(uiState: ExploreUiState, onDismissHorizonAlignmentWarning: () -> Unit) {
+    if (uiState.showHorizonAlignmentWarning) {
+        ExploreHorizonAlignmentWarningBanner(
+            onDismiss = onDismissHorizonAlignmentWarning,
+            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 96.dp)
+        )
+    }
     if (uiState.partialRegionWarning) {
         ExplorePartialRegionBanner(
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp)

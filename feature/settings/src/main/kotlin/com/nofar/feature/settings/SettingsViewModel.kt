@@ -5,6 +5,7 @@ package com.nofar.feature.settings
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nofar.core.data.preferences.UserPreferencesRepository
+import com.nofar.core.data.preferences.resetHorizonAlignmentOffsets
 import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.repository.StorageRepository
 import com.nofar.core.data.usecase.EvictUnusedDemTilesUseCase
@@ -34,6 +35,8 @@ data class SettingsUiState(
     val showRawSensorOverlay: Boolean = false,
     val showHorizonOutline: Boolean = true,
     val showLabelElevation: Boolean = false,
+    val horizonAzimuthOffsetDeg: Float = 0f,
+    val horizonPitchOffsetDeg: Float = 0f,
     val keepRawGeoTiff: Boolean = false,
     val prepareDownloadActive: Boolean = false,
     val showPurgeConfirm: Boolean = false,
@@ -63,37 +66,7 @@ constructor(
 
     private fun observePreferences() {
         viewModelScope.launch {
-            combine(
-                userPreferencesRepository.wifiOnlyDownloads,
-                userPreferencesRepository.simpleModeEnabled,
-                userPreferencesRepository.demCacheLimitBytes,
-                userPreferencesRepository.showRawSensorOverlay,
-                userPreferencesRepository.keepRawGeoTiff
-            ) { wifiOnly, simpleMode, cacheLimitBytes, showRaw, keepTif ->
-                CorePreferenceSnapshot(
-                    wifiOnly = wifiOnly,
-                    simpleMode = simpleMode,
-                    cacheLimitMb = cacheLimitBytes / (1024f * 1024f),
-                    showRaw = showRaw,
-                    keepTif = keepTif
-                )
-            }.combine(
-                combine(
-                    userPreferencesRepository.showHorizonOutline,
-                    userPreferencesRepository.showLabelElevation,
-                    ::DisplayPreferenceSnapshot
-                )
-            ) { core, display ->
-                PreferenceSnapshot(
-                    wifiOnly = core.wifiOnly,
-                    simpleMode = core.simpleMode,
-                    cacheLimitMb = core.cacheLimitMb,
-                    showRaw = core.showRaw,
-                    showHorizon = display.showHorizon,
-                    showElevation = display.showElevation,
-                    keepTif = core.keepTif
-                )
-            }.collect { snapshot ->
+            observeCoreAndDisplayPreferences().collect { snapshot ->
                 _uiState.update {
                     it.copy(
                         wifiOnlyDownloads = snapshot.wifiOnly,
@@ -102,7 +75,9 @@ constructor(
                         showRawSensorOverlay = snapshot.showRaw,
                         showHorizonOutline = snapshot.showHorizon,
                         showLabelElevation = snapshot.showElevation,
-                        keepRawGeoTiff = snapshot.keepTif
+                        keepRawGeoTiff = snapshot.keepTif,
+                        horizonAzimuthOffsetDeg = snapshot.horizonAzimuthOffsetDeg,
+                        horizonPitchOffsetDeg = snapshot.horizonPitchOffsetDeg
                     )
                 }
             }
@@ -112,6 +87,49 @@ constructor(
                 _uiState.update { it.copy(preferredLabelLanguage = language) }
             }
         }
+    }
+
+    private fun observeCoreAndDisplayPreferences() = combine(
+        userPreferencesRepository.wifiOnlyDownloads,
+        userPreferencesRepository.simpleModeEnabled,
+        userPreferencesRepository.demCacheLimitBytes,
+        userPreferencesRepository.showRawSensorOverlay,
+        userPreferencesRepository.keepRawGeoTiff
+    ) { wifiOnly, simpleMode, cacheLimitBytes, showRaw, keepTif ->
+        CorePreferenceSnapshot(
+            wifiOnly = wifiOnly,
+            simpleMode = simpleMode,
+            cacheLimitMb = cacheLimitBytes / (1024f * 1024f),
+            showRaw = showRaw,
+            keepTif = keepTif
+        )
+    }.combine(
+        combine(
+            userPreferencesRepository.showHorizonOutline,
+            userPreferencesRepository.showLabelElevation,
+            ::DisplayPreferenceSnapshot
+        )
+    ) { core, display ->
+        PreferenceSnapshot(
+            wifiOnly = core.wifiOnly,
+            simpleMode = core.simpleMode,
+            cacheLimitMb = core.cacheLimitMb,
+            showRaw = core.showRaw,
+            showHorizon = display.showHorizon,
+            showElevation = display.showElevation,
+            keepTif = core.keepTif
+        )
+    }.combine(
+        combine(
+            userPreferencesRepository.horizonAzimuthOffsetDeg,
+            userPreferencesRepository.horizonPitchOffsetDeg,
+            ::HorizonAlignmentSnapshot
+        )
+    ) { snapshot, alignment ->
+        snapshot.copy(
+            horizonAzimuthOffsetDeg = alignment.azimuthOffsetDeg,
+            horizonPitchOffsetDeg = alignment.pitchOffsetDeg
+        )
     }
 
     private fun observeActiveDownloads() {
@@ -176,6 +194,12 @@ constructor(
     fun onShowLabelElevationChanged(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setShowLabelElevation(enabled)
+        }
+    }
+
+    fun onResetHorizonAlignment() {
+        viewModelScope.launch {
+            userPreferencesRepository.resetHorizonAlignmentOffsets()
         }
     }
 
@@ -274,8 +298,12 @@ constructor(
         val showRaw: Boolean,
         val showHorizon: Boolean,
         val showElevation: Boolean,
-        val keepTif: Boolean
+        val keepTif: Boolean,
+        val horizonAzimuthOffsetDeg: Float = 0f,
+        val horizonPitchOffsetDeg: Float = 0f
     )
 
     private data class DisplayPreferenceSnapshot(val showHorizon: Boolean, val showElevation: Boolean)
+
+    private data class HorizonAlignmentSnapshot(val azimuthOffsetDeg: Float, val pitchOffsetDeg: Float)
 }

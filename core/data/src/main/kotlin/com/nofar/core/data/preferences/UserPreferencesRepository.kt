@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -37,6 +38,10 @@ interface UserPreferencesRepository {
 
     val showHorizonOutline: Flow<Boolean>
 
+    val horizonAzimuthOffsetDeg: Flow<Float>
+
+    val horizonPitchOffsetDeg: Flow<Float>
+
     val showLabelElevation: Flow<Boolean>
 
     suspend fun setWifiOnlyDownloads(enabled: Boolean)
@@ -61,7 +66,13 @@ interface UserPreferencesRepository {
 
     suspend fun setShowHorizonOutline(enabled: Boolean)
 
+    suspend fun setHorizonAlignmentOffsets(azimuthOffsetDeg: Float, pitchOffsetDeg: Float)
+
     suspend fun setShowLabelElevation(enabled: Boolean)
+}
+
+suspend fun UserPreferencesRepository.resetHorizonAlignmentOffsets() {
+    setHorizonAlignmentOffsets(azimuthOffsetDeg = 0f, pitchOffsetDeg = 0f)
 }
 
 @Singleton
@@ -109,6 +120,16 @@ constructor(@ApplicationContext context: Context) :
     override val showHorizonOutline: Flow<Boolean> =
         dataStore.data.map { prefs ->
             prefs[SHOW_HORIZON_OUTLINE_KEY] ?: true
+        }
+
+    override val horizonAzimuthOffsetDeg: Flow<Float> =
+        dataStore.data.map { prefs ->
+            prefs[HORIZON_AZIMUTH_OFFSET_KEY] ?: 0f
+        }
+
+    override val horizonPitchOffsetDeg: Flow<Float> =
+        dataStore.data.map { prefs ->
+            prefs[HORIZON_PITCH_OFFSET_KEY] ?: 0f
         }
 
     override val showLabelElevation: Flow<Boolean> =
@@ -172,6 +193,13 @@ constructor(@ApplicationContext context: Context) :
         }
     }
 
+    override suspend fun setHorizonAlignmentOffsets(azimuthOffsetDeg: Float, pitchOffsetDeg: Float) {
+        dataStore.edit { prefs ->
+            prefs[HORIZON_AZIMUTH_OFFSET_KEY] = azimuthOffsetDeg
+            prefs[HORIZON_PITCH_OFFSET_KEY] = pitchOffsetDeg
+        }
+    }
+
     override suspend fun setShowLabelElevation(enabled: Boolean) {
         dataStore.edit { prefs ->
             prefs[SHOW_LABEL_ELEVATION_KEY] = enabled
@@ -187,6 +215,8 @@ constructor(@ApplicationContext context: Context) :
         private val SIMPLE_MODE_DEFAULTS_APPLIED_KEY = booleanPreferencesKey("simple_mode_defaults_applied")
         private val PREFERRED_LABEL_LANGUAGE_KEY = stringPreferencesKey("preferred_label_language")
         private val SHOW_HORIZON_OUTLINE_KEY = booleanPreferencesKey("show_horizon_outline")
+        private val HORIZON_AZIMUTH_OFFSET_KEY = floatPreferencesKey("horizon_azimuth_offset_deg")
+        private val HORIZON_PITCH_OFFSET_KEY = floatPreferencesKey("horizon_pitch_offset_deg")
         private val SHOW_LABEL_ELEVATION_KEY = booleanPreferencesKey("show_label_elevation")
     }
 }
