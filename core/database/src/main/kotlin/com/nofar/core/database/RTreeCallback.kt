@@ -1,27 +1,45 @@
 package com.nofar.core.database
 
 import androidx.room.RoomDatabase
+import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.db.SupportSQLiteDatabase
+import androidx.sqlite.execSQL
 
 /**
  * SQLite R-Tree virtual table for [GeoEntityEntity] spatial queries.
  * Uses integer [GeoEntityEntity.row_id] because R-Tree requires an integer primary key.
+ *
+ * [RoomDatabase.Builder.setDriver] invokes the [SQLiteConnection] callbacks, not the
+ * [SupportSQLiteDatabase] overloads.
  */
 class RTreeCallback : RoomDatabase.Callback() {
+    override fun onCreate(connection: SQLiteConnection) {
+        super.onCreate(connection)
+        createRTree { connection.execSQL(it) }
+        backfillMissingEntriesSafely { connection.execSQL(it) }
+    }
+
+    override fun onOpen(connection: SQLiteConnection) {
+        super.onOpen(connection)
+        createRTree { connection.execSQL(it) }
+    }
+
     override fun onCreate(db: SupportSQLiteDatabase) {
         super.onCreate(db)
-        createRTree(db)
-        backfillMissingEntriesSafely(db)
+        createRTree(db::execSQL)
+        backfillMissingEntriesSafely(db::execSQL)
     }
 
     override fun onOpen(db: SupportSQLiteDatabase) {
         super.onOpen(db)
-        createRTree(db)
+        createRTree(db::execSQL)
     }
 
     internal companion object {
-        fun createRTree(db: SupportSQLiteDatabase) {
-            db.execSQL(
+        fun createRTree(db: SupportSQLiteDatabase) = createRTree(db::execSQL)
+
+        fun createRTree(execSql: (String) -> Unit) {
+            execSql(
                 """
                 CREATE VIRTUAL TABLE IF NOT EXISTS geo_entity_rtree USING rtree(
                     row_id,
@@ -30,7 +48,7 @@ class RTreeCallback : RoomDatabase.Callback() {
                 )
                 """.trimIndent()
             )
-            db.execSQL(
+            execSql(
                 """
                 CREATE TRIGGER IF NOT EXISTS geo_entity_ai AFTER INSERT ON geo_entity BEGIN
                     INSERT INTO geo_entity_rtree(row_id, min_lat, max_lat, min_lon, max_lon)
@@ -38,7 +56,7 @@ class RTreeCallback : RoomDatabase.Callback() {
                 END
                 """.trimIndent()
             )
-            db.execSQL(
+            execSql(
                 """
                 CREATE TRIGGER IF NOT EXISTS geo_entity_au AFTER UPDATE ON geo_entity BEGIN
                     UPDATE geo_entity_rtree SET
@@ -50,7 +68,7 @@ class RTreeCallback : RoomDatabase.Callback() {
                 END
                 """.trimIndent()
             )
-            db.execSQL(
+            execSql(
                 """
                 CREATE TRIGGER IF NOT EXISTS geo_entity_ad AFTER DELETE ON geo_entity BEGIN
                     DELETE FROM geo_entity_rtree WHERE row_id = OLD.row_id;
@@ -59,9 +77,11 @@ class RTreeCallback : RoomDatabase.Callback() {
             )
         }
 
-        fun backfillMissingEntriesSafely(db: SupportSQLiteDatabase) {
+        fun backfillMissingEntriesSafely(db: SupportSQLiteDatabase) = backfillMissingEntriesSafely(db::execSQL)
+
+        fun backfillMissingEntriesSafely(execSql: (String) -> Unit) {
             try {
-                db.execSQL(
+                execSql(
                     """
                     INSERT INTO geo_entity_rtree(row_id, min_lat, max_lat, min_lon, max_lon)
                     SELECT g.row_id, g.lat, g.lat, g.lon, g.lon
