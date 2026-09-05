@@ -2,7 +2,6 @@ package com.nofar.core.visibility
 
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.Region
-import com.nofar.core.model.RegionBounds
 import javax.inject.Inject
 import kotlin.math.floor
 
@@ -10,7 +9,7 @@ import kotlin.math.floor
  * Running-horizon viewshed for the expert virtual-location map preview only.
  * Explore skyline uses [HorizonProfileComputer] separately.
  */
-@Suppress("ReturnCount")
+@Suppress("ReturnCount", "LongParameterList")
 class TerrainViewshedComputer
 @Inject
 constructor() {
@@ -18,17 +17,19 @@ constructor() {
         observerLat: Double,
         observerLon: Double,
         observerEyeM: Double,
-        clipRegion: Region,
+        clipRegions: List<Region>,
         sampler: DemSampler,
         isCancelled: () -> Boolean = { false }
-    ): MapVisibilityPreview? = if (!RegionBounds.containsPoint(clipRegion, observerLat, observerLon)) {
-        null
-    } else {
-        buildPreview(
+    ): MapVisibilityPreview? {
+        if (clipRegions.isEmpty()) return null
+        if (!RegionRayExtent.observerInsideAnyRegion(clipRegions, observerLat, observerLon)) {
+            return null
+        }
+        return buildPreview(
             observerLat = observerLat,
             observerLon = observerLon,
             observerEyeM = observerEyeM,
-            clipRegion = clipRegion,
+            clipRegions = clipRegions,
             sampler = sampler,
             isCancelled = isCancelled
         )
@@ -38,22 +39,23 @@ constructor() {
         observerLat: Double,
         observerLon: Double,
         observerEyeM: Double,
-        clipRegion: Region,
+        clipRegions: List<Region>,
         sampler: DemSampler,
         isCancelled: () -> Boolean
     ): MapVisibilityPreview? {
         val azimuthStepDeg = AppConfig.MAP_PREVIEW_AZIMUTH_STEP_DEG
-        val radialStepM = AppConfig.MAP_PREVIEW_RADIAL_STEP_M
         val azimuthCount = (360f / azimuthStepDeg).toInt()
         val regionEdgeMeters =
             computeRegionEdgeMeters(
-                clipRegion = clipRegion,
+                clipRegions = clipRegions,
                 observerLat = observerLat,
                 observerLon = observerLon,
                 azimuthStepDeg = azimuthStepDeg,
                 azimuthCount = azimuthCount,
                 isCancelled = isCancelled
             ) ?: return null
+        val maxEdgeM = regionEdgeMeters.maxOrNull()?.toDouble() ?: 0.0
+        val radialStepM = RayDistanceSteps.mapPreviewRadialStepM(maxEdgeM)
         val maxRadialCells =
             regionEdgeMeters.maxOfOrNull { edge ->
                 if (edge <= 0f) 0 else floor(edge / radialStepM).toInt()
@@ -65,7 +67,8 @@ constructor() {
                 azimuthStepDeg = azimuthStepDeg,
                 radialStepM = radialStepM,
                 regionEdgeMeters = regionEdgeMeters,
-                maxRadialCells = maxOf(maxRadialCells, 1)
+                maxRadialCells = maxOf(maxRadialCells, 1),
+                clipRegions = clipRegions
             )
         val completed =
             fillViewshedGrid(
@@ -73,6 +76,7 @@ constructor() {
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = observerEyeM,
+                clipRegions = clipRegions,
                 azimuthStepDeg = azimuthStepDeg,
                 radialStepM = radialStepM,
                 azimuthCount = azimuthCount,
@@ -83,7 +87,7 @@ constructor() {
     }
 
     private fun computeRegionEdgeMeters(
-        clipRegion: Region,
+        clipRegions: List<Region>,
         observerLat: Double,
         observerLon: Double,
         azimuthStepDeg: Float,
@@ -95,8 +99,8 @@ constructor() {
             if (isCancelled()) return null
             val bearingDeg = azimuthIndex * azimuthStepDeg
             val edgeM =
-                RegionRayExtent.maxDistanceInsideRegionM(
-                    region = clipRegion,
+                RegionRayExtent.maxDistanceInsideAnyRegionM(
+                    regions = clipRegions,
                     observerLat = observerLat,
                     observerLon = observerLon,
                     bearingDeg = bearingDeg.toDouble()
@@ -111,6 +115,7 @@ constructor() {
         observerLat: Double,
         observerLon: Double,
         observerEyeM: Double,
+        clipRegions: List<Region>,
         azimuthStepDeg: Float,
         radialStepM: Double,
         azimuthCount: Int,
@@ -126,6 +131,7 @@ constructor() {
                     observerLat = observerLat,
                     observerLon = observerLon,
                     observerEyeM = observerEyeM,
+                    clipRegions = clipRegions,
                     azimuthStepDeg = azimuthStepDeg,
                     radialStepM = radialStepM,
                     toleranceM = toleranceM,
@@ -144,6 +150,7 @@ constructor() {
         observerLat: Double,
         observerLon: Double,
         observerEyeM: Double,
+        clipRegions: List<Region>,
         azimuthStepDeg: Float,
         radialStepM: Double,
         toleranceM: Double,
@@ -168,6 +175,7 @@ constructor() {
                     observerLon = observerLon,
                     bearingDeg = bearingDeg,
                     observerEyeM = observerEyeM,
+                    clipRegions = clipRegions,
                     rayLengthM = rayLengthM,
                     radialStepM = radialStepM,
                     toleranceM = toleranceM,
@@ -187,6 +195,7 @@ constructor() {
         observerLon: Double,
         bearingDeg: Double,
         observerEyeM: Double,
+        clipRegions: List<Region>,
         rayLengthM: Double,
         radialStepM: Double,
         toleranceM: Double,
@@ -195,12 +204,19 @@ constructor() {
     ): Double? {
         val distanceM = (radialIndex + 1) * radialStepM
         val (lat, lon) = GeoMath.destinationPoint(observerLat, observerLon, bearingDeg, distanceM)
+        val insideClip = RegionRayExtent.sampleInsideAnyRegion(clipRegions, lat, lon)
         val terrainM = sampler.elevationAt(lat, lon)?.toDouble()
         if (terrainM == null) {
-            for (remaining in radialIndex until radialCells) {
-                preview.setCellState(azimuthIndex, remaining, MapVisibilityCellState.UNKNOWN)
+            if (insideClip) {
+                for (remaining in radialIndex until radialCells) {
+                    preview.setCellState(azimuthIndex, remaining, MapVisibilityCellState.UNKNOWN)
+                }
+                return null
             }
-            return null
+            return maxSlope
+        }
+        if (!insideClip) {
+            return maxSlope
         }
         val bulgeM = GeoMath.earthBulgeM(distanceM, rayLengthM)
         val surfaceM = terrainM + bulgeM

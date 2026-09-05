@@ -24,6 +24,7 @@ data class ExploreUiState(
     val simpleModeEnabled: Boolean = false,
     val activeRegion: Region? = null,
     val activeRegions: List<Region> = emptyList(),
+    val membershipRegions: List<Region> = emptyList(),
     val activeRegionName: String? = null,
     val partialRegionWarning: Boolean = false,
     val regionResolution: ExploreRegionResolution? = null,

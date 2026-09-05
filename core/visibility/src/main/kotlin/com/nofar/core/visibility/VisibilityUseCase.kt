@@ -7,6 +7,7 @@ import com.nofar.core.data.repository.DemTileRepository
 import com.nofar.core.data.repository.GeoEntityRepository
 import com.nofar.core.database.dao.TileCoverageDao
 import com.nofar.core.model.AppConfig
+import com.nofar.core.model.ContributingRegions
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.GeoEntityType
 import com.nofar.core.model.Region
@@ -66,7 +67,7 @@ constructor(
                 entities = candidateQuery.allEntities
             )
         val candidates = candidateQuery.candidates
-        val collectionRadiusM = regions.maxOf { RegionBounds.dataCollectionRadiusM(it) }
+        val collectionRadiusM = ContributingRegions.maxHorizonRadiusM(regions, location.latitude, location.longitude)
         val request =
             VisibilityRequest(
                 observerLat = location.latitude,
@@ -275,7 +276,9 @@ internal object VisibilityCandidateSelector {
         entities: Collection<GeoEntity>,
         location: UserLocation,
         maxCandidates: Int,
-        peakBudget: Int
+        peakBudget: Int,
+        nearestPeakBudget: Int = AppConfig.PEAK_CANDIDATE_NEAREST_BUDGET,
+        longRangePeakBudget: Int = AppConfig.PEAK_CANDIDATE_LONG_RANGE_BUDGET
     ): List<GeoEntity> {
         if (entities.size <= maxCandidates) {
             return entities.sortedBy { entity -> distanceM(location, entity) }
@@ -283,7 +286,19 @@ internal object VisibilityCandidateSelector {
         val byDistance = entities.sortedBy { entity -> distanceM(location, entity) }
         val peaks = byDistance.filter { it.type == GeoEntityType.PEAK }
         val places = byDistance.filter { it.type != GeoEntityType.PEAK }
-        val selectedPeaks = peaks.take(peakBudget.coerceAtMost(maxCandidates))
+        val nearestPeakCount = nearestPeakBudget.coerceAtMost(peakBudget.coerceAtMost(maxCandidates))
+        val longRangePeakCount =
+            longRangePeakBudget.coerceAtMost((peakBudget - nearestPeakCount).coerceAtLeast(0))
+        val selectedNearestPeaks = peaks.take(nearestPeakCount)
+        val selectedPeakIds = selectedNearestPeaks.map { it.id }.toSet()
+        val longRangePeaks =
+            peaks
+                .filterNot { it.id in selectedPeakIds }
+                .sortedWith(
+                    compareByDescending<GeoEntity> { it.elevation ?: Int.MIN_VALUE }
+                        .thenBy { entity -> distanceM(location, entity) }
+                ).take(longRangePeakCount)
+        val selectedPeaks = (selectedNearestPeaks + longRangePeaks).distinctBy { it.id }
         val remaining = (maxCandidates - selectedPeaks.size).coerceAtLeast(0)
         return selectedPeaks + places.take(remaining)
     }

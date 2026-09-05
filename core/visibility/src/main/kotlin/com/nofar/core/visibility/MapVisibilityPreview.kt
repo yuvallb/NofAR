@@ -1,6 +1,8 @@
 package com.nofar.core.visibility
 
 import com.nofar.core.model.AppConfig
+import com.nofar.core.model.Region
+import com.nofar.core.model.RegionBounds
 import kotlin.math.floor
 
 /**
@@ -16,6 +18,7 @@ data class MapVisibilityPreview(
     val radialStepM: Double,
     val regionEdgeMeters: FloatArray,
     val maxRadialCells: Int,
+    private val clipRegions: List<Region> = emptyList(),
     private val stateCodes: ByteArray
 ) {
     fun maxRegionEdgeM(): Double = regionEdgeMeters.maxOrNull()?.toDouble() ?: 0.0
@@ -30,7 +33,13 @@ data class MapVisibilityPreview(
             regionEdgeMeters[upperIndex] * fraction
     }
 
-    fun isInsideRegion(azimuthDeg: Double, distanceM: Double): Boolean = distanceM <= regionEdgeM(azimuthDeg)
+    fun isInsideRegion(azimuthDeg: Double, distanceM: Double): Boolean {
+        if (distanceM > regionEdgeM(azimuthDeg)) return false
+        val bearingDeg = azimuthDeg
+        val (lat, lon) = GeoMath.destinationPoint(observerLat, observerLon, bearingDeg, distanceM)
+        return clipRegions.isEmpty() ||
+            clipRegions.any { region -> RegionBounds.containsPoint(region, lat, lon) }
+    }
 
     fun radialCellCount(azimuthIndex: Int): Int {
         val edgeM = regionEdgeMeters.getOrNull(azimuthIndex)?.toDouble() ?: 0.0
@@ -82,6 +91,7 @@ data class MapVisibilityPreview(
             radialStepM == other.radialStepM &&
             maxRadialCells == other.maxRadialCells &&
             regionEdgeMeters.contentEquals(other.regionEdgeMeters) &&
+            clipRegions == other.clipRegions &&
             stateCodes.contentEquals(other.stateCodes)
     }
 
@@ -92,6 +102,7 @@ data class MapVisibilityPreview(
         result = 31 * result + radialStepM.hashCode()
         result = 31 * result + maxRadialCells
         result = 31 * result + regionEdgeMeters.contentHashCode()
+        result = 31 * result + clipRegions.hashCode()
         result = 31 * result + stateCodes.contentHashCode()
         return result
     }
@@ -109,7 +120,8 @@ data class MapVisibilityPreview(
             azimuthStepDeg: Float = AppConfig.MAP_PREVIEW_AZIMUTH_STEP_DEG,
             radialStepM: Double = AppConfig.MAP_PREVIEW_RADIAL_STEP_M,
             regionEdgeMeters: FloatArray,
-            maxRadialCells: Int
+            maxRadialCells: Int,
+            clipRegions: List<Region> = emptyList()
         ): MapVisibilityPreview = MapVisibilityPreview(
             observerLat = observerLat,
             observerLon = observerLon,
@@ -117,6 +129,7 @@ data class MapVisibilityPreview(
             radialStepM = radialStepM,
             regionEdgeMeters = regionEdgeMeters,
             maxRadialCells = maxRadialCells,
+            clipRegions = clipRegions,
             stateCodes = ByteArray(regionEdgeMeters.size * maxRadialCells) {
                 MapVisibilityCellState.UNKNOWN.code
             }

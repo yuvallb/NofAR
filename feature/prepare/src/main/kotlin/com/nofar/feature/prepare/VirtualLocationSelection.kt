@@ -1,5 +1,6 @@
 package com.nofar.feature.prepare
 
+import com.nofar.core.model.ContributingRegions
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.Region
 import com.nofar.core.model.RegionBounds
@@ -9,7 +10,8 @@ data class VirtualLocationSelection(
     val lat: Double,
     val lon: Double,
     val primaryRegionId: UUID,
-    val containingRegionIds: Set<UUID>
+    val containingRegionIds: Set<UUID>,
+    val contributingRegionIds: Set<UUID>
 )
 
 object VirtualLocationSelectionLogic {
@@ -22,15 +24,20 @@ object VirtualLocationSelectionLogic {
     fun regionsContainingPoint(regions: List<Region>, lat: Double, lon: Double): List<Region> =
         exploreEligible(regions).filter { RegionBounds.containsPoint(it, lat, lon) }
 
+    fun contributingRegions(regions: List<Region>, lat: Double, lon: Double): List<Region> =
+        ContributingRegions.contributingRegions(exploreEligible(regions), lat, lon)
+
     fun resolveSelection(regions: List<Region>, lat: Double, lon: Double): VirtualLocationSelection? {
         if (!isValidCoordinate(lat, lon)) return null
         val containing = regionsContainingPoint(regions, lat, lon)
+        val contributing = contributingRegions(regions, lat, lon)
         return containing.maxWithOrNull(primaryRegionComparator)?.let { primary ->
             VirtualLocationSelection(
                 lat = lat,
                 lon = lon,
                 primaryRegionId = primary.id,
-                containingRegionIds = containing.map { it.id }.toSet()
+                containingRegionIds = containing.map { it.id }.toSet(),
+                contributingRegionIds = contributing.map { it.id }.toSet()
             )
         }
     }

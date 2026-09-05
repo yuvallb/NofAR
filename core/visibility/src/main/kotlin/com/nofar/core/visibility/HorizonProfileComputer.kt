@@ -98,17 +98,15 @@ constructor() {
         sampler: DemSampler,
         maxRadiusM: Double
     ): Double {
-        val stepM = AppConfig.HORIZON_RAY_STEP_M
         val groundElevationM = sampler.elevationAt(observerLat, observerLon)?.toDouble()
-        val elevations =
+        val samples =
             if (groundElevationM != null) {
-                collectRayElevations(
+                collectRaySamples(
                     observerLat = observerLat,
                     observerLon = observerLon,
                     azimuthDeg = azimuthDeg,
                     groundElevationM = groundElevationM,
                     maxRadiusM = maxRadiusM,
-                    stepM = stepM,
                     sampler = sampler
                 )
             } else {
@@ -117,66 +115,53 @@ constructor() {
         return elevationAngleAtHorizon(
             observerEyeM = observerEyeM,
             groundElevationM = groundElevationM,
-            elevations = elevations,
-            stepM = stepM
+            samples = samples
         )
     }
 
-    private fun collectRayElevations(
+    private fun collectRaySamples(
         observerLat: Double,
         observerLon: Double,
         azimuthDeg: Double,
         groundElevationM: Double,
         maxRadiusM: Double,
-        stepM: Double,
         sampler: DemSampler
-    ): List<Double> {
-        val sampleCount = GeoMath.buildRaySampleCount(maxRadiusM, stepM)
-        val elevations = ArrayList<Double>(sampleCount)
-        elevations += groundElevationM
-        for (index in 1 until sampleCount) {
-            val distanceM = minOf(index * stepM, maxRadiusM)
+    ): List<Pair<Double, Double>> {
+        val distances = RayDistanceSteps.horizonDistances(maxRadiusM)
+        val samples = ArrayList<Pair<Double, Double>>(distances.size)
+        samples += 0.0 to groundElevationM
+        for (index in 1 until distances.size) {
+            val distanceM = distances[index]
             val (lat, lon) = GeoMath.destinationPoint(observerLat, observerLon, azimuthDeg, distanceM)
-            // H-P1-07: stop the ray at the first missing sample rather than holding the last elevation.
-            // Hold-last invents flat plateaus past tile holes and drew false skyline lobes at coverage
-            // edges; breaking keeps the skyline honest to the DEM footprint.
             val sampledElevationM = sampler.elevationAt(lat, lon)?.toDouble() ?: break
-            // H-P1-06: D is the ray length (maxRadiusM), matching TerrainRayMarcher's per-target path
-            // length semantics. H-P1-10: gate on the same flag so flat-earth golden tests stay aligned.
             val bulge =
                 if (TerrainRayMarcher.applyEarthCurvature) {
                     GeoMath.earthBulgeM(distanceM, maxRadiusM)
                 } else {
                     0.0
                 }
-            elevations += sampledElevationM + bulge
+            samples += distanceM to (sampledElevationM + bulge)
         }
-        return elevations
+        return samples
     }
 
     private fun elevationAngleAtHorizon(
         observerEyeM: Double,
         groundElevationM: Double?,
-        elevations: List<Double>,
-        stepM: Double
+        samples: List<Pair<Double, Double>>
     ): Double {
-        if (groundElevationM == null || elevations.size < 2) {
+        if (groundElevationM == null || samples.size < 2) {
             return 0.0
         }
-        // Single eye for both slope selection and the elevation angle: findHorizonIndex reconstructs
-        // the eye as groundElevationM + eyeHeightM, so passing (observerEyeM - groundElevationM) makes
-        // both use exactly observerEyeM. No coerceAtLeast — clamping the height here would let the eye
-        // used for the angle diverge from the eye used to pick the horizon (the "line only when
-        // pitched at the sky" bug when GPS sits below the DEM). See H-P0-01.
         val eyeHeightM = observerEyeM - groundElevationM
-        val horizonIndex = rayMarcher.findHorizonIndex(elevations, stepM, eyeHeightM)
-        val horizonDistanceM = horizonIndex * stepM
+        val horizonIndex = rayMarcher.findHorizonIndexWithDistances(samples, eyeHeightM)
+        val horizonDistanceM = samples[horizonIndex].first
         return if (horizonDistanceM <= 0.0) {
             0.0
         } else {
             GeoMath.elevationAngleDeg(
                 observerEyeM = observerEyeM,
-                targetElevationM = elevations[horizonIndex],
+                targetElevationM = samples[horizonIndex].second,
                 horizontalDistanceM = horizonDistanceM
             )
         }

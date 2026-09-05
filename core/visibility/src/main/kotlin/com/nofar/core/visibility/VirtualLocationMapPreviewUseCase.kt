@@ -26,11 +26,11 @@ constructor(
 ) {
     suspend fun compute(
         regions: List<Region>,
-        clipRegion: Region,
+        clipRegions: List<Region>,
         observerLat: Double,
         observerLon: Double
     ): MapVisibilityPreview? {
-        if (regions.isEmpty()) return null
+        if (regions.isEmpty() || clipRegions.isEmpty()) return null
         val location =
             UserLocation(
                 latitude = observerLat,
@@ -57,7 +57,7 @@ constructor(
                     observerLat = observerLat,
                     observerLon = observerLon,
                     observerEyeM = observerEye.eyeM,
-                    clipRegion = clipRegion,
+                    clipRegions = clipRegions,
                     sampler = sampler,
                     isCancelled = { job == null || !job.isActive }
                 )

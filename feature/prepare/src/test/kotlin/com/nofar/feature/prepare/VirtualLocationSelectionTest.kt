@@ -1,6 +1,7 @@
 package com.nofar.feature.prepare
 
 import com.google.common.truth.Truth.assertThat
+import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.Region
 import java.time.Instant
@@ -85,9 +86,55 @@ class VirtualLocationSelectionTest {
     }
 
     @Test
+    fun resolveSelection_includesContributingRegionsWithin300Km() {
+        val (neighborLat, neighborLon) =
+            destinationM(
+                lat = readyRegion.centerLat,
+                lon = readyRegion.centerLon,
+                bearingDeg = 90.0,
+                distanceM = 80_000.0
+            )
+        val neighbor =
+            readyRegion.copy(
+                id = UUID.randomUUID(),
+                name = "Neighbor",
+                centerLat = neighborLat,
+                centerLon = neighborLon
+            )
+
+        val selection =
+            VirtualLocationSelectionLogic.resolveSelection(
+                regions = listOf(readyRegion, neighbor),
+                lat = readyRegion.centerLat,
+                lon = readyRegion.centerLon
+            )
+
+        assertThat(selection?.contributingRegionIds).containsExactly(readyRegion.id, neighbor.id)
+    }
+
+    @Test
     fun resolveSelection_invalidCoordinate_returnsNull() {
         assertThat(
             VirtualLocationSelectionLogic.resolveSelection(listOf(readyRegion), lat = 91.0, lon = 0.0)
         ).isNull()
+    }
+
+    private fun destinationM(lat: Double, lon: Double, bearingDeg: Double, distanceM: Double): Pair<Double, Double> {
+        val angularDistance = distanceM / AppConfig.EARTH_RADIUS_METERS
+        val bearing = Math.toRadians(bearingDeg)
+        val phi1 = Math.toRadians(lat)
+        val lambda1 = Math.toRadians(lon)
+        val phi2 =
+            kotlin.math.asin(
+                kotlin.math.sin(phi1) * kotlin.math.cos(angularDistance) +
+                    kotlin.math.cos(phi1) * kotlin.math.sin(angularDistance) * kotlin.math.cos(bearing)
+            )
+        val lambda2 =
+            lambda1 +
+                kotlin.math.atan2(
+                    kotlin.math.sin(bearing) * kotlin.math.sin(angularDistance) * kotlin.math.cos(phi1),
+                    kotlin.math.cos(angularDistance) - kotlin.math.sin(phi1) * kotlin.math.sin(phi2)
+                )
+        return Math.toDegrees(phi2) to Math.toDegrees(lambda2)
     }
 }

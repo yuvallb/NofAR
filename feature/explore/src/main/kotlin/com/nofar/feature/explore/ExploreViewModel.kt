@@ -21,6 +21,7 @@ import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.CompassCalibrationState
+import com.nofar.core.model.ContributingRegions
 import com.nofar.core.model.DeviceOrientation
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.LocationAccessState
@@ -112,7 +113,11 @@ constructor(
             quickRegionDownloadUseCase = quickRegionDownloadUseCase,
             downloadScheduler = downloadScheduler,
             uiState = _uiState,
-            onDownloadComplete = { region -> applyActiveRegions(listOf(region)) },
+            onDownloadComplete = { _ ->
+                viewModelScope.launch {
+                    locationRepository.lastLocation?.let { applyRegionResolution(it) }
+                }
+            },
             onRefreshGate = { refreshGate() }
         )
     private val autoDownloadGuard = ExploreAutoDownloadGuard()
@@ -423,7 +428,9 @@ constructor(
         }
         if (requestedRegionId != null) {
             val region = regionRepository.getRegion(requestedRegionId)
-            applyActiveRegions(listOfNotNull(region))
+            if (region != null) {
+                applyActiveRegions(contributing = listOf(region), membership = listOf(region))
+            }
         }
     }
 
@@ -435,7 +442,7 @@ constructor(
                 observer.longitude
             )
         if (eligible.none { it.id == session.primaryRegionId }) {
-            applyActiveRegions(emptyList())
+            applyActiveRegions(contributing = emptyList(), membership = emptyList())
             refreshGate()
             return
         }
@@ -470,7 +477,7 @@ constructor(
                     }
                 }
                 is ExploreRegionResolution.Downloading -> {
-                    applyActiveRegions(emptyList())
+                    applyActiveRegions(contributing = emptyList(), membership = emptyList())
                     _uiState.update {
                         it.copy(
                             regionResolution = resolution,
@@ -481,7 +488,7 @@ constructor(
                     downloadController.observeProgress(resolution.region.id)
                 }
                 is ExploreRegionResolution.NeedsDownload -> {
-                    applyActiveRegions(emptyList())
+                    applyActiveRegions(contributing = emptyList(), membership = emptyList())
                     autoDownloadGuard.onProposalChanged(resolution.proposal)
                     _uiState.update {
                         it.copy(
@@ -502,29 +509,47 @@ constructor(
         refreshGate()
     }
 
-    private suspend fun selectRegionsForLocation(location: UserLocation): List<Region> = regionRepository
-        .regionsContainingPoint(location.latitude, location.longitude)
-        .filter { it.downloadStatus == DownloadStatus.READY || it.downloadStatus == DownloadStatus.PARTIAL }
-        .sortedByDescending { it.updatedAt }
+    private suspend fun selectRegionsForLocation(location: UserLocation): RegionSelection {
+        val eligible =
+            regionRepository.observeAllRegions().first().filter {
+                it.downloadStatus == DownloadStatus.READY || it.downloadStatus == DownloadStatus.PARTIAL
+            }
+        val membership =
+            ContributingRegions
+                .membershipRegions(eligible, location.latitude, location.longitude)
+                .sortedByDescending { it.updatedAt }
+        val contributing =
+            ContributingRegions
+                .contributingRegions(eligible, location.latitude, location.longitude)
+                .sortedByDescending { it.updatedAt }
+        return RegionSelection(membership = membership, contributing = contributing)
+    }
 
-    private fun applyActiveRegions(regions: List<Region>) {
+    private data class RegionSelection(val membership: List<Region>, val contributing: List<Region>)
+
+    private fun applyActiveRegions(selection: RegionSelection) {
+        applyActiveRegions(contributing = selection.contributing, membership = selection.membership)
+    }
+
+    private fun applyActiveRegions(contributing: List<Region>, membership: List<Region>) {
         val primary =
-            regions.firstOrNull { it.id == requestedRegionId }
-                ?: regions.maxByOrNull { it.updatedAt }
-        visibilityPassScheduler.setActiveRegions(regions)
+            membership.firstOrNull { it.id == requestedRegionId }
+                ?: membership.maxByOrNull { it.updatedAt }
+        visibilityPassScheduler.setActiveRegions(contributing)
         _uiState.update {
             it.copy(
                 activeRegion = primary,
-                activeRegions = regions,
-                activeRegionName = formatActiveRegionName(regions, primary),
-                partialRegionWarning = regions.any { region -> region.downloadStatus == DownloadStatus.PARTIAL }
+                activeRegions = contributing,
+                membershipRegions = membership,
+                activeRegionName = formatActiveRegionName(membership, primary),
+                partialRegionWarning = contributing.any { region -> region.downloadStatus == DownloadStatus.PARTIAL }
             )
         }
         virtualObserverLocation?.let { observer ->
-            altitudeController.scheduleResolve(observer, regions)
-        } ?: locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it, regions) }
+            altitudeController.scheduleResolve(observer, contributing)
+        } ?: locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it, contributing) }
         viewModelScope.launch(Dispatchers.IO) {
-            regions.forEach { active ->
+            contributing.forEach { active ->
                 runCatching { regionCoverageRepairUseCase.repairIfNeeded(active) }
             }
             refreshGate()
@@ -594,7 +619,7 @@ constructor(
 
         viewModelScope.launch {
             applyRegionResolution(location)
-            applyRegionBoundary(location, _uiState.value.activeRegions)
+            applyRegionBoundary(location, _uiState.value.membershipRegions)
             refreshGate()
             altitudeController.scheduleResolve(location, _uiState.value.activeRegions)
         }
@@ -638,6 +663,7 @@ constructor(
             it.copy(
                 activeRegion = null,
                 activeRegions = emptyList(),
+                membershipRegions = emptyList(),
                 activeRegionName = null,
                 showRegionExitBanner = false,
                 showGraceExpiredDialog = false,

@@ -29,7 +29,6 @@ data class VirtualLocationPickerUiState(
     val mapRecenterNonce: Long = 0L,
     val loading: Boolean = true,
     val visibilityMask: MapVisibilityPreviewMask? = null,
-    val previewClipRegion: Region? = null,
     val analyzingVisibility: Boolean = false
 )
 
@@ -82,9 +81,6 @@ constructor(
                             analyzingVisibility = state.analyzingVisibility
                         ),
                         loading = false,
-                        previewClipRegion = selection?.let { s ->
-                            eligible.firstOrNull { it.id == s.primaryRegionId }
-                        },
                         mapRecenterNonce =
                         if (state.selectedLat == null && center != null) {
                             state.mapRecenterNonce + 1
@@ -143,7 +139,6 @@ constructor(
                 selectedLon = lon,
                 selectionValid = true,
                 visibilityMask = null,
-                previewClipRegion = eligible.firstOrNull { region -> region.id == selection.primaryRegionId },
                 analyzingVisibility = true,
                 helperMessage = VirtualLocationPickerMessages.ANALYZING_VISIBILITY
             )
@@ -169,16 +164,14 @@ constructor(
                 var producedMask: MapVisibilityPreviewMask? = null
                 try {
                     val state = _uiState.value
-                    val regions =
-                        state.eligibleRegions.filter { selection.containingRegionIds.contains(it.id) }
-                    val clipRegion =
-                        state.previewClipRegion
-                            ?: state.eligibleRegions.firstOrNull { it.id == selection.primaryRegionId }
-                            ?: return@launch
+                    val contributingRegions =
+                        state.eligibleRegions.filter { selection.contributingRegionIds.contains(it.id) }
+                    val clipRegions =
+                        state.eligibleRegions.filter { selection.contributingRegionIds.contains(it.id) }
                     val preview =
                         mapPreviewUseCase.compute(
-                            regions = regions,
-                            clipRegion = clipRegion,
+                            regions = contributingRegions,
+                            clipRegions = clipRegions,
                             observerLat = selection.lat,
                             observerLon = selection.lon
                         )

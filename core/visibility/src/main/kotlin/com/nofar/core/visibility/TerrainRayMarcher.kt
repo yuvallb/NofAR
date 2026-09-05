@@ -104,6 +104,23 @@ class TerrainRayMarcher {
             ?.first ?: 0
     }
 
+    fun findHorizonIndexWithDistances(
+        distanceElevationSamples: List<Pair<Double, Double>>,
+        observerHeightM: Double
+    ): Int {
+        if (distanceElevationSamples.size < 2) return 0
+        val groundElevation = distanceElevationSamples.first().second
+        val observerEye = groundElevation + observerHeightM
+        return distanceElevationSamples.indices
+            .drop(1)
+            .mapNotNull { index ->
+                val (distanceM, elevationM) = distanceElevationSamples[index]
+                if (distanceM <= 0.0) return@mapNotNull null
+                index to ((elevationM - observerEye) / distanceM)
+            }.maxByOrNull { it.second }
+            ?.first ?: 0
+    }
+
     companion object {
         private const val MAX_SAMPLES = 256
         private const val OCCLUSION_TOLERANCE_M = 0.5

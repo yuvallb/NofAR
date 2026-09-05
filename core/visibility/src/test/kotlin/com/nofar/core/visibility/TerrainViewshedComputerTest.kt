@@ -27,7 +27,7 @@ class TerrainViewshedComputerTest {
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = eyeM,
-                clipRegion = region,
+                clipRegions = listOf(region),
                 sampler = sampler
             )!!
         val azimuthIndex = 0
@@ -56,7 +56,7 @@ class TerrainViewshedComputerTest {
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = eyeM,
-                clipRegion = region,
+                clipRegions = listOf(region),
                 sampler = sampler
             )!!
         val wallCell = (wallDistanceM / AppConfig.MAP_PREVIEW_RADIAL_STEP_M).toInt() - 1
@@ -86,7 +86,7 @@ class TerrainViewshedComputerTest {
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = eyeM,
-                clipRegion = region,
+                clipRegions = listOf(region),
                 sampler = sampler
             )!!
         val cellIndex = (spikeDistanceM / AppConfig.MAP_PREVIEW_RADIAL_STEP_M).toInt() - 1
@@ -113,7 +113,7 @@ class TerrainViewshedComputerTest {
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = eyeM,
-                clipRegion = region,
+                clipRegions = listOf(region),
                 sampler = sampler
             )!!
         val holeCell = (holeStartM / AppConfig.MAP_PREVIEW_RADIAL_STEP_M).toInt()
@@ -135,7 +135,7 @@ class TerrainViewshedComputerTest {
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = eyeM,
-                clipRegion = region,
+                clipRegions = listOf(region),
                 sampler = DemSampler { _, _ -> 100f },
                 isCancelled = {
                     checks += 1
@@ -250,5 +250,99 @@ class RegionRayExtentTest {
             )
 
         assertThat(distance).isWithin(25.0).of(17_000.0)
+    }
+
+    @Test
+    fun maxDistanceInsideAnyRegionM_usesFarthestCircle() {
+        val home =
+            Region(
+                id = UUID.randomUUID(),
+                name = "Home",
+                centerLat = 32.0,
+                centerLon = 35.0,
+                radiusM = 5_000.0,
+                minLat = 31.9,
+                maxLat = 32.1,
+                minLon = 34.9,
+                maxLon = 35.1,
+                createdAt = Instant.EPOCH,
+                updatedAt = Instant.EPOCH,
+                downloadStatus = DownloadStatus.READY,
+                downloadProgressPct = 100,
+                osmDatasetVersion = null,
+                estimatedSizeBytes = 1L,
+                entityCount = 1
+            )
+        val (neighborLat, neighborLon) =
+            GeoMath.destinationPoint(
+                lat = home.centerLat,
+                lon = home.centerLon,
+                bearingDeg = 90.0,
+                distanceM = 12_000.0
+            )
+        val neighbor =
+            home.copy(
+                id = UUID.randomUUID(),
+                name = "Neighbor",
+                centerLat = neighborLat,
+                centerLon = neighborLon,
+                radiusM = 5_000.0
+            )
+        val distance =
+            RegionRayExtent.maxDistanceInsideAnyRegionM(
+                regions = listOf(home, neighbor),
+                observerLat = home.centerLat,
+                observerLon = home.centerLon,
+                bearingDeg = 90.0
+            )
+
+        assertThat(distance).isWithin(25.0).of(5_000.0)
+    }
+
+    @Test
+    fun maxDistanceInsideAnyRegionM_overlappingNeighborExtendsReach() {
+        val home =
+            Region(
+                id = UUID.randomUUID(),
+                name = "Home",
+                centerLat = 32.0,
+                centerLon = 35.0,
+                radiusM = 10_000.0,
+                minLat = 31.8,
+                maxLat = 32.2,
+                minLon = 34.8,
+                maxLon = 35.2,
+                createdAt = Instant.EPOCH,
+                updatedAt = Instant.EPOCH,
+                downloadStatus = DownloadStatus.READY,
+                downloadProgressPct = 100,
+                osmDatasetVersion = null,
+                estimatedSizeBytes = 1L,
+                entityCount = 1
+            )
+        val (neighborLat, neighborLon) =
+            GeoMath.destinationPoint(
+                lat = home.centerLat,
+                lon = home.centerLon,
+                bearingDeg = 90.0,
+                distanceM = 8_000.0
+            )
+        val neighbor =
+            home.copy(
+                id = UUID.randomUUID(),
+                name = "Neighbor",
+                centerLat = neighborLat,
+                centerLon = neighborLon,
+                radiusM = 10_000.0
+            )
+        val distance =
+            RegionRayExtent.maxDistanceInsideAnyRegionM(
+                regions = listOf(home, neighbor),
+                observerLat = home.centerLat,
+                observerLon = home.centerLon,
+                bearingDeg = 90.0
+            )
+
+        assertThat(distance).isGreaterThan(15_000.0)
     }
 }

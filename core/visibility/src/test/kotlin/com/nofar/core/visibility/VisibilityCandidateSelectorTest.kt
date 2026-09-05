@@ -69,15 +69,55 @@ class VisibilityCandidateSelectorTest {
         assertThat(selected.drop(2).map { it.id }).containsExactly("place-0", "place-1").inOrder()
     }
 
-    private fun entity(id: String, type: GeoEntityType, lat: Double, lon: Double): GeoEntity = GeoEntity(
-        id = id,
-        osmType = OsmType.NODE,
-        name = id,
-        type = type,
-        lat = lat,
-        lon = lon,
-        elevation = 100,
-        elevationSource = ElevationSource.OSM_TAG,
-        lastSeenAt = Instant.EPOCH
-    )
+    @Test
+    fun overCap_reservesHighestRemainingPeaks() {
+        val nearLowPeaks =
+            (0 until 55).map { index ->
+                entity(
+                    id = "near-$index",
+                    type = GeoEntityType.PEAK,
+                    lat = 32.0 + (index + 1) * 0.001,
+                    lon = 35.0,
+                    elevation = 500 + index
+                )
+            }
+        val farHighPeak =
+            entity(
+                id = "far-high",
+                type = GeoEntityType.PEAK,
+                lat = 32.8,
+                lon = 35.0,
+                elevation = 2_800
+            )
+        val places =
+            (0 until 50).map { index ->
+                entity("place-$index", GeoEntityType.VILLAGE, lat = 32.001 + index * 0.0001, lon = 35.0)
+            }
+
+        val selected =
+            VisibilityCandidateSelector.select(
+                entities = nearLowPeaks + farHighPeak + places,
+                location = location,
+                maxCandidates = 100,
+                peakBudget = 70,
+                nearestPeakBudget = 50,
+                longRangePeakBudget = 20
+            )
+
+        assertThat(selected.map { it.id }).contains("far-high")
+        assertThat(selected.filter { it.type == GeoEntityType.PEAK }.map { it.id }).contains("far-high")
+    }
+
+    private fun entity(id: String, type: GeoEntityType, lat: Double, lon: Double, elevation: Int = 100): GeoEntity =
+        GeoEntity(
+            id = id,
+            osmType = OsmType.NODE,
+            name = id,
+            type = type,
+            lat = lat,
+            lon = lon,
+            elevation = elevation,
+            elevationSource = ElevationSource.OSM_TAG,
+            lastSeenAt = Instant.EPOCH
+        )
 }

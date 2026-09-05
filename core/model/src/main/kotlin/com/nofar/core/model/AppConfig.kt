@@ -46,6 +46,30 @@ object AppConfig {
      */
     const val DATA_COLLECTION_RADIUS_PADDING_M: Double = 5_000.0
 
+    /**
+     * Maximum distance from the observer to the near edge of a region's collection disk for that
+     * region to contribute DEM, horizon, and labels in Explore (meters).
+     */
+    const val CONTRIBUTING_REGION_MAX_DISTANCE_M: Double = 300_000.0
+
+    /** Horizon ray step within the near field (meters). */
+    const val HORIZON_NEAR_FIELD_END_M: Double = 25_000.0
+
+    /** Coarser horizon ray step beyond [HORIZON_NEAR_FIELD_END_M] (meters). */
+    const val HORIZON_FAR_RAY_STEP_M: Double = 500.0
+
+    /** Nearest peaks kept when capping visibility candidates. */
+    const val PEAK_CANDIDATE_NEAREST_BUDGET: Int = 50
+
+    /** Highest remaining peaks kept after the nearest peak budget. */
+    const val PEAK_CANDIDATE_LONG_RANGE_BUDGET: Int = 20
+
+    /** Coarser map viewshed radial step when the preview extent exceeds the near field (meters). */
+    const val MAP_PREVIEW_FAR_RADIAL_STEP_M: Double = 500.0
+
+    /** Map viewshed uses the far radial step when max edge exceeds this (meters). */
+    const val MAP_PREVIEW_NEAR_FIELD_END_M: Double = 25_000.0
+
     /** Warn before cellular download when estimated size exceeds this (bytes). */
     const val CELLULAR_DOWNLOAD_WARNING_BYTES: Long = 100L * 1024 * 1024
 
