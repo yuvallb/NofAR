@@ -1,27 +1,32 @@
 package com.nofar.core.data.repository
 
 import com.nofar.core.data.dem.DemTileReader
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DemTile
 import com.nofar.core.model.GeoEntity
-import com.nofar.core.model.Region
 import com.nofar.core.model.ResolutionLevel
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
 
-interface RegionRepository {
-    fun observeAllRegions(): Flow<List<Region>>
+@Suppress("TooManyFunctions")
+interface CoverageSetRepository {
+    fun observeAllCoverageSets(): Flow<List<CoverageSet>>
 
-    suspend fun getRegion(id: UUID): Region?
+    suspend fun getCoverageSet(id: UUID): CoverageSet?
 
-    suspend fun createRegion(region: Region)
+    suspend fun createCoverageSet(coverageSet: CoverageSet)
 
-    suspend fun updateRegion(region: Region)
+    suspend fun updateCoverageSet(coverageSet: CoverageSet)
 
-    suspend fun updateRegionName(id: UUID, name: String)
+    suspend fun updateCoverageSetName(id: UUID, name: String)
 
-    suspend fun deleteRegion(id: UUID)
+    suspend fun deleteCoverageSet(id: UUID)
 
-    suspend fun regionsContainingPoint(lat: Double, lon: Double): List<Region>
+    suspend fun coverageSetsContainingPoint(lat: Double, lon: Double): List<CoverageSet>
+
+    suspend fun getCellIdsForCoverageSet(id: UUID): List<String>
+
+    suspend fun getCellIdsForCoverageSets(ids: List<UUID>): List<String>
 
     suspend fun updateDownloadStatus(
         id: UUID,
@@ -33,7 +38,7 @@ interface RegionRepository {
 
     suspend fun hasActiveDownload(): Boolean
 
-    suspend fun findDownloadingRegion(): Region?
+    suspend fun findDownloadingCoverageSet(): CoverageSet?
 }
 
 interface GeoEntityRepository {
@@ -50,11 +55,8 @@ interface GeoEntityRepository {
         resolutionLevel: ResolutionLevel
     ): List<GeoEntity>
 
-    suspend fun queryWithinRadiusForRegion(
-        regionId: UUID,
-        regionCenterLat: Double,
-        regionCenterLon: Double,
-        regionRadiusM: Double,
+    suspend fun queryWithinRadiusForCoverageSet(
+        coverageSetId: UUID,
         lat: Double,
         lon: Double,
         radiusM: Double,
@@ -92,7 +94,7 @@ interface DemTileRepository {
 }
 
 data class StorageStats(
-    val regionCount: Int,
+    val coverageSetCount: Int,
     val entityDbSizeBytes: Long,
     val demCacheSizeBytes: Long,
     val entityRowCount: Int

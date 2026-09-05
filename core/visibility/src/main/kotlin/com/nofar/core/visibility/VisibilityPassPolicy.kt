@@ -1,7 +1,7 @@
 package com.nofar.core.visibility
 
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.GeoMathBounds
 import com.nofar.core.model.UserLocation
 
 internal object VisibilityPassPolicy {
@@ -18,7 +18,7 @@ internal object VisibilityPassPolicy {
         else -> {
             val movedEnough =
                 lastPassLocation?.let { previous ->
-                    RegionBounds.haversineDistanceM(
+                    GeoMathBounds.haversineDistanceM(
                         previous.latitude,
                         previous.longitude,
                         location.latitude,

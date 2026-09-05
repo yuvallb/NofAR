@@ -1,13 +1,13 @@
 package com.nofar.feature.explore
 
-import com.nofar.core.data.usecase.ExploreRegionResolution
-import com.nofar.core.data.usecase.QuickRegionProposal
+import com.nofar.core.data.usecase.ExploreCoverageResolution
+import com.nofar.core.data.usecase.QuickCoverageProposal
 import com.nofar.core.designsystem.component.ArLabel
 import com.nofar.core.designsystem.component.HorizonOutlinePoint
 import com.nofar.core.model.AltitudeReading
 import com.nofar.core.model.CompassCalibrationState
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.LocationAccessState
-import com.nofar.core.model.Region
 import com.nofar.core.visibility.CameraFieldOfView
 import com.nofar.core.visibility.ClusteredLabel
 
@@ -22,13 +22,14 @@ data class ExploreUiState(
     val cameraGranted: Boolean = false,
     val exploreGate: ExploreGate = ExploreGate.WAITING_GPS,
     val simpleModeEnabled: Boolean = false,
-    val activeRegion: Region? = null,
-    val activeRegions: List<Region> = emptyList(),
-    val membershipRegions: List<Region> = emptyList(),
-    val activeRegionName: String? = null,
+    val activeCoverageSet: CoverageSet? = null,
+    val activeCoverageSets: List<CoverageSet> = emptyList(),
+    val membershipCoverageSets: List<CoverageSet> = emptyList(),
+    val activeCellIds: Set<String> = emptySet(),
+    val activeCoverageSetName: String? = null,
     val partialRegionWarning: Boolean = false,
-    val regionResolution: ExploreRegionResolution? = null,
-    val downloadPrompt: QuickRegionProposal? = null,
+    val regionResolution: ExploreCoverageResolution? = null,
+    val downloadPrompt: QuickCoverageProposal? = null,
     val downloadProgressPct: Int = 0,
     val downloadUiMessage: String? = null,
     val showCellularWarning: Boolean = false,

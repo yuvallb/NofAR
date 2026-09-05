@@ -3,16 +3,10 @@ package com.nofar.core.model
 import java.time.Instant
 import java.util.UUID
 
-data class Region(
+/** A downloaded offline map coverage set (country pack or local 3×3 cell ring). */
+data class CoverageSet(
     val id: UUID,
     val name: String,
-    val centerLat: Double,
-    val centerLon: Double,
-    val radiusM: Double,
-    val minLat: Double,
-    val maxLat: Double,
-    val minLon: Double,
-    val maxLon: Double,
     val createdAt: Instant,
     val updatedAt: Instant,
     val downloadStatus: DownloadStatus,
@@ -34,7 +28,7 @@ data class GeoEntity(
     val elevation: Int?,
     val elevationSource: ElevationSource?,
     val lastSeenAt: Instant,
-    /** Approximate ground footprint radius (meters), derived from OSM boundary geometry at Prepare time. */
+    /** Approximate ground footprint radius (meters), from type defaults at Prepare time. */
     val footprintRadiusM: Double? = null
 )
 
@@ -51,6 +45,6 @@ data class DemTile(
     val lastAccessedAt: Instant
 )
 
-data class RegionEntityCoverage(val regionId: UUID, val entityId: String, val displayName: String)
+data class CoverageCell(val coverageSetId: UUID, val cellId: String)
 
-data class TileCoverage(val regionId: UUID, val tileId: String)
+data class CoverageEntityCoverage(val coverageSetId: UUID, val entityId: String, val displayName: String)

@@ -2,7 +2,6 @@ package com.nofar.core.visibility
 
 import com.google.common.truth.Truth.assertThat
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.RegionBounds
 import org.junit.Test
 
 /**
@@ -12,8 +11,7 @@ import org.junit.Test
 class BuildHorizonProfileTest {
     private val computer = HorizonProfileComputer()
     private val flatSampler = DemSampler { _, _ -> 100f }
-    private val maxCollectionRadiusM =
-        RegionBounds.dataCollectionRadiusM(AppConfig.REGION_RADIUS_MAX_KM * 1_000.0)
+    private val maxCollectionRadiusM = AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M
 
     @Test
     fun computeDisabled_returnsNull() {

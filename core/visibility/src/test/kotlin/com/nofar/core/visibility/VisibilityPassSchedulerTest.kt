@@ -3,10 +3,12 @@ package com.nofar.core.visibility
 import com.google.common.truth.Truth.assertThat
 import com.nofar.core.common.DispatcherProvider
 import com.nofar.core.data.preferences.UserPreferencesRepository
+import com.nofar.core.data.repository.CoverageSetRepository
+import com.nofar.core.model.CellMembership
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.LabelLanguage
-import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
 import java.time.Instant
 import java.util.UUID
@@ -35,7 +37,7 @@ class VisibilityPassSchedulerTest {
         val scheduler = scheduler(computer, showHorizonOutline = true)
 
         scheduler.start(this)
-        scheduler.setActiveRegions(listOf(sampleRegion()))
+        scheduler.setActiveCoverageSets(listOf(sampleCoverageSet()))
         advanceUntilIdle()
 
         assertThat(scheduler.horizonProfile.value).isEqualTo(knownProfile)
@@ -50,7 +52,7 @@ class VisibilityPassSchedulerTest {
         val scheduler = scheduler(computer, showHorizonOutline = false)
 
         scheduler.start(this)
-        scheduler.setActiveRegions(listOf(sampleRegion()))
+        scheduler.setActiveCoverageSets(listOf(sampleCoverageSet()))
         advanceUntilIdle()
 
         assertThat(computer.lastComputeHorizonProfile).isFalse()
@@ -65,10 +67,11 @@ class VisibilityPassSchedulerTest {
     }
 
     private fun TestScope.scheduler(
-        computer: RegionVisibilityComputer,
+        computer: CoverageVisibilityComputer,
         showHorizonOutline: Boolean
     ): VisibilityPassScheduler = VisibilityPassScheduler(
         visibilityUseCase = computer,
+        coverageSetRepository = FakeCoverageSetRepository(),
         userPreferencesRepository = FakeUserPreferencesRepository(showHorizonOutline),
         dispatchers = dispatcherProvider(StandardTestDispatcher(testScheduler))
     ).also { scheduler ->
@@ -96,7 +99,7 @@ class VisibilityPassSchedulerTest {
         val scheduler = scheduler(computer, showHorizonOutline = false)
 
         scheduler.start(this)
-        scheduler.setActiveRegions(listOf(sampleRegion()))
+        scheduler.setActiveCoverageSets(listOf(sampleCoverageSet()))
         advanceUntilIdle()
 
         assertThat(scheduler.hereContext.value).isEqualTo(here)
@@ -123,16 +126,9 @@ class VisibilityPassSchedulerTest {
         timestampMillis = 1_000L
     )
 
-    private fun sampleRegion(): Region = Region(
+    private fun sampleCoverageSet(): CoverageSet = CoverageSet(
         id = UUID.randomUUID(),
-        name = "Region",
-        centerLat = 32.5,
-        centerLon = 35.5,
-        radiusM = 10_000.0,
-        minLat = 32.4,
-        maxLat = 32.6,
-        minLon = 35.4,
-        maxLon = 35.6,
+        name = "Coverage",
         createdAt = Instant.EPOCH,
         updatedAt = Instant.EPOCH,
         downloadStatus = DownloadStatus.READY,
@@ -156,13 +152,14 @@ class VisibilityPassSchedulerTest {
         val scheduler =
             VisibilityPassScheduler(
                 visibilityUseCase = computer,
+                coverageSetRepository = FakeCoverageSetRepository(),
                 userPreferencesRepository = FakeUserPreferencesRepository(showHorizon = false),
                 dispatchers = dispatcherProvider(StandardTestDispatcher(testScheduler))
             )
         scheduler.configureObserverLocation(kotlinx.coroutines.flow.flowOf(virtualLocation))
         scheduler.seedObserverLocation(virtualLocation)
         scheduler.start(this)
-        scheduler.setActiveRegions(listOf(sampleRegion()))
+        scheduler.setActiveCoverageSets(listOf(sampleCoverageSet()))
         advanceUntilIdle()
 
         assertThat(computer.lastLocation?.latitude).isEqualTo(31.0)
@@ -175,7 +172,7 @@ class VisibilityPassSchedulerTest {
         val computer = RecordingComputer()
         val scheduler = scheduler(computer, showHorizonOutline = false)
         scheduler.start(this)
-        scheduler.setActiveRegions(listOf(sampleRegion()))
+        scheduler.setActiveCoverageSets(listOf(sampleCoverageSet()))
         advanceUntilIdle()
         val afterFirst = computer.computeCount
 
@@ -200,6 +197,7 @@ class VisibilityPassSchedulerTest {
         val scheduler =
             VisibilityPassScheduler(
                 visibilityUseCase = computer,
+                coverageSetRepository = FakeCoverageSetRepository(),
                 userPreferencesRepository = FakeUserPreferencesRepository(showHorizon = false),
                 dispatchers = dispatcherProvider(StandardTestDispatcher(testScheduler))
             )
@@ -209,7 +207,7 @@ class VisibilityPassSchedulerTest {
         )
         scheduler.seedObserverLocation(virtualLocation)
         scheduler.start(this)
-        scheduler.setActiveRegions(listOf(sampleRegion()))
+        scheduler.setActiveCoverageSets(listOf(sampleCoverageSet()))
         testScheduler.runCurrent()
         val afterFirst = computer.computeCount
         assertThat(afterFirst).isAtLeast(1)
@@ -221,12 +219,13 @@ class VisibilityPassSchedulerTest {
         scheduler.stop()
     }
 
-    private class RecordingComputer : RegionVisibilityComputer {
+    private class RecordingComputer : CoverageVisibilityComputer {
         var lastLocation: UserLocation? = null
         var computeCount: Int = 0
 
-        override suspend fun computeForRegions(
-            regions: List<Region>,
+        override suspend fun computeForCoverageSets(
+            coverageSets: List<CoverageSet>,
+            cellIds: Set<String>,
             location: UserLocation,
             computeHorizonProfile: Boolean
         ): VisibilityResult {
@@ -241,17 +240,52 @@ class VisibilityPassSchedulerTest {
         }
     }
 
-    private class FakeComputer(private val result: VisibilityResult) : RegionVisibilityComputer {
+    private class FakeComputer(private val result: VisibilityResult) : CoverageVisibilityComputer {
         var lastComputeHorizonProfile: Boolean? = null
 
-        override suspend fun computeForRegions(
-            regions: List<Region>,
+        override suspend fun computeForCoverageSets(
+            coverageSets: List<CoverageSet>,
+            cellIds: Set<String>,
             location: UserLocation,
             computeHorizonProfile: Boolean
         ): VisibilityResult {
             lastComputeHorizonProfile = computeHorizonProfile
             return result
         }
+    }
+
+    private class FakeCoverageSetRepository : CoverageSetRepository {
+        override fun observeAllCoverageSets(): Flow<List<CoverageSet>> = MutableStateFlow(emptyList())
+
+        override suspend fun getCoverageSet(id: UUID): CoverageSet? = null
+
+        override suspend fun createCoverageSet(coverageSet: CoverageSet) = Unit
+
+        override suspend fun updateCoverageSet(coverageSet: CoverageSet) = Unit
+
+        override suspend fun updateCoverageSetName(id: UUID, name: String) = Unit
+
+        override suspend fun deleteCoverageSet(id: UUID) = Unit
+
+        override suspend fun coverageSetsContainingPoint(lat: Double, lon: Double): List<CoverageSet> = emptyList()
+
+        override suspend fun getCellIdsForCoverageSet(id: UUID): List<String> =
+            listOf(CellMembership.cellIdForPoint(32.5, 35.5))
+
+        override suspend fun getCellIdsForCoverageSets(ids: List<UUID>): List<String> =
+            ids.flatMap { getCellIdsForCoverageSet(it) }
+
+        override suspend fun updateDownloadStatus(
+            id: UUID,
+            status: DownloadStatus,
+            progressPct: Int,
+            osmDatasetVersion: Instant?,
+            entityCount: Int?
+        ) = Unit
+
+        override suspend fun hasActiveDownload(): Boolean = false
+
+        override suspend fun findDownloadingCoverageSet(): CoverageSet? = null
     }
 
     private class FakeUserPreferencesRepository(showHorizon: Boolean) : UserPreferencesRepository {
@@ -261,6 +295,7 @@ class VisibilityPassSchedulerTest {
         override val keepRawGeoTiff: Flow<Boolean> = MutableStateFlow(false)
         override val simpleModeEnabled: Flow<Boolean> = MutableStateFlow(false)
         override val simpleModeDefaultsApplied: Flow<Boolean> = MutableStateFlow(false)
+        override val demV4UpgradeApplied: Flow<Boolean> = MutableStateFlow(false)
         override val preferredLabelLanguage: Flow<LabelLanguage> = MutableStateFlow(LabelLanguage.DEFAULT)
         override val showHorizonOutline: Flow<Boolean> = MutableStateFlow(showHorizon)
         override val horizonAzimuthOffsetDeg: Flow<Float> = MutableStateFlow(0f)
@@ -278,6 +313,8 @@ class VisibilityPassSchedulerTest {
         override suspend fun setSimpleModeEnabled(enabled: Boolean) = Unit
 
         override suspend fun markSimpleModeDefaultsApplied() = Unit
+
+        override suspend fun markDemV4UpgradeApplied() = Unit
 
         override suspend fun setPreferredLabelLanguage(language: LabelLanguage) = Unit
 

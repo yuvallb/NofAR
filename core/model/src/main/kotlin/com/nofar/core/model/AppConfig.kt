@@ -19,11 +19,14 @@ object AppConfig {
     /** Maximum interval between visibility passes. */
     val visibilityRefreshMaxInterval: Duration = 2.seconds
 
-    /** Minimum circular region radius (kilometers). */
-    const val REGION_RADIUS_MIN_KM: Double = 5.0
+    /** Explore entity spatial query radius around the observer (meters). */
+    const val EXPLORE_ENTITY_QUERY_RADIUS_M: Double = 100_000.0
 
-    /** Maximum circular region radius (kilometers). */
-    const val REGION_RADIUS_MAX_KM: Double = 20.0
+    /** Maximum on-disk DEM bytes for a pack/cell-set offer (fraction of cache limit). */
+    const val COVERAGE_BYTE_BUDGET_CACHE_FRACTION: Double = 0.5
+
+    /** Extra headroom added to cache limit when installing a large pack (bytes). */
+    const val PACK_CACHE_HEADROOM_BYTES: Long = 200L * 1024 * 1024
 
     /** Web-mercator-safe latitude clamp for map center (degrees). */
     const val MAP_CENTER_LAT_MIN: Double = -85.0
@@ -36,21 +39,6 @@ object AppConfig {
 
     /** Longitude clamp for map center (degrees). */
     const val MAP_CENTER_LON_MAX: Double = 180.0
-
-    /** Default circular region radius for Simple Mode auto-download (meters). */
-    const val SIMPLE_MODE_DEFAULT_RADIUS_M: Double = 10_000.0
-
-    /**
-     * Extra radius beyond [Region.radiusM] used for OSM/DEM download and Explore visibility.
-     * Membership / "inside region" checks stay on [Region.radiusM].
-     */
-    const val DATA_COLLECTION_RADIUS_PADDING_M: Double = 5_000.0
-
-    /**
-     * Maximum distance from the observer to the near edge of a region's collection disk for that
-     * region to contribute DEM, horizon, and labels in Explore (meters).
-     */
-    const val CONTRIBUTING_REGION_MAX_DISTANCE_M: Double = 300_000.0
 
     /** Horizon ray step within the near field (meters). */
     const val HORIZON_NEAR_FIELD_END_M: Double = 25_000.0
@@ -70,8 +58,8 @@ object AppConfig {
     /** Map viewshed uses the far radial step when max edge exceeds this (meters). */
     const val MAP_PREVIEW_NEAR_FIELD_END_M: Double = 25_000.0
 
-    /** Warn before cellular download when estimated size exceeds this (bytes). */
-    const val CELLULAR_DOWNLOAD_WARNING_BYTES: Long = 100L * 1024 * 1024
+    /** Warn before cellular download when estimated wire size exceeds this (bytes). */
+    const val CELLULAR_DOWNLOAD_WARNING_BYTES: Long = 50L * 1024 * 1024
 
     /** Default DEM tile cache size limit (bytes). */
     const val DEM_CACHE_DEFAULT_LIMIT_BYTES: Long = 500L * 1024 * 1024
@@ -130,7 +118,7 @@ object AppConfig {
      * Explore HUD shows DEM beside GPS when the rounded GPS and DEM altitudes differ by more
      * than this many meters.
      */
-    const val ALTITUDE_GPS_DEM_DISAGREE_METERS: Int = 5
+    const val ALTITUDE_GPS_DEM_DISAGREE_METERS: Int = 20
 
     /** AR labels are hidden when horizontal GPS accuracy exceeds this (meters). */
     const val EXPLORE_LOCATION_ACCURACY_THRESHOLD_METERS: Float = 30f

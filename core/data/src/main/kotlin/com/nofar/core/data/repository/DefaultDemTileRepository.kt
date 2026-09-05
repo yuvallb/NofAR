@@ -87,9 +87,20 @@ constructor(
     override suspend fun totalCacheSizeBytes(): Long = demTileDao.totalCacheSizeBytes()
 
     override suspend fun evictTile(tileId: String): Boolean {
-        val file = demFile(tileId)
-        if (file.exists()) {
-            file.delete()
+        // Bypass requireValidTileId so legacy COG_10 (and other non-v4) rows can be wiped
+        // during DemRasterUpgradeUseCase without crashing startup.
+        val file = File(demDirectory, "$tileId.bin")
+        val canonicalDem = demDirectory.canonicalFile
+        val canonicalFile = runCatching { file.canonicalFile }.getOrNull()
+        if (canonicalFile != null &&
+            (
+                canonicalFile.path.startsWith(canonicalDem.path + File.separator) ||
+                    canonicalFile == canonicalDem
+                )
+        ) {
+            if (canonicalFile.exists()) {
+                canonicalFile.delete()
+            }
         }
         demTileDao.deleteById(tileId)
         return true

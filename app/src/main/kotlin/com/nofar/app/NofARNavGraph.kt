@@ -20,9 +20,9 @@ import java.util.UUID
 internal fun NavGraphBuilder.nofarNavGraph(navController: NavHostController) {
     homeScreen(
         onNavigateToSettings = { navController.navigate(SETTINGS_ROUTE) },
-        onNavigateToPrepare = { regionId -> navController.navigate(buildPrepareRoute(regionId)) },
-        onNavigateToExplore = { regionId ->
-            navController.navigate(ExploreRouteBuilder.build(regionId = regionId))
+        onNavigateToPrepare = { coverageSetId -> navController.navigate(buildPrepareRoute(coverageSetId)) },
+        onNavigateToExplore = { coverageSetId ->
+            navController.navigate(ExploreRouteBuilder.build(coverageSetId = coverageSetId))
         },
         onNavigateToVirtualLocationPicker = {
             navController.navigate(VIRTUAL_LOCATION_PICKER_ROUTE)
@@ -49,12 +49,12 @@ internal fun NavGraphBuilder.nofarNavGraph(navController: NavHostController) {
     )
 }
 
-internal fun buildPrepareRoute(regionId: UUID?): String = PrepareRouteBuilder.build(regionId = regionId)
+internal fun buildPrepareRoute(coverageSetId: UUID?): String = PrepareRouteBuilder.build(coverageSetId = coverageSetId)
 
 private fun NavHostController.navigateToVirtualExplore(selection: VirtualLocationSelection) {
     navigate(
         ExploreRouteBuilder.build(
-            regionId = selection.primaryRegionId,
+            coverageSetId = selection.primaryCoverageSetId,
             virtualLat = selection.lat,
             virtualLon = selection.lon
         )

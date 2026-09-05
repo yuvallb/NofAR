@@ -48,21 +48,21 @@ interface GeoEntityDao {
     @Query(
         """
         DELETE FROM geo_entity WHERE id IN (
-            SELECT c.entity_id FROM region_entity_coverage c
-            WHERE c.region_id = :regionId
+            SELECT c.entity_id FROM coverage_entity c
+            WHERE c.coverage_set_id = :coverageSetId
             AND (
-                SELECT COUNT(*) FROM region_entity_coverage c2
+                SELECT COUNT(*) FROM coverage_entity c2
                 WHERE c2.entity_id = c.entity_id
             ) = 1
         )
         """
     )
-    suspend fun deleteEntitiesExclusiveToRegion(regionId: String): Int
+    suspend fun deleteEntitiesExclusiveToCoverageSet(coverageSetId: String): Int
 
     @Query(
         """
         DELETE FROM geo_entity WHERE id NOT IN (
-            SELECT DISTINCT entity_id FROM region_entity_coverage
+            SELECT DISTINCT entity_id FROM coverage_entity
         )
         """
     )

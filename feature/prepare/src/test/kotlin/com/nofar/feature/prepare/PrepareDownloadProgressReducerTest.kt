@@ -12,10 +12,10 @@ class PrepareDownloadProgressReducerTest {
 
     @Test
     fun addRegionWithNullRegionId_ignoresBackgroundDownloadProgress() {
-        val state = PrepareUiState(regionId = null, step = PrepareStep.DEFINE)
+        val state = PrepareUiState(coverageSetId = null, step = PrepareStep.DEFINE)
         val progress =
             PrepareProgress(
-                regionId = otherRegionId,
+                coverageSetId = otherRegionId,
                 phase = PreparePhase.OSM,
                 overallPercent = 20,
                 message = "Downloading OSM data…"
@@ -32,13 +32,13 @@ class PrepareDownloadProgressReducerTest {
     fun progressForDifferentRegion_isIgnored() {
         val state =
             PrepareUiState(
-                regionId = trackedRegionId,
+                coverageSetId = trackedRegionId,
                 step = PrepareStep.ESTIMATE,
                 downloadUiState = PrepareDownloadUiState.IDLE
             )
         val progress =
             PrepareProgress(
-                regionId = otherRegionId,
+                coverageSetId = otherRegionId,
                 phase = PreparePhase.DEM,
                 overallPercent = 55
             )
@@ -52,13 +52,13 @@ class PrepareDownloadProgressReducerTest {
     fun progressForTrackedRegion_switchesToDownloading() {
         val state =
             PrepareUiState(
-                regionId = trackedRegionId,
+                coverageSetId = trackedRegionId,
                 step = PrepareStep.ESTIMATE,
                 downloadUiState = PrepareDownloadUiState.IDLE
             )
         val progress =
             PrepareProgress(
-                regionId = trackedRegionId,
+                coverageSetId = trackedRegionId,
                 phase = PreparePhase.OSM,
                 overallPercent = 12,
                 message = "Downloading OSM data…"
@@ -75,13 +75,13 @@ class PrepareDownloadProgressReducerTest {
     fun completeOrError_keepsTerminalUiStateButUpdatesProgress() {
         val completeState =
             PrepareUiState(
-                regionId = trackedRegionId,
+                coverageSetId = trackedRegionId,
                 downloadUiState = PrepareDownloadUiState.COMPLETE,
                 step = PrepareStep.COMPLETE
             )
         val progress =
             PrepareProgress(
-                regionId = trackedRegionId,
+                coverageSetId = trackedRegionId,
                 phase = PreparePhase.POST_PROCESSING,
                 overallPercent = 100
             )
@@ -95,7 +95,7 @@ class PrepareDownloadProgressReducerTest {
 
     @Test
     fun nullProgress_leavesStateUnchanged() {
-        val state = PrepareUiState(regionId = trackedRegionId)
+        val state = PrepareUiState(coverageSetId = trackedRegionId)
         assertThat(applyLiveDownloadProgress(state, null)).isEqualTo(state)
     }
 }

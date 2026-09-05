@@ -1,50 +1,56 @@
 package com.nofar.feature.home
 
-import com.nofar.core.data.repository.HomeRegionMetadataRepository
-import com.nofar.core.data.usecase.InsideRegionUseCase
-import com.nofar.core.designsystem.component.RegionCardState
+import com.nofar.core.data.repository.HomeCoverageSetMetadataRepository
+import com.nofar.core.data.usecase.InsideCoverageUseCase
+import com.nofar.core.designsystem.component.CoverageSetCardState
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
 import kotlin.math.max
 
-internal suspend fun buildHomeRegionCards(
-    insideRegionUseCase: InsideRegionUseCase,
-    metadataRepository: HomeRegionMetadataRepository,
-    regions: List<Region>,
+internal suspend fun buildHomeCoverageSetCards(
+    insideCoverageUseCase: InsideCoverageUseCase,
+    metadataRepository: HomeCoverageSetMetadataRepository,
+    coverageSetRepository: com.nofar.core.data.repository.CoverageSetRepository,
+    coverageSets: List<CoverageSet>,
     location: UserLocation?
-): List<RegionCardState> {
-    val sorted = HomeRegionLogic.sortRegionsForDisplay(regions, location)
+): List<CoverageSetCardState> {
+    val cellIdsBySet =
+        coverageSets.associate { set ->
+            set.id to coverageSetRepository.getCellIdsForCoverageSet(set.id).toSet()
+        }
+    val sorted = HomeCoverageLogic.sortCoverageSetsForDisplay(coverageSets, location, cellIdsBySet)
     val insideIds =
         if (location != null) {
-            insideRegionUseCase.insideRegionIds(location.latitude, location.longitude, regions)
+            insideCoverageUseCase.insideCoverageSetIds(location.latitude, location.longitude, coverageSets)
         } else {
             emptySet()
         }
-    return sorted.map { region ->
-        val isInside = region.id in insideIds
-        val metadata = metadataRepository.getMetadata(region.id, region)
+    return sorted.map { coverageSet ->
+        val isInside = coverageSet.id in insideIds
+        val cellIds = cellIdsBySet[coverageSet.id].orEmpty().toList()
+        val metadata = metadataRepository.getMetadata(coverageSet.id, cellIds)
         val demSizeBytes = metadata.demSizeBytes
-        val displayEntityCount = max(region.entityCount, metadata.liveEntityCount)
+        val displayEntityCount = max(coverageSet.entityCount, metadata.liveEntityCount)
         val demTimestamp =
             metadata.latestDemTimestamp
                 ?: if (
-                    region.downloadStatus == DownloadStatus.READY ||
-                    region.downloadStatus == DownloadStatus.PARTIAL
+                    coverageSet.downloadStatus == DownloadStatus.READY ||
+                    coverageSet.downloadStatus == DownloadStatus.PARTIAL
                 ) {
-                    region.updatedAt
+                    coverageSet.updatedAt
                 } else {
                     null
                 }
         val osmSizeBytes =
             if (demSizeBytes > 0L) {
-                max(0L, region.estimatedSizeBytes - demSizeBytes)
+                max(0L, coverageSet.estimatedSizeBytes - demSizeBytes)
             } else {
-                region.estimatedSizeBytes
+                coverageSet.estimatedSizeBytes
             }
-        RegionCardState(
-            region = region.copy(entityCount = displayEntityCount),
-            isYouAreHere = HomeRegionLogic.shouldShowYouAreHere(region, isInside),
+        CoverageSetCardState(
+            coverageSet = coverageSet.copy(entityCount = displayEntityCount),
+            isYouAreHere = HomeCoverageLogic.shouldShowYouAreHere(coverageSet, isInside),
             osmSizeBytes = osmSizeBytes,
             demSizeBytes = demSizeBytes,
             latestDemTimestamp = demTimestamp

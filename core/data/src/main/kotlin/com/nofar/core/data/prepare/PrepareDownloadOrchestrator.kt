@@ -4,7 +4,8 @@
     "LongMethod",
     "CyclomaticComplexMethod",
     "MaxLineLength",
-    "TooManyFunctions"
+    "TooManyFunctions",
+    "ReturnCount"
 )
 
 package com.nofar.core.data.prepare
@@ -17,19 +18,17 @@ import com.nofar.core.data.dem.GeoTiffConversionResult
 import com.nofar.core.data.dem.GeoTiffConverter
 import com.nofar.core.data.osm.OverpassStreamParser
 import com.nofar.core.data.preferences.UserPreferencesRepository
+import com.nofar.core.data.repository.CoverageSetRepository
 import com.nofar.core.data.repository.DefaultDemTileRepository
 import com.nofar.core.data.repository.GeoEntityRepository
-import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.usecase.LruEvictionUseCase
+import com.nofar.core.database.dao.CoverageCellDao
+import com.nofar.core.database.dao.CoverageEntityDao
 import com.nofar.core.database.dao.CoverageLinker
-import com.nofar.core.database.dao.RegionEntityCoverageDao
-import com.nofar.core.database.dao.TileCoverageDao
-import com.nofar.core.database.model.TileCoverageEntity
 import com.nofar.core.database.model.asEntity
 import com.nofar.core.model.DemTile
 import com.nofar.core.model.DemTileId
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.RegionBounds
 import com.nofar.core.network.DemTileFetcher
 import com.nofar.core.network.OverpassApi
 import com.nofar.core.network.OverpassQueryBuilder
@@ -40,13 +39,14 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 
 data class PrepareProgress(
-    val regionId: UUID,
+    val coverageSetId: UUID,
     val phase: PreparePhase,
     val overallPercent: Int,
     val osmBytesRead: Long = 0L,
@@ -109,13 +109,13 @@ class PrepareDownloadOrchestrator
 @Inject
 constructor(
     @ApplicationContext private val context: Context,
-    private val regionRepository: RegionRepository,
+    private val coverageSetRepository: CoverageSetRepository,
     private val geoEntityRepository: GeoEntityRepository,
     private val demTileRepository: DefaultDemTileRepository,
     private val overpassApi: OverpassApi,
     private val demTileFetcher: DemTileFetcher,
-    private val regionEntityCoverageDao: RegionEntityCoverageDao,
-    private val tileCoverageDao: TileCoverageDao,
+    private val coverageEntityDao: CoverageEntityDao,
+    private val coverageCellDao: CoverageCellDao,
     private val coverageLinker: CoverageLinker,
     private val postProcessor: PreparePostProcessor,
     private val userPreferencesRepository: UserPreferencesRepository,
@@ -133,7 +133,7 @@ constructor(
     private var cancelled = false
 
     @Volatile
-    private var activeRegionId: UUID? = null
+    private var activeCoverageSetId: UUID? = null
 
     @Volatile
     private var lastPersistedPercent = -1
@@ -146,140 +146,121 @@ constructor(
         _lastError.value = null
     }
 
-    suspend fun download(regionId: UUID): Result<Unit> {
+    suspend fun download(coverageSetId: UUID): Result<Unit> {
         cancelled = false
-        activeRegionId = regionId
+        activeCoverageSetId = coverageSetId
         lastPersistedPercent = -1
         _lastError.value = null
-        val region =
-            regionRepository.getRegion(regionId) ?: return Result.failure(IllegalStateException("Region missing"))
+        val coverageSet =
+            coverageSetRepository.getCoverageSet(coverageSetId)
+                ?: return Result.failure(IllegalStateException("Coverage set missing"))
 
-        regionRepository.updateDownloadStatus(regionId, DownloadStatus.DOWNLOADING, progressPct = 0)
-        resetRegionCoverage(regionId)
-        val collectionRadiusM = RegionBounds.dataCollectionRadiusM(region)
-        val bbox =
-            OverpassQueryBuilder.boundingBoxFromCircle(region.centerLat, region.centerLon, collectionRadiusM)
-        val estimate = PrepareEstimator.estimate(region.centerLat, region.centerLon, collectionRadiusM)
+        val cells =
+            coverageCellDao.getCellIdsForCoverageSet(coverageSetId.toString())
+                .mapNotNull { DemTileId.parse(it) }
+        if (cells.isEmpty()) {
+            coverageSetRepository.updateDownloadStatus(
+                coverageSetId,
+                DownloadStatus.NOT_DOWNLOADED,
+                progressPct = 0
+            )
+            return Result.failure(IllegalStateException("No cells configured for coverage set"))
+        }
+        val estimate = PrepareEstimator.estimateForCells(cells)
+        val cacheLimit = userPreferencesRepository.demCacheLimitBytes.first()
+        val budget = (cacheLimit * com.nofar.core.model.AppConfig.COVERAGE_BYTE_BUDGET_CACHE_FRACTION).toLong()
+        if (estimate.demEstimateMinBytes > budget) {
+            coverageSetRepository.updateDownloadStatus(
+                coverageSetId,
+                DownloadStatus.NOT_DOWNLOADED,
+                progressPct = 0
+            )
+            return Result.failure(
+                IllegalStateException(
+                    "Coverage set DEM (${estimate.demEstimateMinBytes} bytes) exceeds " +
+                        "${(com.nofar.core.model.AppConfig.COVERAGE_BYTE_BUDGET_CACHE_FRACTION * 100).toInt()}% of cache limit"
+                )
+            )
+        }
+
+        coverageSetRepository.updateDownloadStatus(coverageSetId, DownloadStatus.DOWNLOADING, progressPct = 0)
+        // Clear OSM links only — keep DEM files and ref counts so retries resume.
+        coverageEntityDao.deleteForCoverageSet(coverageSetId.toString())
         var osmDatasetVersion = Instant.now()
         var entityCount = 0
         var demFailures = 0
 
         return try {
-            // OSM phase (0–40%)
             updateProgress(PreparePhase.OSM, 0, message = "Contacting OpenStreetMap servers…")
             persistProgress(0)
-            val overpassResponse =
-                overpassApi.queryRegion(bbox) { bytes ->
-                    val pct =
-                        (
-                            (
-                                bytes.toDouble() / estimate.osmEstimateBytes.coerceAtLeast(
-                                    1
-                                )
-                                ) * 40
-                            ).toInt().coerceIn(0, 40)
-                    _progress.value =
-                        PrepareProgress(
-                            regionId = regionId,
-                            phase = PreparePhase.OSM,
-                            overallPercent = pct,
-                            osmBytesRead = bytes,
-                            message = "Downloading OSM data…"
-                        )
-                }
-            osmDatasetVersion = overpassResponse.datasetVersion
-            // Prefer the live Settings/Prepare preference at download time so a re-download
-            // never keeps a stale region.labelLanguage from an earlier parse.
             val labelLanguage = userPreferencesRepository.preferredLabelLanguage.first()
-            if (region.labelLanguage != labelLanguage) {
-                regionRepository.updateRegion(region.copy(labelLanguage = labelLanguage))
+            if (coverageSet.labelLanguage != labelLanguage) {
+                coverageSetRepository.updateCoverageSet(coverageSet.copy(labelLanguage = labelLanguage))
             }
-            overpassResponse.body.use { stream ->
-                val footprintByEntityId = mutableMapOf<String, Double>()
-                var savedCount = 0
-                entityCount =
+
+            var totalOsmBytes = 0L
+            cells.forEachIndexed { cellIndex, (tileLat, tileLon) ->
+                checkCancelled()
+                if (cellIndex > 0) {
+                    delay(OVERPASS_CELL_GAP_MS)
+                }
+                val bbox = OverpassQueryBuilder.boundingBoxForCell(tileLat, tileLon)
+                val overpassResponse =
+                    overpassApi.queryRegion(bbox) { bytes ->
+                        totalOsmBytes += bytes
+                        val cellFraction =
+                            (cellIndex + bytes.toDouble() / estimate.osmEstimateBytes.coerceAtLeast(1)) / cells.size
+                        val pct = (cellFraction * 40).toInt().coerceIn(0, 40)
+                        _progress.value =
+                            PrepareProgress(
+                                coverageSetId = coverageSetId,
+                                phase = PreparePhase.OSM,
+                                overallPercent = pct,
+                                osmBytesRead = totalOsmBytes,
+                                message = "Downloading OSM cell ${cellIndex + 1}/${cells.size}…"
+                            )
+                    }
+                osmDatasetVersion = overpassResponse.datasetVersion
+                var savedInCell = 0
+                overpassResponse.body.use { stream ->
                     overpassStreamParser.parse(
                         input = stream,
                         labelLanguage = labelLanguage,
                         onElement = { element ->
                             checkCancelled()
-                            if (savedCount < MAX_OSM_ENTITIES) {
-                                // Stream upserts — never buffer the full Overpass entity list.
+                            if (savedInCell < MAX_OSM_ENTITIES_PER_CELL) {
                                 coverageLinker.upsertAndLinkEntity(
-                                    regionId = regionId.toString(),
+                                    coverageSetId = coverageSetId.toString(),
                                     entity = overpassStreamParser.toGeoEntity(element).asEntity(),
                                     displayName = element.name
                                 )
-                                savedCount++
-                                if (savedCount % 50 == 0) {
-                                    updateProgress(
-                                        PreparePhase.OSM,
-                                        ((savedCount.toDouble() / MAX_OSM_ENTITIES) * 40)
-                                            .toInt()
-                                            .coerceIn(1, 39),
-                                        message = "Saving OpenStreetMap features ($savedCount)…"
-                                    )
-                                }
+                                savedInCell++
                             }
                         },
-                        onFootprint = { entityId, radiusM ->
-                            val existing = footprintByEntityId[entityId]
-                            footprintByEntityId[entityId] =
-                                if (existing == null) {
-                                    radiusM
-                                } else {
-                                    minOf(existing, radiusM)
-                                }
-                        }
+                        onFootprint = { _, _ -> }
                     )
-                entityCount = savedCount
-                applyFootprints(regionId, footprintByEntityId)
-                updateProgress(
-                    PreparePhase.OSM,
-                    40,
-                    message = "Saving OpenStreetMap features ($savedCount)…"
-                )
+                }
             }
-            val coverageCount = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString()).size
-            if (coverageCount != entityCount) {
-                entityCount = maxOf(entityCount, coverageCount)
-            }
-            regionRepository.updateDownloadStatus(
-                regionId,
+            entityCount = coverageEntityDao.getEntityIdsForCoverageSet(coverageSetId.toString()).size
+            updateProgress(PreparePhase.OSM, 40, message = "Saving OpenStreetMap features ($entityCount)…")
+            coverageSetRepository.updateDownloadStatus(
+                coverageSetId,
                 DownloadStatus.DOWNLOADING,
                 progressPct = 40,
                 osmDatasetVersion = osmDatasetVersion,
                 entityCount = entityCount
             )
-            applyOsmAutoName(regionId)
+            applyOsmAutoName(coverageSetId)
 
-            // DEM phase (40–90%)
-            val tiles =
-                DemTileId.intersectingTiles(
-                    RegionBounds.boundingBox(region.centerLat, region.centerLon, collectionRadiusM)
-                )
-            if (tiles.size > MAX_DEM_TILES_PER_REGION) {
-                throw IllegalStateException(
-                    "Region requires ${tiles.size} DEM tiles (max $MAX_DEM_TILES_PER_REGION); " +
-                        "move the center away from the poles or shrink the radius"
-                )
-            }
-            val linkedTileIds = mutableListOf<String>()
-            tiles.forEachIndexed { index, (tileLat, tileLon) ->
+            cells.forEachIndexed { index, (tileLat, tileLon) ->
                 checkCancelled()
                 val tileId = DemTileId.fromCoordinates(tileLat, tileLon)
                 val binFile = demTileRepository.demFile(tileId)
                 if (demTileRepository.isBinReadable(tileId)) {
                     ensureTileRegistered(tileId, binFile)
-                    acquireTileForRegion(regionId, tileId)
-                    linkedTileIds.add(tileId)
-                    val pct = 40 + ((index + 1) * 50 / tiles.size.coerceAtLeast(1))
-                    updateProgress(
-                        PreparePhase.DEM,
-                        pct,
-                        demTileIndex = index + 1,
-                        demTileCount = tiles.size
-                    )
+                    acquireTileForCoverageSet(tileId)
+                    val pct = 40 + ((index + 1) * 50 / cells.size.coerceAtLeast(1))
+                    updateProgress(PreparePhase.DEM, pct, demTileIndex = index + 1, demTileCount = cells.size)
                     persistProgress(pct)
                     return@forEachIndexed
                 }
@@ -302,63 +283,35 @@ constructor(
                                 0.5
                             }
                             val pct =
-                                40 + (((index + tileFraction * 0.7) * 50) / tiles.size.coerceAtLeast(1)).toInt()
-                            val remaining =
-                                estimate.totalEstimateBytes - (estimate.osmEstimateBytes + bytesRead)
+                                40 + (((index + tileFraction * 0.7) * 50) / cells.size.coerceAtLeast(1)).toInt()
                             updateProgress(
                                 PreparePhase.DEM,
                                 pct.coerceIn(40, 90),
                                 demTileIndex = index + 1,
-                                demTileCount = tiles.size,
-                                remainingBytesEstimate = remaining.coerceAtLeast(0),
-                                message = "Downloading DEM tile ${index + 1}/${tiles.size}"
+                                demTileCount = cells.size,
+                                message = "Downloading DEM tile ${index + 1}/${cells.size}"
                             )
                         }
                     }
 
-                    val convertPct =
-                        40 + (((index + 0.85) * 50) / tiles.size.coerceAtLeast(1)).toInt()
-                    updateProgress(
-                        PreparePhase.DEM,
-                        convertPct.coerceIn(40, 90),
-                        demTileIndex = index + 1,
-                        demTileCount = tiles.size,
-                        message = "Converting tile ${index + 1}/${tiles.size} to local binary…"
-                    )
                     val conversion = geoTiffConverter.convert(tifFile, tileLat, tileLon, binFile)
-                    val keepRawTif = userPreferencesRepository.keepRawGeoTiff.first()
-                    if (!keepRawTif) {
+                    if (!userPreferencesRepository.keepRawGeoTiff.first()) {
                         tifFile.delete()
                     }
-
-                    upsertConvertedTile(
-                        tileId = tileId,
-                        tileLat = tileLat,
-                        tileLon = tileLon,
-                        conversion = conversion
-                    )
-                    acquireTileForRegion(regionId, tileId)
-                    linkedTileIds.add(tileId)
-                    val completedPct = 40 + ((index + 1) * 50 / tiles.size.coerceAtLeast(1))
-                    persistProgress(completedPct)
+                    upsertConvertedTile(tileId, tileLat, tileLon, conversion)
+                    acquireTileForCoverageSet(tileId)
+                    persistProgress(40 + ((index + 1) * 50 / cells.size.coerceAtLeast(1)))
                 } catch (error: Exception) {
                     demFailures++
                     Log.w(TAG, "DEM tile failed for $tileId", error)
                     tifFile.delete()
                 }
             }
-            if (linkedTileIds.isNotEmpty()) {
-                val existingTileIds = tileCoverageDao.getTileIdsForRegion(regionId.toString())
-                if (existingTileIds.isEmpty()) {
-                    coverageLinker.linkTiles(regionId.toString(), linkedTileIds)
-                }
-            }
 
-            // Post-processing (90–100%)
             updateProgress(PreparePhase.POST_PROCESSING, 90, message = "Filling elevations…")
             persistProgress(90)
             val elevationFillOk =
-                postProcessor.process(regionId) { processed, total ->
+                postProcessor.process(coverageSetId) { processed, total ->
                     val pct = 90 + ((processed * 9) / total.coerceAtLeast(1))
                     updateProgress(
                         PreparePhase.POST_PROCESSING,
@@ -366,7 +319,6 @@ constructor(
                         message = "Filling elevations ($processed/$total)…"
                     )
                 }
-            // Drop entities left without coverage after re-download (Requirements §5.3).
             geoEntityRepository.garbageCollectOrphans()
             updateProgress(PreparePhase.POST_PROCESSING, 100, message = "Finalizing…")
 
@@ -377,65 +329,44 @@ constructor(
                     !elevationFillOk -> DownloadStatus.PARTIAL
                     else -> DownloadStatus.READY
                 }
-            regionRepository.updateDownloadStatus(regionId, terminalStatus, progressPct = 100)
+            coverageSetRepository.updateDownloadStatus(coverageSetId, terminalStatus, progressPct = 100)
 
             try {
                 enforceDemCacheLimit()
             } catch (_: Exception) {
-                // Region is already READY/PARTIAL; cache eviction is best-effort.
+                // Coverage set is already READY/PARTIAL; cache eviction is best-effort.
             }
             Result.success(Unit)
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: Exception) {
-            Log.e(TAG, "Prepare download failed for region $regionId", error)
+            Log.e(TAG, "Prepare download failed for coverage set $coverageSetId", error)
             _lastError.value = PrepareDownloadError.fromThrowable(error)
             val status =
                 if (entityCount > 0 || demFailures > 0) DownloadStatus.PARTIAL else DownloadStatus.NOT_DOWNLOADED
-            regionRepository.updateDownloadStatus(regionId, status, progressPct = _progress.value?.overallPercent ?: 0)
+            coverageSetRepository.updateDownloadStatus(
+                coverageSetId,
+                status,
+                progressPct = _progress.value?.overallPercent ?: 0
+            )
             Result.failure(error)
         } finally {
-            if (activeRegionId == regionId) {
+            if (activeCoverageSetId == coverageSetId) {
                 _progress.value = null
-                activeRegionId = null
+                activeCoverageSetId = null
             }
         }
     }
 
-    private suspend fun applyFootprints(regionId: UUID, footprintByEntityId: Map<String, Double>) {
-        if (footprintByEntityId.isEmpty()) return
-        for ((entityId, radiusM) in footprintByEntityId) {
-            checkCancelled()
-            val entity = geoEntityRepository.getById(entityId) ?: continue
-            coverageLinker.upsertAndLinkEntity(
-                regionId = regionId.toString(),
-                entity = entity.copy(footprintRadiusM = radiusM).asEntity(),
-                displayName = entity.name
-            )
-        }
-    }
-
-    private suspend fun applyOsmAutoName(regionId: UUID) {
-        val region = regionRepository.getRegion(regionId)
-        if (region != null && !RegionNamePolicy.isUserProvidedName(region.name)) {
-            val entityIds = regionEntityCoverageDao.getEntityIdsForRegion(regionId.toString())
+    private suspend fun applyOsmAutoName(coverageSetId: UUID) {
+        val coverageSet = coverageSetRepository.getCoverageSet(coverageSetId)
+        if (coverageSet != null && !RegionNamePolicy.isUserProvidedName(coverageSet.name)) {
+            val entityIds = coverageEntityDao.getEntityIdsForCoverageSet(coverageSetId.toString())
             val entities = entityIds.mapNotNull { entityId -> geoEntityRepository.getById(entityId) }
-            RegionNameResolver.closestEntityName(region, entities)?.let { chosenName ->
-                regionRepository.updateRegionName(regionId, chosenName)
-            }
-        }
-    }
-
-    private suspend fun resetRegionCoverage(regionId: UUID) {
-        val regionIdString = regionId.toString()
-        val oldTileIds = tileCoverageDao.getTileIdsForRegion(regionIdString)
-        tileCoverageDao.deleteForRegion(regionIdString)
-        regionEntityCoverageDao.deleteForRegion(regionIdString)
-        oldTileIds.forEach { tileId ->
-            demTileRepository.decrementRefCount(tileId)
-            if (demTileRepository.getTile(tileId)?.refCount == 0) {
-                demTileRepository.evictTile(tileId)
-            }
+            val cellIds = coverageCellDao.getCellIdsForCoverageSet(coverageSetId.toString())
+            val (referenceLat, referenceLon) = CoverageNameResolver.referenceCenterFromCellIds(cellIds)
+            val chosenName = CoverageNameResolver.closestEntityName(entities, referenceLat, referenceLon)
+            coverageSetRepository.updateCoverageSetName(coverageSetId, chosenName)
         }
     }
 
@@ -476,32 +407,18 @@ constructor(
                 tileLon = tileLon,
                 noDataValue = conversion.noDataValue,
                 sizeBytes = conversion.sizeBytes,
-                // Preserve refs held by other regions; this region's claim is added via acquire.
                 refCount = existing?.refCount ?: 0,
                 lastAccessedAt = Instant.now()
             )
         )
     }
 
-    /**
-     * Links [tileId] to [regionId] and increments refCount only when the coverage row is new.
-     * Avoids inflating refs on retries / forced re-converts when the junction already exists.
-     */
-    private suspend fun acquireTileForRegion(regionId: UUID, tileId: String) {
-        if (linkTileCoverage(regionId, tileId)) {
+    private suspend fun acquireTileForCoverageSet(tileId: String) {
+        val owners = coverageCellDao.getCoverageSetIdsForCell(tileId).size
+        val current = demTileRepository.getTile(tileId)?.refCount ?: return
+        if (current < owners) {
             demTileRepository.incrementRefCount(tileId)
         }
-    }
-
-    private suspend fun linkTileCoverage(regionId: UUID, tileId: String): Boolean {
-        val rowId =
-            tileCoverageDao.insert(
-                TileCoverageEntity(
-                    regionId = regionId.toString(),
-                    tileId = tileId
-                )
-            )
-        return rowId != -1L
     }
 
     private fun updateProgress(
@@ -513,10 +430,10 @@ constructor(
         remainingBytesEstimate: Long = _progress.value?.remainingBytesEstimate ?: 0L,
         message: String = _progress.value?.message ?: ""
     ) {
-        val regionId = activeRegionId ?: return
+        val coverageSetId = activeCoverageSetId ?: return
         _progress.value =
             PrepareProgress(
-                regionId = regionId,
+                coverageSetId = coverageSetId,
                 phase = phase,
                 overallPercent = overallPercent.coerceIn(0, 100),
                 osmBytesRead = osmBytesRead,
@@ -528,11 +445,11 @@ constructor(
     }
 
     private suspend fun persistProgress(overallPercent: Int) {
-        val regionId = activeRegionId ?: return
+        val coverageSetId = activeCoverageSetId ?: return
         val pct = overallPercent.coerceIn(0, 100)
         if (pct >= lastPersistedPercent + 5 || pct == 0 || pct == 100) {
             lastPersistedPercent = pct
-            regionRepository.updateDownloadStatus(regionId, DownloadStatus.DOWNLOADING, pct)
+            coverageSetRepository.updateDownloadStatus(coverageSetId, DownloadStatus.DOWNLOADING, pct)
         }
     }
 
@@ -550,11 +467,7 @@ constructor(
 
     companion object {
         private const val TAG = "PrepareDownload"
-
-        /** Hard cap so a pathological Overpass response cannot grow the Room DB unboundedly. */
-        const val MAX_OSM_ENTITIES: Int = 50_000
-
-        /** Caps polar / corrupted-region tile explosions (20 km + padding ≈ a few tiles mid-lat). */
-        const val MAX_DEM_TILES_PER_REGION: Int = 64
+        const val MAX_OSM_ENTITIES_PER_CELL: Int = 50_000
+        private const val OVERPASS_CELL_GAP_MS: Long = 1_000L
     }
 }

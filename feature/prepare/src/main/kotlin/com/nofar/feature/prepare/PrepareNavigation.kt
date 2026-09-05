@@ -10,7 +10,7 @@ fun NavGraphBuilder.prepareScreen(onNavigateBack: () -> Unit, onNavigateToSettin
         route = PREPARE_ROUTE_WITH_ARG,
         arguments =
         listOf(
-            navArgument("regionId") {
+            navArgument("coverageSetId") {
                 type = NavType.StringType
                 nullable = true
                 defaultValue = null

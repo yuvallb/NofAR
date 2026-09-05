@@ -2,7 +2,7 @@ package com.nofar.core.visibility
 
 import com.google.common.truth.Truth.assertThat
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.GeoMathBounds
 import kotlin.math.abs
 import org.junit.After
 import org.junit.Rule
@@ -148,7 +148,7 @@ class HorizonProfileComputerTest {
         val sampler =
             DemSampler { lat, lon ->
                 val distanceM =
-                    RegionBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
+                    GeoMathBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
                 if (distanceM < 50.0) {
                     100f
                 } else {
@@ -190,7 +190,7 @@ class HorizonProfileComputerTest {
         val sampler =
             DemSampler { lat, lon ->
                 val distanceM =
-                    RegionBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
+                    GeoMathBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
                 when {
                     distanceM <= cutoffM + 1.0 -> 100f
                     distanceM <= holeEndM -> null
@@ -237,7 +237,7 @@ class HorizonProfileComputerTest {
         val sampler =
             DemSampler { lat, lon ->
                 val distanceM =
-                    RegionBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
+                    GeoMathBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
                 when {
                     distanceM < 50.0 -> 100f
                     kotlin.math.abs(distanceM - ridgeDistanceM) < AppConfig.HORIZON_RAY_STEP_M ->
@@ -281,7 +281,7 @@ class HorizonProfileComputerTest {
         val sampler =
             DemSampler { lat, lon ->
                 val distanceM =
-                    RegionBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
+                    GeoMathBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
                 if (distanceM < 1.0) sentinelGroundM.toFloat() else 72f
             }
 
@@ -306,7 +306,7 @@ class HorizonProfileComputerTest {
         val sampler =
             DemSampler { lat, lon ->
                 val distanceM =
-                    RegionBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
+                    GeoMathBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
                 if (distanceM < 1.0) null else 72f
             }
 
@@ -320,12 +320,12 @@ class HorizonProfileComputerTest {
             )
 
         profile.elevationAnglesDeg.forEach { angle ->
-            assertThat(abs(angle)).isLessThan(1f)
+            assertThat(angle.isNaN()).isTrue()
         }
     }
 
     @Test
-    fun missingDemData_fallsBackToFlatHorizon() {
+    fun missingDemData_returnsInvalidHorizonAngles() {
         val sampler = DemElevationSampler(emptyMap())
         val profile =
             computer.sweep(
@@ -336,7 +336,7 @@ class HorizonProfileComputerTest {
             )
 
         profile.elevationAnglesDeg.forEach { angle ->
-            assertThat(angle).isWithin(0.001f).of(0f)
+            assertThat(angle.isNaN()).isTrue()
         }
     }
 

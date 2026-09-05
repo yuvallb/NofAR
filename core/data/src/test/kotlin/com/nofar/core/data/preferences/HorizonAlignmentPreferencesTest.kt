@@ -30,6 +30,7 @@ class HorizonAlignmentPreferencesTest {
         override val keepRawGeoTiff = kotlinx.coroutines.flow.flowOf(false)
         override val simpleModeEnabled = kotlinx.coroutines.flow.flowOf(false)
         override val simpleModeDefaultsApplied = kotlinx.coroutines.flow.flowOf(false)
+        override val demV4UpgradeApplied = kotlinx.coroutines.flow.flowOf(false)
         override val preferredLabelLanguage =
             kotlinx.coroutines.flow.flowOf(com.nofar.core.model.LabelLanguage.DEFAULT)
         override val showHorizonOutline = kotlinx.coroutines.flow.flowOf(true)
@@ -48,6 +49,8 @@ class HorizonAlignmentPreferencesTest {
         override suspend fun setSimpleModeEnabled(enabled: Boolean) = Unit
 
         override suspend fun markSimpleModeDefaultsApplied() = Unit
+
+        override suspend fun markDemV4UpgradeApplied() = Unit
 
         override suspend fun setPreferredLabelLanguage(language: com.nofar.core.model.LabelLanguage) = Unit
 

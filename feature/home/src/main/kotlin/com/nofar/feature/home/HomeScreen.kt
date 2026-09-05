@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.nofar.core.designsystem.component.CoverageSetCardState
 import com.nofar.core.designsystem.component.NofARHomeTopBar
 import com.nofar.core.designsystem.component.NofARPrimaryButton
 import com.nofar.core.designsystem.component.NofARRegionCard
@@ -34,10 +35,9 @@ import com.nofar.core.designsystem.component.NofARRegionListDivider
 import com.nofar.core.designsystem.component.NofARSecondaryOutlinedButton
 import com.nofar.core.designsystem.component.NofARSectionHeader
 import com.nofar.core.designsystem.component.NofARStorageSummary
-import com.nofar.core.designsystem.component.RegionCardState
 import com.nofar.core.designsystem.theme.NofARColors
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.LocationAccessState
-import com.nofar.core.model.Region
 import com.nofar.core.ui.location.LocationPermissionBanner
 import com.nofar.core.ui.permission.PermissionState
 import com.nofar.core.ui.permission.rememberNofARPermissionState
@@ -62,8 +62,8 @@ fun HomeScreen(
 
     HomePermissionEffects(permissionState = permissionState)
 
-    LaunchedEffect(uiState.navigateToExploreRegionId) {
-        uiState.navigateToExploreRegionId?.let { regionId ->
+    LaunchedEffect(uiState.navigateToExploreCoverageSetId) {
+        uiState.navigateToExploreCoverageSetId?.let { regionId ->
             onNavigateToExplore(regionId)
             viewModel.onExploreNavigationHandled()
         }
@@ -140,14 +140,14 @@ private fun HomeScreenContent(
             onExploreAnotherLocation = onExploreAnotherLocation
         )
         NofARSecondaryOutlinedButton(
-            text = "+ ADD REGION",
+            text = "+ ADD COVERAGE",
             onClick = { onNavigateToPrepare(null) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
         )
         Spacer(modifier = Modifier.height(8.dp))
-        NofARSectionHeader(title = "LOCAL REGIONS")
+        NofARSectionHeader(title = "LOCAL COVERAGE")
         HomeRegionList(
-            regions = uiState.regions,
+            regions = uiState.coverageSets,
             onPrepare = { regionId -> onNavigateToPrepare(regionId) },
             onAddRegion = { onNavigateToPrepare(null) },
             onDelete = onDelete,
@@ -179,7 +179,7 @@ private fun GlobalEnterExploreSection(
         if (!enabled) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Add region or move inside a ready region to explore the horizon.",
+                text = "Add coverage or move inside downloaded cells to explore the horizon.",
                 style = androidx.compose.material3.MaterialTheme.typography.bodySmall,
                 color = NofARColors.TextCaption
             )
@@ -198,7 +198,7 @@ private fun GlobalEnterExploreSection(
 
 @Composable
 private fun HomeRegionList(
-    regions: List<RegionCardState>,
+    regions: List<CoverageSetCardState>,
     onPrepare: (UUID) -> Unit,
     onAddRegion: () -> Unit,
     onDelete: (UUID) -> Unit,
@@ -207,12 +207,12 @@ private fun HomeRegionList(
     if (regions.isEmpty()) {
         Column(modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(
-                text = "No regions yet. Download map data for an area to get started.",
+                text = "No coverage sets yet. Download map data for an area to get started.",
                 color = NofARColors.TextSecondary
             )
             Spacer(modifier = Modifier.height(12.dp))
             NofARPrimaryButton(
-                text = "ADD REGION",
+                text = "ADD COVERAGE",
                 onClick = onAddRegion,
                 modifier = Modifier.fillMaxWidth()
             )
@@ -223,7 +223,7 @@ private fun HomeRegionList(
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 16.dp)
     ) {
-        items(regions, key = { it.region.id }) { cardState ->
+        items(regions, key = { it.coverageSet.id }) { cardState ->
             NofARRegionCard(
                 state = cardState,
                 onPrepare = onPrepare,
@@ -231,7 +231,7 @@ private fun HomeRegionList(
                 deleteIcon = {
                     Icon(
                         imageVector = Icons.Default.Delete,
-                        contentDescription = "Delete region",
+                        contentDescription = "Delete coverage set",
                         tint = NofARColors.TextSecondary
                     )
                 }
@@ -243,23 +243,23 @@ private fun HomeRegionList(
 
 @Composable
 private fun HomeScreenDialogs(uiState: HomeUiState, viewModel: HomeViewModel) {
-    uiState.deleteConfirmRegion?.let { region ->
-        DeleteRegionDialog(
-            region = region,
-            onConfirm = viewModel::confirmDeleteRegion,
-            onDismiss = viewModel::dismissDeleteRegion
+    uiState.deleteConfirmCoverageSet?.let { coverageSet ->
+        DeleteCoverageSetDialog(
+            coverageSet = coverageSet,
+            onConfirm = viewModel::confirmDeleteCoverageSet,
+            onDismiss = viewModel::dismissDeleteCoverageSet
         )
     }
 }
 
 @Composable
-private fun DeleteRegionDialog(region: Region, onConfirm: () -> Unit, onDismiss: () -> Unit) {
+private fun DeleteCoverageSetDialog(coverageSet: CoverageSet, onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Delete ${region.name}?") },
+        title = { Text("Delete ${coverageSet.name}?") },
         text = {
             Text(
-                "This removes the region and any entities or DEM tiles not shared with other regions."
+                "This removes the coverage set and any entities or DEM tiles not shared with other coverage sets."
             )
         },
         confirmButton = {

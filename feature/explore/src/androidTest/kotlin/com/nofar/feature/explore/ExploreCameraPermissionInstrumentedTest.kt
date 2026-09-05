@@ -31,7 +31,7 @@ class ExploreCameraPermissionInstrumentedTest {
                 waitingForGpsFix = false,
                 cameraGranted = granted,
                 calibrationState = com.nofar.core.model.CompassCalibrationState.OK,
-                activeRegion = null,
+                activeCoverageSet = null,
                 graceExpired = false,
                 simpleModeEnabled = false,
                 regionDownloadNeeded = false,

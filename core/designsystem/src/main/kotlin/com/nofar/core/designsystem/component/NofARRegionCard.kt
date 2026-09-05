@@ -24,33 +24,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.designsystem.util.NofARFormatters
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.Region
 import java.util.UUID
 
 @Composable
-fun NofARRegionCard(
-    state: RegionCardState,
+fun NofARCoverageSetCard(
+    state: CoverageSetCardState,
     onPrepare: (UUID) -> Unit,
     onDelete: (UUID) -> Unit,
     modifier: Modifier = Modifier,
     deleteIcon: @Composable () -> Unit
 ) {
-    val region = state.region
+    val coverageSet = state.coverageSet
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(8.dp),
         color = NofARColors.Surface
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            RegionCardHeader(region = region)
+            CoverageSetCardHeader(coverageSet = coverageSet)
             if (state.isYouAreHere) {
                 Spacer(modifier = Modifier.height(8.dp))
                 NofARYouAreHereBadge()
             }
-            RegionCardMetadata(state = state)
-            RegionCardDownloadProgress(region = region)
-            RegionCardActions(
+            CoverageSetCardMetadata(state = state)
+            CoverageSetCardDownloadProgress(coverageSet = coverageSet)
+            CoverageSetCardActions(
                 state = state,
                 onPrepare = onPrepare,
                 onDelete = onDelete,
@@ -60,53 +60,57 @@ fun NofARRegionCard(
     }
 }
 
+/** @deprecated Use [NofARCoverageSetCard]. */
 @Composable
-private fun RegionCardHeader(region: Region) {
+fun NofARRegionCard(
+    state: RegionCardState,
+    onPrepare: (UUID) -> Unit,
+    onDelete: (UUID) -> Unit,
+    modifier: Modifier = Modifier,
+    deleteIcon: @Composable () -> Unit
+) = NofARCoverageSetCard(state, onPrepare, onDelete, modifier, deleteIcon)
+
+@Composable
+private fun CoverageSetCardHeader(coverageSet: CoverageSet) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = region.name,
+            text = coverageSet.name,
             style = MaterialTheme.typography.titleMedium,
             color = NofARColors.TextPrimary,
             fontWeight = FontWeight.Bold,
             modifier = Modifier.weight(1f)
         )
         Spacer(modifier = Modifier.width(8.dp))
-        NofARStatusBadge(status = region.downloadStatus, progressPct = region.downloadProgressPct)
+        NofARStatusBadge(
+            status = coverageSet.downloadStatus,
+            progressPct = coverageSet.downloadProgressPct
+        )
     }
 }
 
 @Composable
-private fun RegionCardMetadata(state: RegionCardState) {
-    val region = state.region
+private fun CoverageSetCardMetadata(state: CoverageSetCardState) {
+    val coverageSet = state.coverageSet
     Spacer(modifier = Modifier.height(8.dp))
-    val center =
-        "Center: ${NofARFormatters.formatCoordinate(region.centerLat)}, " +
-            NofARFormatters.formatCoordinate(region.centerLon)
-    Text(
-        text = "$center | Radius: ${NofARFormatters.formatRadiusKm(region.radiusM)}",
-        style = MaterialTheme.typography.bodySmall,
-        color = NofARColors.TextSecondary
-    )
     val sizeText =
         if (state.demSizeBytes > 0L) {
             "Size: OSM ${NofARFormatters.formatMegabytes(state.osmSizeBytes)} + " +
                 "DEM ${NofARFormatters.formatMegabytes(state.demSizeBytes)}"
         } else {
-            "Size: ${NofARFormatters.formatMegabytes(region.estimatedSizeBytes)}"
+            "Size: ${NofARFormatters.formatMegabytes(coverageSet.estimatedSizeBytes)}"
         }
     Text(
-        text =
-        "Entities: ${NofARFormatters.formatCount(region.entityCount)} | $sizeText",
+        text = "Entities: ${NofARFormatters.formatCount(coverageSet.entityCount)} | $sizeText",
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
     )
     Text(
         text =
-        "OSM: ${NofARFormatters.formatTimestamp(region.osmDatasetVersion)} | " +
+        "OSM: ${NofARFormatters.formatTimestamp(coverageSet.osmDatasetVersion)} | " +
             "DEM: ${NofARFormatters.formatTimestamp(state.latestDemTimestamp)}",
         style = MaterialTheme.typography.bodySmall,
         color = NofARColors.TextSecondary
@@ -114,11 +118,11 @@ private fun RegionCardMetadata(state: RegionCardState) {
 }
 
 @Composable
-private fun RegionCardDownloadProgress(region: Region) {
-    if (region.downloadStatus != DownloadStatus.DOWNLOADING) return
+private fun CoverageSetCardDownloadProgress(coverageSet: CoverageSet) {
+    if (coverageSet.downloadStatus != DownloadStatus.DOWNLOADING) return
     Spacer(modifier = Modifier.height(8.dp))
     LinearProgressIndicator(
-        progress = { region.downloadProgressPct / 100f },
+        progress = { coverageSet.downloadProgressPct / 100f },
         modifier = Modifier.fillMaxWidth(),
         color = NofARColors.StatusDownloading,
         trackColor = NofARColors.SurfaceVariant
@@ -126,13 +130,13 @@ private fun RegionCardDownloadProgress(region: Region) {
 }
 
 @Composable
-private fun RegionCardActions(
-    state: RegionCardState,
+private fun CoverageSetCardActions(
+    state: CoverageSetCardState,
     onPrepare: (UUID) -> Unit,
     onDelete: (UUID) -> Unit,
     deleteIcon: @Composable () -> Unit
 ) {
-    val region = state.region
+    val coverageSet = state.coverageSet
     Spacer(modifier = Modifier.height(12.dp))
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -140,15 +144,15 @@ private fun RegionCardActions(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            RegionCardPrimaryAction(
-                region = region,
+            CoverageSetCardPrimaryAction(
+                coverageSet = coverageSet,
                 onPrepare = onPrepare,
                 modifier = Modifier.fillMaxWidth()
             )
         }
         Spacer(modifier = Modifier.width(8.dp))
         IconButton(
-            onClick = { onDelete(region.id) },
+            onClick = { onDelete(coverageSet.id) },
             modifier = Modifier.defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
         ) {
             deleteIcon()
@@ -157,20 +161,24 @@ private fun RegionCardActions(
 }
 
 @Composable
-private fun RegionCardPrimaryAction(region: Region, onPrepare: (UUID) -> Unit, modifier: Modifier = Modifier) {
-    when (region.downloadStatus) {
+private fun CoverageSetCardPrimaryAction(
+    coverageSet: CoverageSet,
+    onPrepare: (UUID) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    when (coverageSet.downloadStatus) {
         DownloadStatus.NOT_DOWNLOADED ->
-            NofARPrimaryButton(text = "PREPARE", onClick = { onPrepare(region.id) }, modifier = modifier)
+            NofARPrimaryButton(text = "PREPARE", onClick = { onPrepare(coverageSet.id) }, modifier = modifier)
         DownloadStatus.DOWNLOADING ->
             NofARSecondaryOutlinedButton(
                 text = "VIEW PROGRESS",
-                onClick = { onPrepare(region.id) },
+                onClick = { onPrepare(coverageSet.id) },
                 modifier = modifier
             )
         else ->
             NofARPrimaryButton(
                 text = "UPDATE DATA",
-                onClick = { onPrepare(region.id) },
+                onClick = { onPrepare(coverageSet.id) },
                 modifier = modifier
             )
     }

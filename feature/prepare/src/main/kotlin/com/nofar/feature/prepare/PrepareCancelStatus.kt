@@ -2,8 +2,8 @@ package com.nofar.feature.prepare
 
 import com.nofar.core.data.prepare.PreparePhase
 import com.nofar.core.data.prepare.PrepareProgress
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.Region
 
 internal object PrepareCancelStatus {
     /**
@@ -11,7 +11,7 @@ internal object PrepareCancelStatus {
      * usable coverage; otherwise reset to NOT_DOWNLOADED.
      */
     fun resolve(
-        region: Region?,
+        region: CoverageSet?,
         progress: PrepareProgress?,
         hasTileCoverage: Boolean,
         liveEntityCount: Int

@@ -21,7 +21,9 @@ class DemTileReader private constructor(
     val height: Int,
     val tileLat: Int,
     val tileLon: Int,
-    val noDataValue: Float
+    val noDataValue: Float,
+    private val scale: Float,
+    private val valueOffset: Float
 ) : Closeable {
     override fun close() {
         file.close()
@@ -32,9 +34,7 @@ class DemTileReader private constructor(
 
         val x = pixelX(lon)
         val y = pixelY(lat)
-        val offset = y * width + x
-        val value = dataBuffer.getFloat(offset * Float.SIZE_BYTES)
-        return if (isPlausibleElevation(value)) value else null
+        return decodeSample(x, y)
     }
 
     /** Bilinear sample for map viewshed preview (not used on Explore hot path). */
@@ -46,31 +46,33 @@ class DemTileReader private constructor(
         val lon1 = tileLon + 1.0
         val lat0 = tileLat.toDouble()
         val lat1 = tileLat + 1.0
-        val xFrac = ((lon - lon0) / (lon1 - lon0) * (width - 1)).coerceIn(0.0, (width - 1).toDouble())
-        val yFrac = ((lat1 - lat) / (lat1 - lat0) * (height - 1)).coerceIn(0.0, (height - 1).toDouble())
+        val xFrac = ((lon - lon0) / (lon1 - lon0) * width - 0.5).coerceIn(0.0, (width - 1).toDouble())
+        val yFrac = ((lat1 - lat) / (lat1 - lat0) * height - 0.5).coerceIn(0.0, (height - 1).toDouble())
         val x0 = floor(xFrac).toInt().coerceIn(0, width - 1)
         val y0 = floor(yFrac).toInt().coerceIn(0, height - 1)
         val x1 = (x0 + 1).coerceAtMost(width - 1)
         val y1 = (y0 + 1).coerceAtMost(height - 1)
         val tx = (xFrac - x0).toFloat()
         val ty = (yFrac - y0).toFloat()
-        val v00 = samplePixel(x0, y0)
-        val v10 = samplePixel(x1, y0)
-        val v01 = samplePixel(x0, y1)
-        val v11 = samplePixel(x1, y1)
+        val v00 = decodeSample(x0, y0)
+        val v10 = decodeSample(x1, y0)
+        val v01 = decodeSample(x0, y1)
+        val v11 = decodeSample(x1, y1)
         val cornersValid = v00 != null && v10 != null && v01 != null && v11 != null
         return if (cornersValid) {
-            val top = v00 * (1f - tx) + v10 * tx
-            val bottom = v01 * (1f - tx) + v11 * tx
+            val top = v00!! * (1f - tx) + v10 * tx
+            val bottom = v01!! * (1f - tx) + v11 * tx
             top * (1f - ty) + bottom * ty
         } else {
             null
         }
     }
 
-    private fun samplePixel(x: Int, y: Int): Float? {
+    private fun decodeSample(x: Int, y: Int): Float? {
         val offset = y * width + x
-        val value = dataBuffer.getFloat(offset * Float.SIZE_BYTES)
+        val raw = dataBuffer.getShort(offset * DemBinaryFormat.BYTES_PER_SAMPLE)
+        if (raw == DemBinaryFormat.INT16_NO_DATA) return null
+        val value = raw * scale + valueOffset
         return if (isPlausibleElevation(value)) value else null
     }
 
@@ -99,13 +101,15 @@ class DemTileReader private constructor(
     private fun pixelX(lon: Double): Int {
         val lon0 = tileLon.toDouble()
         val lon1 = tileLon + 1.0
-        return floor((lon - lon0) / (lon1 - lon0) * (width - 1)).toInt().coerceIn(0, width - 1)
+        val frac = ((lon - lon0) / (lon1 - lon0)).coerceIn(0.0, 1.0 - 1e-12)
+        return floor(frac * width).toInt().coerceIn(0, width - 1)
     }
 
     private fun pixelY(lat: Double): Int {
         val lat0 = tileLat.toDouble()
         val lat1 = tileLat + 1.0
-        return floor((lat1 - lat) / (lat1 - lat0) * (height - 1)).toInt().coerceIn(0, height - 1)
+        val frac = ((lat1 - lat) / (lat1 - lat0)).coerceIn(0.0, 1.0 - 1e-12)
+        return floor(frac * height).toInt().coerceIn(0, height - 1)
     }
 
     companion object {
@@ -117,15 +121,17 @@ class DemTileReader private constructor(
         /** Above Everest (8849 m); rejects `32767` and similar positive sentinels. */
         private const val MAX_PLAUSIBLE_ELEVATION_M = 9_000f
 
-        fun hasCurrentFormat(file: File): Boolean {
-            if (!file.exists() || file.length() <= DemBinaryFormat.HEADER_SIZE_BYTES) return false
+        fun hasCurrentFormat(file: File): Boolean = readMagic(file) == DemBinaryFormat.MAGIC
+
+        private fun readMagic(file: File): String? {
+            if (!file.exists() || file.length() <= DemBinaryFormat.HEADER_SIZE_BYTES) return null
             return runCatching {
                 RandomAccessFile(file, "r").use { input ->
                     val magicBytes = ByteArray(DemBinaryFormat.MAGIC_SIZE_BYTES)
                     input.readFully(magicBytes)
-                    magicBytes.toString(Charsets.US_ASCII) == DemBinaryFormat.MAGIC
+                    magicBytes.toString(Charsets.US_ASCII)
                 }
-            }.getOrDefault(false)
+            }.getOrNull()
         }
 
         fun open(file: File): DemTileReader {
@@ -142,8 +148,14 @@ class DemTileReader private constructor(
             }
             val originLat = header.getDouble()
             val originLon = header.getDouble()
+            val sampleType = header.getInt()
+            require(sampleType == DemBinaryFormat.SAMPLE_TYPE_INT16) {
+                "Unsupported DEM sample type: $sampleType"
+            }
+            val scale = header.getFloat()
+            val valueOffset = header.getFloat()
             val noDataValue = header.getFloat()
-            val dataBytes = width.toLong() * height * Float.SIZE_BYTES
+            val dataBytes = width.toLong() * height * DemBinaryFormat.BYTES_PER_SAMPLE
             val mapped =
                 raf.channel.map(
                     FileChannel.MapMode.READ_ONLY,
@@ -158,7 +170,9 @@ class DemTileReader private constructor(
                 height = height,
                 tileLat = originLat.toInt(),
                 tileLon = originLon.toInt(),
-                noDataValue = noDataValue
+                noDataValue = noDataValue,
+                scale = scale,
+                valueOffset = valueOffset
             )
         }
     }

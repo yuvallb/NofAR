@@ -34,7 +34,7 @@ class GeoTiffConverterTest {
         assertThat(result.width).isEqualTo(width)
         assertThat(result.height).isEqualTo(height)
         DemTileReader.open(output).use { reader ->
-            assertThat(reader.elevationAt(32.5, 35.5)).isWithin(0.001f).of(111f)
+            assertThat(reader.elevationAt(32.5, 35.5)).isWithin(0.001f).of(122f)
         }
     }
 
@@ -71,9 +71,10 @@ class GeoTiffConverterTest {
         val output = tempDir.newFile("padded-edge-tile.bin")
         DefaultGeoTiffConverter().convert(input, tileLat = 32, tileLon = 35, output)
 
-        assertThat(readBinElevations(output, width, height).asList())
-            .containsExactlyElementsIn(samples.asList())
-            .inOrder()
+        val actual = readBinElevations(output, width, height)
+        samples.indices.forEach { index ->
+            assertThat(actual[index]).isWithin(1f).of(samples[index])
+        }
     }
 
     @Test
@@ -98,9 +99,10 @@ class GeoTiffConverterTest {
         val output = tempDir.newFile("floating-point-predictor.bin")
         DefaultGeoTiffConverter().convert(input, tileLat = 32, tileLon = 35, output)
 
-        assertThat(readBinElevations(output, width, height).asList())
-            .containsExactlyElementsIn(samples.asList())
-            .inOrder()
+        val actual = readBinElevations(output, width, height)
+        samples.indices.forEach { index ->
+            assertThat(actual[index]).isWithin(1f).of(samples[index])
+        }
     }
 
     // Copernicus GLO-30 declares its no-data as the ASCII GDAL_NODATA tag (-32767). The converter used to
@@ -118,7 +120,7 @@ class GeoTiffConverterTest {
         val output = tempDir.newFile("nodata.bin")
         val result = DefaultGeoTiffConverter().convert(input, tileLat = 32, tileLon = 35, output)
 
-        assertThat(result.noDataValue).isWithin(0.001f).of(DemBinaryFormat.DEFAULT_NO_DATA_VALUE)
+        assertThat(result.noDataValue).isWithin(0.001f).of(DemBinaryFormat.HEADER_NO_DATA_VALUE)
         DemTileReader.open(output).use { reader ->
             assertThat(reader.elevationAt(32.5, 35.5)).isNull()
             assertThat(reader.elevationAt(32.999, 35.0)).isWithin(0.001f).of(72f)
@@ -277,7 +279,7 @@ class GeoTiffConverterTest {
             val tilePixelHeight = minOf(tileLength, height - startY)
             // TIFF edge tiles retain the declared full tile dimensions and row stride. Pixels
             // outside the image are padding and must not shift valid rows during conversion.
-            val tileSamples = FloatArray(tileWidth * tileLength) { DemBinaryFormat.DEFAULT_NO_DATA_VALUE }
+            val tileSamples = FloatArray(tileWidth * tileLength) { DemBinaryFormat.HEADER_NO_DATA_VALUE }
             for (row in 0 until tilePixelHeight) {
                 for (col in 0 until tilePixelWidth) {
                     tileSamples[row * tileWidth + col] = samples[(startY + row) * width + (startX + col)]
@@ -324,7 +326,7 @@ class GeoTiffConverterTest {
     private fun readBinElevations(file: File, width: Int, height: Int): FloatArray {
         val buffer = ByteBuffer.wrap(file.readBytes()).order(ByteOrder.LITTLE_ENDIAN)
         buffer.position(DemBinaryFormat.HEADER_SIZE_BYTES)
-        return FloatArray(width * height) { buffer.float }
+        return FloatArray(width * height) { buffer.short.toFloat() }
     }
 
     private fun writeIfdEntry(buffer: ByteBuffer, tag: Int, type: Int, count: Int, value: Int) {

@@ -1,7 +1,7 @@
 package com.nofar.feature.explore
 
 import com.google.common.truth.Truth.assertThat
-import com.nofar.core.data.usecase.QuickRegionProposal
+import com.nofar.core.data.usecase.QuickCoverageProposal
 import java.util.UUID
 import org.junit.Test
 
@@ -11,15 +11,16 @@ class ExploreAutoDownloadGuardTest {
     private fun sampleProposal(
         lat: Double = 32.0,
         lon: Double = 35.0,
-        existingRegionId: UUID? = null
-    ): QuickRegionProposal = QuickRegionProposal(
+        cellIds: List<String> = listOf("N32E035"),
+        existingCoverageSetId: UUID? = null
+    ): QuickCoverageProposal = QuickCoverageProposal(
         centerLat = lat,
         centerLon = lon,
-        radiusM = 10_000.0,
+        cellIds = cellIds,
         name = "Test",
         estimateBytes = 1L,
         demTileCount = 1,
-        existingRegionId = existingRegionId
+        existingCoverageSetId = existingCoverageSetId
     )
 
     @Test
@@ -48,16 +49,30 @@ class ExploreAutoDownloadGuardTest {
     @Test
     fun onProposalChanged_clearsGuardForNewLocation() {
         val first = sampleProposal(lat = 32.0, lon = 35.0)
-        val second = sampleProposal(lat = 33.0, lon = 36.0)
+        val second = sampleProposal(lat = 33.0, lon = 36.0, cellIds = listOf("N33E036"))
         guard.markAttempted(first)
         guard.onProposalChanged(second)
         assertThat(guard.shouldAttempt(second, forceRetry = false)).isTrue()
     }
 
     @Test
-    fun proposalKey_usesExistingRegionIdWhenPresent() {
-        val regionId = UUID.randomUUID()
-        val proposal = sampleProposal(existingRegionId = regionId)
-        assertThat(guard.proposalKey(proposal)).isEqualTo(regionId.toString())
+    fun proposalKey_usesSortedCellSet() {
+        val coverageSetId = UUID.randomUUID()
+        val proposal =
+            sampleProposal(
+                cellIds = listOf("N33E036", "N32E035", "N32E035"),
+                existingCoverageSetId = coverageSetId
+            )
+        assertThat(guard.proposalKey(proposal)).isEqualTo("N32E035|N33E036")
+    }
+
+    @Test
+    fun sameCellsAtDifferentLocation_remainsBlocked() {
+        val first = sampleProposal(lat = 32.1, lon = 35.1)
+        val movedWithinCell = sampleProposal(lat = 32.8, lon = 35.8)
+        guard.markAttempted(first)
+        guard.onProposalChanged(movedWithinCell)
+
+        assertThat(guard.shouldAttempt(movedWithinCell, forceRetry = false)).isFalse()
     }
 }

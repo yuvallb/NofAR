@@ -3,20 +3,14 @@ package com.nofar.core.model
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Lightweight JSON mappers for debug export — not used on hot paths.
- */
 object ModelJson {
-    fun regionToJson(region: Region): String = buildString {
+    fun coverageSetToJson(coverageSet: CoverageSet): String = buildString {
         append('{')
-        append("\"id\":\"").append(region.id).append('"')
-        append(",\"name\":\"").append(escape(region.name)).append('"')
-        append(",\"centerLat\":").append(region.centerLat)
-        append(",\"centerLon\":").append(region.centerLon)
-        append(",\"radiusM\":").append(region.radiusM)
-        append(",\"downloadStatus\":\"").append(region.downloadStatus.name).append('"')
-        append(",\"downloadProgressPct\":").append(region.downloadProgressPct)
-        append(",\"entityCount\":").append(region.entityCount)
+        append("\"id\":\"").append(coverageSet.id).append('"')
+        append(",\"name\":\"").append(escape(coverageSet.name)).append('"')
+        append(",\"downloadStatus\":\"").append(coverageSet.downloadStatus.name).append('"')
+        append(",\"downloadProgressPct\":").append(coverageSet.downloadProgressPct)
+        append(",\"entityCount\":").append(coverageSet.entityCount)
         append('}')
     }
 

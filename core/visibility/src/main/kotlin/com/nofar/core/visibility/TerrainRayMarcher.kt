@@ -6,6 +6,7 @@ package com.nofar.core.visibility
  * Ports slope-comparison / line-of-sight logic from [scripts/line_dem_profile.py] and applies
  * bulge correction per Requirements §3.3.3.
  */
+@Suppress("ReturnCount")
 class TerrainRayMarcher {
     private val sampleDistances = DoubleArray(MAX_SAMPLES)
     private val sampleLats = DoubleArray(MAX_SAMPLES)
@@ -16,6 +17,9 @@ class TerrainRayMarcher {
      *
      * Missing DEM samples along the ray (excluding endpoints) fail closed: the target is treated as
      * not visible rather than assuming clear line of sight through unknown terrain.
+     *
+     * Long rays (up to [AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M]) use near/far stepping so sample
+     * count stays within [MAX_SAMPLES] without leaving an unsampled gap before the target.
      */
     fun isTargetVisible(
         observerLat: Double,
@@ -30,18 +34,23 @@ class TerrainRayMarcher {
     ): Boolean {
         if (totalDistanceM <= 0.0) return true
 
-        val sampleCount = GeoMath.buildRaySampleCount(totalDistanceM, rayStepM).coerceAtMost(MAX_SAMPLES)
+        val distances = RayDistanceSteps.entityRayDistances(totalDistanceM, rayStepM)
+        val sampleCount = distances.size.coerceAtMost(MAX_SAMPLES)
+        if (sampleCount < 2) return true
+
         val bearing = GeoMath.initialBearingDeg(observerLat, observerLon, targetLat, targetLon)
-        fillSamplePoints(
-            observerLat = observerLat,
-            observerLon = observerLon,
-            targetLat = targetLat,
-            targetLon = targetLon,
-            totalDistanceM = totalDistanceM,
-            rayStepM = rayStepM,
-            bearing = bearing,
-            sampleCount = sampleCount
-        )
+        for (index in 0 until sampleCount) {
+            val distance = distances[index]
+            sampleDistances[index] = distance
+            if (index == sampleCount - 1) {
+                sampleLats[index] = targetLat
+                sampleLons[index] = targetLon
+            } else {
+                val (lat, lon) = GeoMath.destinationPoint(observerLat, observerLon, bearing, distance)
+                sampleLats[index] = lat
+                sampleLons[index] = lon
+            }
+        }
 
         return (1 until sampleCount - 1).none { index ->
             val distance = sampleDistances[index]
@@ -58,30 +67,6 @@ class TerrainRayMarcher {
                     0.0
                 }
             terrainElevation + bulge > sightLineHeight + OCCLUSION_TOLERANCE_M
-        }
-    }
-
-    private fun fillSamplePoints(
-        observerLat: Double,
-        observerLon: Double,
-        targetLat: Double,
-        targetLon: Double,
-        totalDistanceM: Double,
-        rayStepM: Double,
-        bearing: Double,
-        sampleCount: Int
-    ) {
-        for (index in 0 until sampleCount) {
-            val distance = minOf(index * rayStepM, totalDistanceM)
-            sampleDistances[index] = distance
-            if (index == sampleCount - 1) {
-                sampleLats[index] = targetLat
-                sampleLons[index] = targetLon
-            } else {
-                val (lat, lon) = GeoMath.destinationPoint(observerLat, observerLon, bearing, distance)
-                sampleLats[index] = lat
-                sampleLons[index] = lon
-            }
         }
     }
 
@@ -122,8 +107,8 @@ class TerrainRayMarcher {
     }
 
     companion object {
-        private const val MAX_SAMPLES = 256
-        private const val OCCLUSION_TOLERANCE_M = 0.5
+        private const val MAX_SAMPLES = 512
+        private const val OCCLUSION_TOLERANCE_M = 1.0
 
         /** When true, ray-march applies earth bulge correction. Disable for flat-earth tests. */
         var applyEarthCurvature: Boolean = true

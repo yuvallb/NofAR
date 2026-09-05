@@ -21,9 +21,9 @@ NofAR (“the app”) is an offline-first Android application. This policy descr
 
 ### Location (precise / GPS)
 
-Used to detect whether you are inside a downloaded region, to place AR labels, and to define Prepare regions. Location is processed on-device. The app does not continuously upload a GPS track.
+Used to detect whether you are inside downloaded map coverage, to place AR labels, and to propose local or country-pack downloads. Location is processed on-device. The app does not continuously upload a GPS track.
 
-During **Prepare** downloads, Overpass API requests include the circular region’s bounding box (an approximate geographic area you chose), not a live GPS trail. See [Legal & data sources](#legal--data-sources).
+During **Prepare** downloads, Overpass API requests include the bounding box of each selected 1° map cell, not a live GPS trail. See [Legal & data sources](#legal--data-sources).
 
 ### Camera
 
@@ -31,16 +31,16 @@ Used in **Explore** to show the live camera feed under AR labels. Frames are not
 
 ### Network
 
-Used only when you download or update a region in **Prepare**:
+Used only when you download or update map coverage in **Prepare**:
 
-- OpenStreetMap place/peak data via public Overpass API mirrors
-- Copernicus DEM elevation tiles
+- OpenStreetMap place/peak data via public Overpass API mirrors (one request per 1° cell)
+- Copernicus GLO-90 DEM elevation tiles
 
-Home and Explore modes are designed to work offline once a region is ready.
+Home and Explore modes are designed to work offline once coverage is ready.
 
 ### On-device storage
 
-Downloaded regions, OSM entities, and elevation rasters are stored locally on your device. You can remove them from the app. The app does not sync this data to a NofAR server (there is none).
+Downloaded coverage sets, OSM entities, and elevation rasters are stored locally on your device. You can remove them from the app. The app does not sync this data to a NofAR server (there is none).
 
 ## Data sharing
 
@@ -50,8 +50,8 @@ Third-party services contacted **only during Prepare**, at your request:
 
 | Service | What is sent | Purpose |
 |---------|----------------|---------|
-| Overpass API mirrors | Overpass QL query including the region bounding box | Fetch OSM places and peaks |
-| Copernicus DEM distribution | Tile download requests for the region | Fetch elevation data |
+| Overpass API mirrors | Overpass QL query including each cell’s bounding box | Fetch OSM places and peaks |
+| Copernicus DEM distribution | Tile download requests for selected 1° cells | Fetch GLO-90 elevation data |
 
 Those operators’ own policies apply to their servers. Prefer downloading over trusted networks.
 
@@ -59,7 +59,7 @@ Those operators’ own policies apply to their servers. Prefer downloading over 
 
 The app may request:
 
-- **Location** — region detection and AR placement
+- **Location** — coverage detection and AR placement
 - **Camera** — Explore overlay
 - **Internet / network state** — Prepare downloads only
 
@@ -78,5 +78,5 @@ Source and issues: [https://github.com/yuvallb/NofAR](https://github.com/yuvallb
 ## Legal & data sources
 
 - Map data © OpenStreetMap contributors, [ODbL](https://www.openstreetmap.org/copyright).
-- Elevation: Copernicus DEM, ESA / Airbus.
+- Elevation: Copernicus DEM GLO-90, ESA / Airbus.
 - App license: [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).

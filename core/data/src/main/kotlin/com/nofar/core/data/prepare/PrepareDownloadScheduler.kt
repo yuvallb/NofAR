@@ -28,24 +28,24 @@ class PrepareDownloadScheduler
 constructor(@ApplicationContext private val context: Context) {
     private val workManager = WorkManager.getInstance(context)
 
-    fun enqueue(regionId: UUID) {
+    fun enqueue(coverageSetId: UUID) {
         val request =
             OneTimeWorkRequestBuilder<PrepareDownloadWorker>()
-                .setInputData(workDataOf(PrepareDownloadWorker.KEY_REGION_ID to regionId.toString()))
+                .setInputData(workDataOf(PrepareDownloadWorker.KEY_COVERAGE_SET_ID to coverageSetId.toString()))
                 .build()
         workManager.enqueueUniqueWork(
-            "${PrepareDownloadWorker.UNIQUE_WORK_PREFIX}$regionId",
+            "${PrepareDownloadWorker.UNIQUE_WORK_PREFIX}$coverageSetId",
             ExistingWorkPolicy.REPLACE,
             request
         )
     }
 
-    fun cancel(regionId: UUID) {
-        workManager.cancelUniqueWork("${PrepareDownloadWorker.UNIQUE_WORK_PREFIX}$regionId")
+    fun cancel(coverageSetId: UUID) {
+        workManager.cancelUniqueWork("${PrepareDownloadWorker.UNIQUE_WORK_PREFIX}$coverageSetId")
     }
 
-    fun observeWorkState(regionId: UUID): Flow<PrepareWorkState?> = workManager
-        .getWorkInfosForUniqueWorkFlow("${PrepareDownloadWorker.UNIQUE_WORK_PREFIX}$regionId")
+    fun observeWorkState(coverageSetId: UUID): Flow<PrepareWorkState?> = workManager
+        .getWorkInfosForUniqueWorkFlow("${PrepareDownloadWorker.UNIQUE_WORK_PREFIX}$coverageSetId")
         .map { infos -> infos.firstOrNull()?.state?.toPrepareWorkState() }
 
     private fun WorkInfo.State.toPrepareWorkState(): PrepareWorkState = when (this) {

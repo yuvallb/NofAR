@@ -9,7 +9,7 @@ import com.nofar.core.data.prepare.PrepareProgress
  */
 internal fun applyLiveDownloadProgress(state: PrepareUiState, progress: PrepareProgress?): PrepareUiState {
     val belongsToTrackedRegion =
-        progress != null && state.regionId != null && state.regionId == progress.regionId
+        progress != null && state.coverageSetId != null && state.coverageSetId == progress.coverageSetId
     if (!belongsToTrackedRegion) {
         return state
     }

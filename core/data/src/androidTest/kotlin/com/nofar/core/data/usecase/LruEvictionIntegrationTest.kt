@@ -5,10 +5,13 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.nofar.core.data.repository.DefaultCoverageSetRepository
 import com.nofar.core.data.repository.DefaultDemTileRepository
 import com.nofar.core.database.NofARDatabase
+import com.nofar.core.database.model.CoverageCellEntity
+import com.nofar.core.database.model.CoverageSetEntity
 import com.nofar.core.database.model.DemTileEntity
-import com.nofar.core.database.model.TileCoverageEntity
+import com.nofar.core.model.DownloadStatus
 import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
@@ -80,13 +83,27 @@ class LruEvictionIntegrationTest {
     }
 
     @Test
-    fun forceLruEviction_removesReferencedTilesAndMarksRegionPartial() = runTest {
-        val regionId = "region-1"
+    fun forceLruEviction_removesReferencedTilesAndMarksCoverageSetPartial() = runTest {
+        val coverageSetId = java.util.UUID.randomUUID().toString()
+        val tileId = "Copernicus_DSM_COG_30_N32_00_E035_00_DEM"
         val now = System.currentTimeMillis()
+        database.coverageSetDao().upsert(
+            CoverageSetEntity(
+                id = coverageSetId,
+                name = "Test",
+                createdAt = now,
+                updatedAt = now,
+                downloadStatus = DownloadStatus.READY.name,
+                downloadProgressPct = 100,
+                osmDatasetVersion = now,
+                estimatedSizeBytes = 120L * 1024 * 1024,
+                entityCount = 10
+            )
+        )
         database.demTileDao().upsert(
             DemTileEntity(
-                tileId = "tile-used",
-                filePath = "dem/tile-used.bin",
+                tileId = tileId,
+                filePath = "dem/$tileId.bin",
                 width = 100,
                 height = 100,
                 tileLat = 32,
@@ -97,42 +114,26 @@ class LruEvictionIntegrationTest {
                 lastAccessedAt = now
             )
         )
-        database.tileCoverageDao().insert(
-            TileCoverageEntity(regionId = regionId, tileId = "tile-used")
-        )
-        database.regionDao().upsert(
-            com.nofar.core.database.model.RegionEntity(
-                id = regionId,
-                name = "Test",
-                centerLat = 32.0,
-                centerLon = 35.0,
-                radiusM = 10_000.0,
-                minLat = 31.0,
-                maxLat = 33.0,
-                minLon = 34.0,
-                maxLon = 36.0,
-                createdAt = now,
-                updatedAt = now,
-                downloadStatus = com.nofar.core.model.DownloadStatus.READY.name,
-                downloadProgressPct = 100,
-                osmDatasetVersion = now,
-                estimatedSizeBytes = 120L * 1024 * 1024,
-                entityCount = 10
-            )
+        database.coverageCellDao().insert(
+            CoverageCellEntity(coverageSetId = coverageSetId, cellId = tileId)
         )
 
-        val regionRepository = com.nofar.core.data.repository.DefaultRegionRepository(database.regionDao())
+        val coverageSetRepository =
+            DefaultCoverageSetRepository(database.coverageSetDao(), database.coverageCellDao())
         val useCase =
             ForceLruEvictionUseCase(
                 demTileRepository = demTileRepository,
-                tileCoverageDao = database.tileCoverageDao(),
-                regionRepository = regionRepository
+                coverageCellDao = database.coverageCellDao(),
+                coverageSetRepository = coverageSetRepository
             )
         val result = useCase.execute(50L * 1024 * 1024)
 
         assertThat(result.tilesEvicted).isEqualTo(1)
-        assertThat(demTileRepository.getTile("tile-used")).isNull()
-        val region = regionRepository.getRegion(java.util.UUID.fromString(regionId))
-        assertThat(region?.downloadStatus).isEqualTo(com.nofar.core.model.DownloadStatus.PARTIAL)
+        assertThat(demTileRepository.getTile(tileId)).isNull()
+        // Geometry (coverage_cell) is retained for re-download.
+        assertThat(database.coverageCellDao().getCellIdsForCoverageSet(coverageSetId))
+            .containsExactly(tileId)
+        val coverageSet = coverageSetRepository.getCoverageSet(java.util.UUID.fromString(coverageSetId))
+        assertThat(coverageSet?.downloadStatus).isEqualTo(DownloadStatus.PARTIAL)
     }
 }

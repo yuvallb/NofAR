@@ -2,6 +2,7 @@ package com.nofar.core.data.dem
 
 import com.google.common.truth.Truth.assertThat
 import java.io.RandomAccessFile
+import kotlin.math.floor
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -12,9 +13,8 @@ class DemTileBinaryTest {
 
     @Test
     fun fullTileGrid_roundTripCornerSamples() {
-        val width = 3600
-        val height = 3600
-        // Wrapped so every sample stays inside the reader's plausible-elevation band.
+        val width = 1_200
+        val height = 1_200
         val elevations = FloatArray(width * height) { index -> (index % 3_000).toFloat() }
         val file = tempDir.newFile("full-tile.bin")
         DemTileWriter(tileLat = 32, tileLon = 35).write(file, width, height, elevations)
@@ -60,23 +60,18 @@ class DemTileBinaryTest {
         val legacyFile = tempDir.newFile("legacy.bin")
         currentFile.copyTo(legacyFile, overwrite = true)
         RandomAccessFile(legacyFile, "rw").use { file ->
-            file.write("NOFAR_DEM".toByteArray(Charsets.US_ASCII))
+            file.write("NOFAR_DM3".toByteArray(Charsets.US_ASCII))
         }
 
         assertThat(DemTileReader.hasCurrentFormat(currentFile)).isTrue()
         assertThat(DemTileReader.hasCurrentFormat(legacyFile)).isFalse()
     }
 
-    // Device regression: tiles converted before GDAL_NODATA was honoured still hold Copernicus'
-    // -32767 sentinel while the header declares -9999. Accepting it as a real elevation put the Explore
-    // skyline eye ~32 km underground, so every azimuth read ~90° and the horizon tracked camera pitch.
     @Test
     fun unnormalizedNoDataSentinels_areRejectedAsElevations() {
         val width = 10
         val height = 10
-        val sentinel = -32767f
-        val elevations = FloatArray(width * height) { sentinel }
-        // One genuine sample in the north-west corner pixel proves the guard is value-based, not blanket.
+        val elevations = FloatArray(width * height) { DemBinaryFormat.HEADER_NO_DATA_VALUE }
         elevations[0] = 72f
         val file = tempDir.newFile("sentinel.bin")
 
@@ -113,10 +108,40 @@ class DemTileBinaryTest {
         DemTileReader.open(file).use { reader ->
             val lat = 32.5
             val lon = 35.5
-            val expectedRow = ((33.0 - lat) / 1.0 * (height - 1)).toInt().coerceIn(0, height - 1)
-            val expectedCol = ((lon - 35.0) / 1.0 * (width - 1)).toInt().coerceIn(0, width - 1)
+            val fracX = (lon - 35.0) / 1.0
+            val fracY = (33.0 - lat) / 1.0
+            val expectedCol = floor(fracX * width).toInt().coerceIn(0, width - 1)
+            val expectedRow = floor(fracY * height).toInt().coerceIn(0, height - 1)
             val expected = elevations[expectedRow * width + expectedCol]
             assertThat(reader.elevationAt(lat, lon)).isWithin(0.001f).of(expected)
+        }
+    }
+
+    @Test
+    fun int16Quantization_roundsToNearestMeter() {
+        val elevations = floatArrayOf(100.4f, 100.6f, -500.5f)
+        val file = tempDir.newFile("quantize.bin")
+        DemTileWriter(tileLat = 32, tileLon = 35).write(file, 3, 1, elevations)
+
+        DemTileReader.open(file).use { reader ->
+            assertThat(reader.elevationAt(32.0, 35.0)).isWithin(0.001f).of(100f)
+            assertThat(reader.elevationAt(32.0, 35.4)).isWithin(0.001f).of(101f)
+            assertThat(reader.elevationAt(32.0, 35.7)).isWithin(0.001f).of(-500f)
+        }
+    }
+
+    @Test
+    fun polarWidth_nonSquareDimensions() {
+        val width = 800
+        val height = 1_200
+        val elevations = FloatArray(width * height) { 250f }
+        val file = tempDir.newFile("polar.bin")
+        DemTileWriter(tileLat = 55, tileLon = 10).write(file, width, height, elevations)
+
+        DemTileReader.open(file).use { reader ->
+            assertThat(reader.width).isEqualTo(width)
+            assertThat(reader.height).isEqualTo(height)
+            assertThat(reader.elevationAt(55.5, 10.5)).isWithin(0.001f).of(250f)
         }
     }
 }

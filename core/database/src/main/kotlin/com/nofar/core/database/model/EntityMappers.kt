@@ -2,6 +2,9 @@
 
 package com.nofar.core.database.model
 
+import com.nofar.core.model.CoverageCell
+import com.nofar.core.model.CoverageEntityCoverage
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DemTile
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.ElevationSource
@@ -10,22 +13,12 @@ import com.nofar.core.model.GeoEntityType
 import com.nofar.core.model.LabelLanguage
 import com.nofar.core.model.ModelJson
 import com.nofar.core.model.OsmType
-import com.nofar.core.model.Region
-import com.nofar.core.model.RegionEntityCoverage
-import com.nofar.core.model.TileCoverage
 import java.time.Instant
 import java.util.UUID
 
-fun RegionEntity.asExternalModel(): Region = Region(
+fun CoverageSetEntity.asExternalModel(): CoverageSet = CoverageSet(
     id = UUID.fromString(id),
     name = name,
-    centerLat = centerLat,
-    centerLon = centerLon,
-    radiusM = radiusM,
-    minLat = minLat,
-    maxLat = maxLat,
-    minLon = minLon,
-    maxLon = maxLon,
     createdAt = Instant.ofEpochMilli(createdAt),
     updatedAt = Instant.ofEpochMilli(updatedAt),
     downloadStatus = DownloadStatus.valueOf(downloadStatus),
@@ -36,16 +29,9 @@ fun RegionEntity.asExternalModel(): Region = Region(
     labelLanguage = LabelLanguage.fromStoredName(labelLanguage)
 )
 
-fun Region.asEntity(): RegionEntity = RegionEntity(
+fun CoverageSet.asEntity(): CoverageSetEntity = CoverageSetEntity(
     id = id.toString(),
     name = name,
-    centerLat = centerLat,
-    centerLon = centerLon,
-    radiusM = radiusM,
-    minLat = minLat,
-    maxLat = maxLat,
-    minLon = minLon,
-    maxLon = maxLon,
     createdAt = createdAt.toEpochMilli(),
     updatedAt = updatedAt.toEpochMilli(),
     downloadStatus = downloadStatus.name,
@@ -108,29 +94,29 @@ fun DemTile.asEntity(): DemTileEntity = DemTileEntity(
     lastAccessedAt = lastAccessedAt.toEpochMilli()
 )
 
-fun RegionEntityCoverageEntity.asExternalModel(): RegionEntityCoverage = RegionEntityCoverage(
-    regionId = UUID.fromString(regionId),
+fun CoverageEntityEntity.asExternalModel(): CoverageEntityCoverage = CoverageEntityCoverage(
+    coverageSetId = UUID.fromString(coverageSetId),
     entityId = entityId,
     displayName = displayName
 )
 
-fun RegionEntityCoverage.asEntity(): RegionEntityCoverageEntity = RegionEntityCoverageEntity(
-    regionId = regionId.toString(),
+fun CoverageEntityCoverage.asEntity(): CoverageEntityEntity = CoverageEntityEntity(
+    coverageSetId = coverageSetId.toString(),
     entityId = entityId,
     displayName = displayName
 )
 
-fun TileCoverageEntity.asExternalModel(): TileCoverage = TileCoverage(
-    regionId = UUID.fromString(regionId),
-    tileId = tileId
+fun CoverageCellEntity.asExternalModel(): CoverageCell = CoverageCell(
+    coverageSetId = UUID.fromString(coverageSetId),
+    cellId = cellId
 )
 
-fun TileCoverage.asEntity(): TileCoverageEntity = TileCoverageEntity(
-    regionId = regionId.toString(),
-    tileId = tileId
+fun CoverageCell.asEntity(): CoverageCellEntity = CoverageCellEntity(
+    coverageSetId = coverageSetId.toString(),
+    cellId = cellId
 )
 
-fun RegionEntity.toDebugJson(): String = asExternalModel().let(ModelJson::regionToJson)
+fun CoverageSetEntity.toDebugJson(): String = asExternalModel().let(ModelJson::coverageSetToJson)
 
 fun GeoEntityEntity.toDebugJson(): String = asExternalModel().let(ModelJson::geoEntityToJson)
 

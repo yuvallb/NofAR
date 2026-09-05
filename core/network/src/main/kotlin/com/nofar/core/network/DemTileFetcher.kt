@@ -162,10 +162,10 @@ class DefaultDemTileFetcher(
 
     companion object {
         private const val COPERNICUS_BASE_URL =
-            "https://copernicus-dem-30m.s3.eu-central-1.amazonaws.com"
+            "https://copernicus-dem-90m.s3.eu-central-1.amazonaws.com"
 
-        /** Soft cap on a single Copernicus DEM GeoTIFF download. */
-        const val MAX_TILE_BYTES: Long = 80L * 1024 * 1024
+        /** Soft cap on a single Copernicus GLO-90 GeoTIFF download. */
+        const val MAX_TILE_BYTES: Long = 16L * 1024 * 1024
         private const val HTTP_PARTIAL_CONTENT = 206
         private const val HTTP_RANGE_NOT_SATISFIABLE = 416
         private const val BUFFER_SIZE = 8192

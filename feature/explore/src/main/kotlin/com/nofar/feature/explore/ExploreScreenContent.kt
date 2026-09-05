@@ -119,10 +119,7 @@ private fun BoxScope.ExploreScreenModalLayer(
     onDismissWifiOnlyBlocked: () -> Unit
 ) {
     if (uiState.exploreGate == ExploreGate.GRACE_EXPIRED) {
-        ExploreGraceExpiredDialog(
-            regionName = uiState.activeRegionName.orEmpty(),
-            onExit = onNavigateBack
-        )
+        ExploreGraceExpiredDialog(onExit = onNavigateBack)
     }
 
     uiState.expandedCluster?.let { cluster ->
@@ -332,7 +329,7 @@ private fun BoxScope.ExploreReadyStatusBanners(uiState: ExploreUiState, onDismis
         )
     }
     if (uiState.partialRegionWarning) {
-        ExplorePartialRegionBanner(
+        ExplorePartialCoverageBanner(
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp)
         )
     }
@@ -344,8 +341,7 @@ private fun BoxScope.ExploreReadyStatusBanners(uiState: ExploreUiState, onDismis
         )
     }
     if (uiState.showRegionExitBanner && !uiState.isVirtualExplore) {
-        ExploreRegionExitBanner(
-            regionName = uiState.activeRegionName.orEmpty(),
+        ExploreCoverageExitBanner(
             graceSecondsRemaining = uiState.regionExitGraceSecondsRemaining,
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 120.dp)
         )
@@ -400,7 +396,7 @@ private fun BoxScope.ExploreReadyBottomChrome(
             onNavigateBack = onNavigateBack
         )
         NofARExploreBottomHud(
-            maxRangeKm = AppConfig.REGION_RADIUS_MAX_KM.toInt(),
+            maxRangeKm = (AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M / 1_000).toInt(),
             contentPadding = chromePadding,
             modifier = Modifier.align(Alignment.BottomCenter)
         )

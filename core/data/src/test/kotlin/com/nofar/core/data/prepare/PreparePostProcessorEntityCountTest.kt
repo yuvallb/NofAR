@@ -1,8 +1,7 @@
 package com.nofar.core.data.prepare
 
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.Region
-import com.nofar.core.model.RegionBounds
 import java.time.Instant
 import java.util.UUID
 import org.junit.Assert.assertEquals
@@ -26,25 +25,17 @@ class PreparePostProcessorEntityCountTest {
     }
 
     @Test
-    fun regionEntity_preservesHigherCountOnCopy() {
-        val region = sampleRegion(entityCount = 25)
-        val updated = region.copy(entityCount = maxOf(0, region.entityCount))
+    fun coverageSetEntity_preservesHigherCountOnCopy() {
+        val coverageSet = sampleCoverageSet(entityCount = 25)
+        val updated = coverageSet.copy(entityCount = maxOf(0, coverageSet.entityCount))
         assertEquals(25, updated.entityCount)
     }
 
-    private fun sampleRegion(entityCount: Int): Region {
+    private fun sampleCoverageSet(entityCount: Int): CoverageSet {
         val now = Instant.parse("2025-01-01T00:00:00Z")
-        val box = RegionBounds.boundingBox(32.0, 35.0, 10_000.0)
-        return Region(
+        return CoverageSet(
             id = UUID.randomUUID(),
             name = "Test",
-            centerLat = 32.0,
-            centerLon = 35.0,
-            radiusM = 10_000.0,
-            minLat = box.minLat,
-            maxLat = box.maxLat,
-            minLon = box.minLon,
-            maxLon = box.maxLon,
             createdAt = now,
             updatedAt = now,
             downloadStatus = DownloadStatus.DOWNLOADING,

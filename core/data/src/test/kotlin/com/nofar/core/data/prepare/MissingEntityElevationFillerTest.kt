@@ -187,11 +187,8 @@ private class FakeGeoEntityRepository(private val store: MutableMap<String, GeoE
         resolutionLevel: ResolutionLevel
     ): List<GeoEntity> = store.values.toList()
 
-    override suspend fun queryWithinRadiusForRegion(
-        regionId: UUID,
-        regionCenterLat: Double,
-        regionCenterLon: Double,
-        regionRadiusM: Double,
+    override suspend fun queryWithinRadiusForCoverageSet(
+        coverageSetId: UUID,
         lat: Double,
         lon: Double,
         radiusM: Double,

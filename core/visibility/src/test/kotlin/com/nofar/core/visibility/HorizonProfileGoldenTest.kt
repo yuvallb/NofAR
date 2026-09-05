@@ -2,7 +2,7 @@ package com.nofar.core.visibility
 
 import com.google.common.truth.Truth.assertThat
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.GeoMathBounds
 import org.junit.Test
 
 /**
@@ -17,7 +17,7 @@ class HorizonProfileGoldenTest {
     private val eyeM = 100.0 + AppConfig.EYE_HEIGHT_METERS
 
     private fun distanceFromObserverM(lat: Double, lon: Double): Double =
-        RegionBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
+        GeoMathBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
 
     // H-P2-04: flat, bulge-corrected terrain sits exactly on the true horizon in every bucket.
     @Test

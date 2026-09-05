@@ -21,6 +21,7 @@ private val Context.userPreferencesDataStore: DataStore<Preferences> by preferen
     name = "user_preferences"
 )
 
+@Suppress("TooManyFunctions")
 interface UserPreferencesRepository {
     val wifiOnlyDownloads: Flow<Boolean>
 
@@ -33,6 +34,8 @@ interface UserPreferencesRepository {
     val simpleModeEnabled: Flow<Boolean>
 
     val simpleModeDefaultsApplied: Flow<Boolean>
+
+    val demV4UpgradeApplied: Flow<Boolean>
 
     val preferredLabelLanguage: Flow<LabelLanguage>
 
@@ -56,6 +59,8 @@ interface UserPreferencesRepository {
 
     suspend fun markSimpleModeDefaultsApplied()
 
+    suspend fun markDemV4UpgradeApplied()
+
     suspend fun setPreferredLabelLanguage(language: LabelLanguage)
 
     /**
@@ -76,6 +81,7 @@ suspend fun UserPreferencesRepository.resetHorizonAlignmentOffsets() {
 }
 
 @Singleton
+@Suppress("TooManyFunctions")
 class DefaultUserPreferencesRepository
 @Inject
 constructor(@ApplicationContext context: Context) :
@@ -110,6 +116,11 @@ constructor(@ApplicationContext context: Context) :
     override val simpleModeDefaultsApplied: Flow<Boolean> =
         dataStore.data.map { prefs ->
             prefs[SIMPLE_MODE_DEFAULTS_APPLIED_KEY] ?: false
+        }
+
+    override val demV4UpgradeApplied: Flow<Boolean> =
+        dataStore.data.map { prefs ->
+            prefs[DEM_V4_UPGRADE_APPLIED_KEY] ?: false
         }
 
     override val preferredLabelLanguage: Flow<LabelLanguage> =
@@ -173,6 +184,12 @@ constructor(@ApplicationContext context: Context) :
         }
     }
 
+    override suspend fun markDemV4UpgradeApplied() {
+        dataStore.edit { prefs ->
+            prefs[DEM_V4_UPGRADE_APPLIED_KEY] = true
+        }
+    }
+
     override suspend fun setPreferredLabelLanguage(language: LabelLanguage) {
         dataStore.edit { prefs ->
             prefs[PREFERRED_LABEL_LANGUAGE_KEY] = language.name
@@ -213,6 +230,7 @@ constructor(@ApplicationContext context: Context) :
         private val KEEP_RAW_GEOTIFF_KEY = booleanPreferencesKey("keep_raw_geotiff")
         private val SIMPLE_MODE_ENABLED_KEY = booleanPreferencesKey("simple_mode_enabled")
         private val SIMPLE_MODE_DEFAULTS_APPLIED_KEY = booleanPreferencesKey("simple_mode_defaults_applied")
+        private val DEM_V4_UPGRADE_APPLIED_KEY = booleanPreferencesKey("dem_v4_upgrade_applied")
         private val PREFERRED_LABEL_LANGUAGE_KEY = stringPreferencesKey("preferred_label_language")
         private val SHOW_HORIZON_OUTLINE_KEY = booleanPreferencesKey("show_horizon_outline")
         private val HORIZON_AZIMUTH_OFFSET_KEY = floatPreferencesKey("horizon_azimuth_offset_deg")

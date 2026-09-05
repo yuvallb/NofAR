@@ -5,15 +5,15 @@ import androidx.room.Room
 import com.nofar.core.database.GeoEntitySpatialQuery
 import com.nofar.core.database.NofARDatabase
 import com.nofar.core.database.NofARDatabaseMigrations
+import com.nofar.core.database.dao.CoverageCellDao
+import com.nofar.core.database.dao.CoverageEntityDao
+import com.nofar.core.database.dao.CoverageIngestDao
 import com.nofar.core.database.dao.CoverageLinker
+import com.nofar.core.database.dao.CoverageSetDao
 import com.nofar.core.database.dao.DemTileDao
 import com.nofar.core.database.dao.GeoEntityDao
 import com.nofar.core.database.dao.GeoEntitySpatialDao
 import com.nofar.core.database.dao.GeoEntityUpserter
-import com.nofar.core.database.dao.RegionDao
-import com.nofar.core.database.dao.RegionEntityCoverageDao
-import com.nofar.core.database.dao.RegionIngestDao
-import com.nofar.core.database.dao.TileCoverageDao
 import com.nofar.core.database.useBundledSqliteWithRTree
 import dagger.Module
 import dagger.Provides
@@ -40,7 +40,7 @@ object DatabaseModule {
         .build()
 
     @Provides
-    fun provideRegionDao(database: NofARDatabase): RegionDao = database.regionDao()
+    fun provideCoverageSetDao(database: NofARDatabase): CoverageSetDao = database.coverageSetDao()
 
     @Provides
     fun provideGeoEntityDao(database: NofARDatabase): GeoEntityDao = database.geoEntityDao()
@@ -49,25 +49,24 @@ object DatabaseModule {
     fun provideGeoEntitySpatialDao(database: NofARDatabase): GeoEntitySpatialDao = database.geoEntitySpatialDao()
 
     @Provides
-    fun provideRegionEntityCoverageDao(database: NofARDatabase): RegionEntityCoverageDao =
-        database.regionEntityCoverageDao()
+    fun provideCoverageEntityDao(database: NofARDatabase): CoverageEntityDao = database.coverageEntityDao()
 
     @Provides
     fun provideDemTileDao(database: NofARDatabase): DemTileDao = database.demTileDao()
 
     @Provides
-    fun provideTileCoverageDao(database: NofARDatabase): TileCoverageDao = database.tileCoverageDao()
+    fun provideCoverageCellDao(database: NofARDatabase): CoverageCellDao = database.coverageCellDao()
 
     @Provides
-    fun provideRegionIngestDao(database: NofARDatabase): RegionIngestDao = database.regionIngestDao()
+    fun provideCoverageIngestDao(database: NofARDatabase): CoverageIngestDao = database.coverageIngestDao()
 
     @Provides
     @Singleton
     fun provideCoverageLinker(
-        regionEntityCoverageDao: RegionEntityCoverageDao,
-        tileCoverageDao: TileCoverageDao,
-        regionIngestDao: RegionIngestDao
-    ): CoverageLinker = CoverageLinker(regionEntityCoverageDao, tileCoverageDao, regionIngestDao)
+        coverageEntityDao: CoverageEntityDao,
+        coverageCellDao: CoverageCellDao,
+        coverageIngestDao: CoverageIngestDao
+    ): CoverageLinker = CoverageLinker(coverageEntityDao, coverageCellDao, coverageIngestDao)
 
     @Provides
     @Singleton
@@ -78,6 +77,6 @@ object DatabaseModule {
     fun provideGeoEntitySpatialQuery(
         geoEntitySpatialDao: GeoEntitySpatialDao,
         geoEntityDao: GeoEntityDao,
-        regionEntityCoverageDao: RegionEntityCoverageDao
-    ): GeoEntitySpatialQuery = GeoEntitySpatialQuery(geoEntitySpatialDao, geoEntityDao, regionEntityCoverageDao)
+        coverageEntityDao: CoverageEntityDao
+    ): GeoEntitySpatialQuery = GeoEntitySpatialQuery(geoEntitySpatialDao, geoEntityDao, coverageEntityDao)
 }

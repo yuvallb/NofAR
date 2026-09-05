@@ -1,7 +1,7 @@
 package com.nofar.core.location
 
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.GeoMathBounds
 import com.nofar.core.model.UserLocation
 
 /**
@@ -18,7 +18,7 @@ class LocationMovedTracker {
             return null
         }
         val distanceM =
-            RegionBounds.haversineDistanceM(
+            GeoMathBounds.haversineDistanceM(
                 previous.latitude,
                 previous.longitude,
                 location.latitude,

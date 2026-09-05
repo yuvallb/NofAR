@@ -24,4 +24,6 @@ dependencies {
     androidTestImplementation(libs.truth)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(project(":core:database"))
+    androidTestImplementation(libs.room.runtime)
+    androidTestImplementation(libs.room.ktx)
 }

@@ -32,7 +32,11 @@ private fun NofARThemePreviewContent() {
         )
         NofARStatusBadge(status = DownloadStatus.READY, modifier = Modifier.padding(vertical = 8.dp))
         NofARPrimaryButton(text = "ENTER EXPLORE", onClick = {}, modifier = Modifier.padding(vertical = 4.dp))
-        NofARSecondaryOutlinedButton(text = "+ ADD REGION", onClick = {}, modifier = Modifier.padding(vertical = 4.dp))
-        NofARWarningBanner(message = "Outside Active Region Boundary")
+        NofARSecondaryOutlinedButton(
+            text = "+ ADD COVERAGE",
+            onClick = {},
+            modifier = Modifier.padding(vertical = 4.dp)
+        )
+        NofARWarningBanner(message = "Outside downloaded maps")
     }
 }

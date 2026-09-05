@@ -141,7 +141,7 @@ fun ExploreRegionDataErrorOverlay(onExit: () -> Unit, modifier: Modifier = Modif
             modifier = Modifier.padding(24.dp)
         ) {
             Text(
-                text = stringResource(R.string.explore_region_data_missing),
+                text = stringResource(R.string.explore_coverage_data_missing),
                 style = MaterialTheme.typography.bodyLarge,
                 color = NofARColors.ArAccent,
                 textAlign = TextAlign.Center
@@ -156,13 +156,13 @@ fun ExploreRegionDataErrorOverlay(onExit: () -> Unit, modifier: Modifier = Modif
 }
 
 @Composable
-fun ExplorePartialRegionBanner(modifier: Modifier = Modifier) {
+fun ExplorePartialCoverageBanner(modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = NofARColors.WarningBanner.copy(alpha = 0.92f)
     ) {
         Text(
-            text = stringResource(R.string.explore_partial_region_warning),
+            text = stringResource(R.string.explore_partial_coverage_warning),
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = NofARColors.TextPrimary,
@@ -195,14 +195,14 @@ fun ExploreLocationAccuracyBanner(accuracyMeters: Int, thresholdMeters: Int, mod
 }
 
 @Composable
-fun ExploreRegionExitBanner(regionName: String, graceSecondsRemaining: Int, modifier: Modifier = Modifier) {
+fun ExploreCoverageExitBanner(graceSecondsRemaining: Int, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier.fillMaxWidth(),
         color = NofARColors.WarningBanner.copy(alpha = 0.92f)
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             Text(
-                text = stringResource(R.string.explore_outside_region_title),
+                text = stringResource(R.string.explore_outside_coverage_title),
                 style = MaterialTheme.typography.titleSmall,
                 color = NofARColors.TextPrimary,
                 fontWeight = FontWeight.Bold
@@ -210,8 +210,7 @@ fun ExploreRegionExitBanner(regionName: String, graceSecondsRemaining: Int, modi
             Text(
                 text =
                 stringResource(
-                    R.string.explore_outside_region_message,
-                    regionName,
+                    R.string.explore_outside_coverage_message,
                     graceSecondsRemaining
                 ),
                 style = MaterialTheme.typography.bodyMedium,
@@ -222,14 +221,14 @@ fun ExploreRegionExitBanner(regionName: String, graceSecondsRemaining: Int, modi
 }
 
 @Composable
-fun ExploreGraceExpiredDialog(regionName: String, onExit: () -> Unit) {
+fun ExploreGraceExpiredDialog(onExit: () -> Unit) {
     AlertDialog(
         onDismissRequest = {},
         title = {
             Text(text = stringResource(R.string.explore_grace_expired_title))
         },
         text = {
-            Text(text = stringResource(R.string.explore_grace_expired_message, regionName))
+            Text(text = stringResource(R.string.explore_grace_expired_message))
         },
         confirmButton = {
             TextButton(onClick = onExit) {

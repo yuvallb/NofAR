@@ -1,7 +1,6 @@
 package com.nofar.core.visibility
 
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.Region
 import javax.inject.Inject
 import kotlin.math.floor
 
@@ -17,19 +16,19 @@ constructor() {
         observerLat: Double,
         observerLon: Double,
         observerEyeM: Double,
-        clipRegions: List<Region>,
+        clipCellIds: Set<String>,
         sampler: DemSampler,
         isCancelled: () -> Boolean = { false }
     ): MapVisibilityPreview? {
-        if (clipRegions.isEmpty()) return null
-        if (!RegionRayExtent.observerInsideAnyRegion(clipRegions, observerLat, observerLon)) {
+        if (clipCellIds.isEmpty()) return null
+        if (!CoverageRayExtent.observerInsideAnyRegion(clipCellIds, observerLat, observerLon)) {
             return null
         }
         return buildPreview(
             observerLat = observerLat,
             observerLon = observerLon,
             observerEyeM = observerEyeM,
-            clipRegions = clipRegions,
+            clipCellIds = clipCellIds,
             sampler = sampler,
             isCancelled = isCancelled
         )
@@ -39,7 +38,7 @@ constructor() {
         observerLat: Double,
         observerLon: Double,
         observerEyeM: Double,
-        clipRegions: List<Region>,
+        clipCellIds: Set<String>,
         sampler: DemSampler,
         isCancelled: () -> Boolean
     ): MapVisibilityPreview? {
@@ -47,7 +46,7 @@ constructor() {
         val azimuthCount = (360f / azimuthStepDeg).toInt()
         val regionEdgeMeters =
             computeRegionEdgeMeters(
-                clipRegions = clipRegions,
+                clipCellIds = clipCellIds,
                 observerLat = observerLat,
                 observerLon = observerLon,
                 azimuthStepDeg = azimuthStepDeg,
@@ -68,7 +67,7 @@ constructor() {
                 radialStepM = radialStepM,
                 regionEdgeMeters = regionEdgeMeters,
                 maxRadialCells = maxOf(maxRadialCells, 1),
-                clipRegions = clipRegions
+                clipCellIds = clipCellIds
             )
         val completed =
             fillViewshedGrid(
@@ -76,7 +75,7 @@ constructor() {
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = observerEyeM,
-                clipRegions = clipRegions,
+                clipCellIds = clipCellIds,
                 azimuthStepDeg = azimuthStepDeg,
                 radialStepM = radialStepM,
                 azimuthCount = azimuthCount,
@@ -87,7 +86,7 @@ constructor() {
     }
 
     private fun computeRegionEdgeMeters(
-        clipRegions: List<Region>,
+        clipCellIds: Set<String>,
         observerLat: Double,
         observerLon: Double,
         azimuthStepDeg: Float,
@@ -99,8 +98,8 @@ constructor() {
             if (isCancelled()) return null
             val bearingDeg = azimuthIndex * azimuthStepDeg
             val edgeM =
-                RegionRayExtent.maxDistanceInsideAnyRegionM(
-                    regions = clipRegions,
+                CoverageRayExtent.maxDistanceInsideAnyRegionM(
+                    cellIds = clipCellIds,
                     observerLat = observerLat,
                     observerLon = observerLon,
                     bearingDeg = bearingDeg.toDouble()
@@ -115,7 +114,7 @@ constructor() {
         observerLat: Double,
         observerLon: Double,
         observerEyeM: Double,
-        clipRegions: List<Region>,
+        clipCellIds: Set<String>,
         azimuthStepDeg: Float,
         radialStepM: Double,
         azimuthCount: Int,
@@ -131,7 +130,7 @@ constructor() {
                     observerLat = observerLat,
                     observerLon = observerLon,
                     observerEyeM = observerEyeM,
-                    clipRegions = clipRegions,
+                    clipCellIds = clipCellIds,
                     azimuthStepDeg = azimuthStepDeg,
                     radialStepM = radialStepM,
                     toleranceM = toleranceM,
@@ -150,7 +149,7 @@ constructor() {
         observerLat: Double,
         observerLon: Double,
         observerEyeM: Double,
-        clipRegions: List<Region>,
+        clipCellIds: Set<String>,
         azimuthStepDeg: Float,
         radialStepM: Double,
         toleranceM: Double,
@@ -175,7 +174,7 @@ constructor() {
                     observerLon = observerLon,
                     bearingDeg = bearingDeg,
                     observerEyeM = observerEyeM,
-                    clipRegions = clipRegions,
+                    clipCellIds = clipCellIds,
                     rayLengthM = rayLengthM,
                     radialStepM = radialStepM,
                     toleranceM = toleranceM,
@@ -195,7 +194,7 @@ constructor() {
         observerLon: Double,
         bearingDeg: Double,
         observerEyeM: Double,
-        clipRegions: List<Region>,
+        clipCellIds: Set<String>,
         rayLengthM: Double,
         radialStepM: Double,
         toleranceM: Double,
@@ -204,7 +203,7 @@ constructor() {
     ): Double? {
         val distanceM = (radialIndex + 1) * radialStepM
         val (lat, lon) = GeoMath.destinationPoint(observerLat, observerLon, bearingDeg, distanceM)
-        val insideClip = RegionRayExtent.sampleInsideAnyRegion(clipRegions, lat, lon)
+        val insideClip = CoverageRayExtent.sampleInsideAnyRegion(clipCellIds, lat, lon)
         val terrainM = sampler.elevationAt(lat, lon)?.toDouble()
         if (terrainM == null) {
             if (insideClip) {

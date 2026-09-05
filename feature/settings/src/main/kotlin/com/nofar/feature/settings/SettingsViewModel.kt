@@ -6,7 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.preferences.resetHorizonAlignmentOffsets
-import com.nofar.core.data.repository.RegionRepository
+import com.nofar.core.data.repository.CoverageSetRepository
 import com.nofar.core.data.repository.StorageRepository
 import com.nofar.core.data.usecase.EvictUnusedDemTilesUseCase
 import com.nofar.core.data.usecase.ForceLruEvictionUseCase
@@ -27,7 +27,7 @@ data class SettingsUiState(
     val demCacheBytes: Long = 0L,
     val entityDbSizeBytes: Long = 0L,
     val entityRowCount: Int = 0,
-    val regionCount: Int = 0,
+    val coverageSetCount: Int = 0,
     val evictionThresholdMb: Float = AppConfig.DEM_CACHE_DEFAULT_LIMIT_BYTES / (1024f * 1024f),
     val wifiOnlyDownloads: Boolean = false,
     val simpleModeEnabled: Boolean = false,
@@ -49,7 +49,7 @@ class SettingsViewModel
 @Inject
 constructor(
     private val storageRepository: StorageRepository,
-    private val regionRepository: RegionRepository,
+    private val coverageSetRepository: CoverageSetRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val evictUnusedDemTilesUseCase: EvictUnusedDemTilesUseCase,
     private val lruEvictionUseCase: LruEvictionUseCase,
@@ -134,7 +134,7 @@ constructor(
 
     private fun observeActiveDownloads() {
         viewModelScope.launch {
-            regionRepository.observeAllRegions().collect { regions ->
+            coverageSetRepository.observeAllCoverageSets().collect { regions ->
                 val active = regions.any { it.downloadStatus == DownloadStatus.DOWNLOADING }
                 _uiState.update { it.copy(prepareDownloadActive = active) }
             }
@@ -149,7 +149,7 @@ constructor(
                     demCacheBytes = stats.demCacheSizeBytes,
                     entityDbSizeBytes = stats.entityDbSizeBytes,
                     entityRowCount = stats.entityRowCount,
-                    regionCount = stats.regionCount
+                    coverageSetCount = stats.coverageSetCount
                 )
             }
         }

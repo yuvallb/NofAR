@@ -14,14 +14,14 @@ class SettingsClearUnusedTilesTest {
         val storageRepository = RecordingStorageRepository(
             initialStats =
             StorageStats(
-                regionCount = 2,
+                coverageSetCount = 2,
                 entityDbSizeBytes = 1_000_000,
                 demCacheSizeBytes = 200_000_000,
                 entityRowCount = 500
             ),
             afterStats =
             StorageStats(
-                regionCount = 2,
+                coverageSetCount = 2,
                 entityDbSizeBytes = 1_000_000,
                 demCacheSizeBytes = 150_000_000,
                 entityRowCount = 500

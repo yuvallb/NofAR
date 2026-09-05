@@ -107,7 +107,7 @@ class DemRaycastVisibilityEngineTest {
             entity = entity,
             bearingDeg = GeoMath.initialBearingDeg(observerLat, observerLon, entity.lat, entity.lon),
             distanceM =
-            com.nofar.core.model.RegionBounds.haversineDistanceM(
+            com.nofar.core.model.GeoMathBounds.haversineDistanceM(
                 observerLat,
                 observerLon,
                 entity.lat,

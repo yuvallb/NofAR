@@ -1,56 +1,59 @@
 package com.nofar.feature.home
 
+import com.nofar.core.model.CellMembership
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.Region
-import com.nofar.core.model.RegionBounds
 import com.nofar.core.model.UserLocation
 import java.util.UUID
 
 private val EXPLORE_ELIGIBLE_STATUSES = setOf(DownloadStatus.READY, DownloadStatus.PARTIAL)
 
-private val EXPLORE_REGION_PREFERENCE: Comparator<Region> =
-    compareBy<Region> { it.downloadStatus == DownloadStatus.READY }
+private val EXPLORE_COVERAGE_PREFERENCE: Comparator<CoverageSet> =
+    compareBy<CoverageSet> { it.downloadStatus == DownloadStatus.READY }
         .thenBy { it.updatedAt }
 
 sealed interface ExploreNavigationDecision {
     data object Disabled : ExploreNavigationDecision
 
-    data class Direct(val regionId: UUID) : ExploreNavigationDecision
+    data class Direct(val coverageSetId: UUID) : ExploreNavigationDecision
 }
 
-internal object HomeRegionLogic {
-    fun sortRegionsForDisplay(regions: List<Region>, location: UserLocation?): List<Region> {
-        if (location == null) return regions.sortedByDescending { it.updatedAt }
-        return regions.sortedWith(
-            compareBy<Region> { region ->
-                !RegionBounds.containsPoint(region, location.latitude, location.longitude)
-            }.thenBy { region ->
-                RegionBounds.haversineDistanceM(
-                    region.centerLat,
-                    region.centerLon,
-                    location.latitude,
-                    location.longitude
-                )
+internal object HomeCoverageLogic {
+    fun sortCoverageSetsForDisplay(
+        coverageSets: List<CoverageSet>,
+        location: UserLocation?,
+        cellIdsBySet: Map<UUID, Set<String>>
+    ): List<CoverageSet> {
+        if (location == null) return coverageSets.sortedByDescending { it.updatedAt }
+        return coverageSets.sortedWith(
+            compareBy<CoverageSet> { set ->
+                val cells = cellIdsBySet[set.id].orEmpty()
+                !CellMembership.hasCell(cells, location.latitude, location.longitude)
             }.thenByDescending { it.updatedAt }
         )
     }
 
-    fun shouldShowYouAreHere(region: Region, isInside: Boolean): Boolean =
-        isInside && region.downloadStatus in EXPLORE_ELIGIBLE_STATUSES
+    fun shouldShowYouAreHere(coverageSet: CoverageSet, isInside: Boolean): Boolean =
+        isInside && coverageSet.downloadStatus in EXPLORE_ELIGIBLE_STATUSES
 
-    fun exploreEligibleInside(regions: List<Region>, location: UserLocation?): List<Region> {
+    fun exploreEligibleInside(
+        coverageSets: List<CoverageSet>,
+        location: UserLocation?,
+        cellIdsBySet: Map<UUID, Set<String>>
+    ): List<CoverageSet> {
         if (location == null) return emptyList()
-        return regions.filter { region ->
-            RegionBounds.containsPoint(region, location.latitude, location.longitude) &&
-                region.downloadStatus in EXPLORE_ELIGIBLE_STATUSES
+        return coverageSets.filter { set ->
+            val cells = cellIdsBySet[set.id].orEmpty()
+            CellMembership.hasCell(cells, location.latitude, location.longitude) &&
+                set.downloadStatus in EXPLORE_ELIGIBLE_STATUSES
         }
     }
 
-    fun isEnterExploreEnabled(insideExploreRegions: List<Region>): Boolean = insideExploreRegions.isNotEmpty()
+    fun isEnterExploreEnabled(insideExplore: List<CoverageSet>): Boolean = insideExplore.isNotEmpty()
 
-    fun resolveExploreNavigation(insideExploreRegions: List<Region>): ExploreNavigationDecision {
+    fun resolveExploreNavigation(insideExplore: List<CoverageSet>): ExploreNavigationDecision {
         val selected =
-            insideExploreRegions.maxWithOrNull(EXPLORE_REGION_PREFERENCE)
+            insideExplore.maxWithOrNull(EXPLORE_COVERAGE_PREFERENCE)
                 ?: return ExploreNavigationDecision.Disabled
         return ExploreNavigationDecision.Direct(selected.id)
     }

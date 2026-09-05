@@ -2,12 +2,12 @@ package com.nofar.feature.explore
 
 import com.nofar.core.data.prepare.PrepareDownloadScheduler
 import com.nofar.core.data.prepare.PrepareWorkState
-import com.nofar.core.data.repository.RegionRepository
-import com.nofar.core.data.usecase.ExploreRegionResolution
-import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
-import com.nofar.core.data.usecase.QuickRegionProposal
+import com.nofar.core.data.repository.CoverageSetRepository
+import com.nofar.core.data.usecase.ExploreCoverageResolution
+import com.nofar.core.data.usecase.QuickCoverageDownloadUseCase
+import com.nofar.core.data.usecase.QuickCoverageProposal
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.Region
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -22,17 +22,19 @@ import kotlinx.coroutines.launch
  */
 internal class ExploreDownloadController(
     private val scope: CoroutineScope,
-    private val regionRepository: RegionRepository,
-    private val quickRegionDownloadUseCase: QuickRegionDownloadUseCase,
+    private val coverageSetRepository: CoverageSetRepository,
+    private val quickCoverageDownloadUseCase: QuickCoverageDownloadUseCase,
     private val downloadScheduler: PrepareDownloadScheduler,
     private val uiState: MutableStateFlow<ExploreUiState>,
-    private val onDownloadComplete: suspend (Region) -> Unit,
+    private val onDownloadComplete: suspend (CoverageSet) -> Unit,
     private val onRefreshGate: () -> Unit
 ) {
-    var pendingCellularProposal: QuickRegionProposal? = null
+    var pendingCellularProposal: QuickCoverageProposal? = null
     private var observationJob: Job? = null
+    private var activeProposal: QuickCoverageProposal? = null
 
-    suspend fun startDownload(proposal: QuickRegionProposal) {
+    suspend fun startDownload(proposal: QuickCoverageProposal) {
+        activeProposal = proposal
         uiState.update {
             it.copy(
                 downloadUiMessage = null,
@@ -40,40 +42,38 @@ internal class ExploreDownloadController(
             )
         }
         val result =
-            quickRegionDownloadUseCase.createAndEnqueueAtLocation(
+            quickCoverageDownloadUseCase.createAndEnqueueAtLocation(
                 centerLat = proposal.centerLat,
                 centerLon = proposal.centerLon,
-                radiusM = proposal.radiusM,
                 name = proposal.name,
-                existingRegionId = proposal.existingRegionId
+                existingCoverageSetId = proposal.existingCoverageSetId,
+                cellIds = proposal.cellIds
             )
         result
-            .onSuccess { regionId ->
-                val region = regionRepository.getRegion(regionId)
+            .onSuccess { coverageSetId ->
+                val region = coverageSetRepository.getCoverageSet(coverageSetId)
                 if (region != null) {
                     uiState.update {
                         it.copy(
-                            regionResolution = ExploreRegionResolution.Downloading(region),
+                            regionResolution = ExploreCoverageResolution.Downloading(region),
                             downloadPrompt = null
                         )
                     }
-                    observeProgress(regionId)
+                    observeProgress(coverageSetId)
                 }
                 onRefreshGate()
             }.onFailure { error ->
-                uiState.update {
-                    it.copy(downloadUiMessage = error.message ?: "Download failed. Try again.")
-                }
+                failDownload(error.message ?: "Download failed. Try again.")
             }
     }
 
-    fun observeProgress(regionId: UUID) {
+    fun observeProgress(coverageSetId: UUID) {
         observationJob?.cancel()
         observationJob =
             scope.launch {
-                launch { pollProgress(regionId) }
-                downloadScheduler.observeWorkState(regionId).collect { workState ->
-                    handleWorkState(regionId, workState)
+                launch { pollProgress(coverageSetId) }
+                downloadScheduler.observeWorkState(coverageSetId).collect { workState ->
+                    handleWorkState(coverageSetId, workState)
                 }
             }
     }
@@ -87,10 +87,10 @@ internal class ExploreDownloadController(
         stopObservation()
     }
 
-    private suspend fun pollProgress(regionId: UUID) {
+    private suspend fun pollProgress(coverageSetId: UUID) {
         var keepPolling = true
         while (keepPolling) {
-            val region = regionRepository.getRegion(regionId)
+            val region = coverageSetRepository.getCoverageSet(coverageSetId)
             if (region == null) {
                 delay(DOWNLOAD_POLL_INTERVAL_MS)
                 continue
@@ -98,7 +98,7 @@ internal class ExploreDownloadController(
             uiState.update {
                 it.copy(
                     downloadProgressPct = region.downloadProgressPct,
-                    regionResolution = ExploreRegionResolution.Downloading(region)
+                    regionResolution = ExploreCoverageResolution.Downloading(region)
                 )
             }
             keepPolling =
@@ -119,10 +119,10 @@ internal class ExploreDownloadController(
         }
     }
 
-    private suspend fun handleWorkState(regionId: UUID, workState: PrepareWorkState?) {
+    private suspend fun handleWorkState(coverageSetId: UUID, workState: PrepareWorkState?) {
         when (workState) {
             PrepareWorkState.SUCCEEDED -> {
-                val region = regionRepository.getRegion(regionId)
+                val region = coverageSetRepository.getCoverageSet(coverageSetId)
                 if (region != null &&
                     (
                         region.downloadStatus == DownloadStatus.READY ||
@@ -137,11 +137,12 @@ internal class ExploreDownloadController(
         }
     }
 
-    private suspend fun completeDownload(region: Region) {
+    private suspend fun completeDownload(region: CoverageSet) {
         onDownloadComplete(region)
+        activeProposal = null
         uiState.update {
             it.copy(
-                regionResolution = ExploreRegionResolution.Active(region),
+                regionResolution = ExploreCoverageResolution.Active(region),
                 downloadPrompt = null,
                 downloadProgressPct = 100,
                 downloadUiMessage = null
@@ -150,9 +151,19 @@ internal class ExploreDownloadController(
         onRefreshGate()
     }
 
-    private fun failDownload() {
-        uiState.update {
-            it.copy(downloadUiMessage = "Download failed. Try again.")
+    private fun failDownload(message: String = "Download failed. Try again.") {
+        val proposal = activeProposal ?: uiState.value.downloadPrompt
+        uiState.update { state ->
+            if (proposal == null) {
+                state.copy(downloadUiMessage = message, downloadProgressPct = 0)
+            } else {
+                state.copy(
+                    regionResolution = ExploreCoverageResolution.NeedsDownload(proposal),
+                    downloadPrompt = proposal,
+                    downloadProgressPct = 0,
+                    downloadUiMessage = message
+                )
+            }
         }
         onRefreshGate()
     }

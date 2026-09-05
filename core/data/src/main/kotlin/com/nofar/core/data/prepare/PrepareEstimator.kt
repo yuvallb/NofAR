@@ -1,8 +1,8 @@
 package com.nofar.core.data.prepare
 
-import com.nofar.core.model.BoundingBox
 import com.nofar.core.model.DemTileId
-import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.Glo90TileDimensions
+import kotlin.math.cos
 import kotlin.math.max
 
 data class DownloadEstimate(
@@ -13,30 +13,42 @@ data class DownloadEstimate(
 ) {
     val totalMinBytes: Long get() = osmEstimateBytes + demEstimateMinBytes
     val totalMaxBytes: Long get() = osmEstimateBytes + demEstimateMaxBytes
-    val totalEstimateBytes: Long get() = (totalMinBytes + totalMaxBytes) / 2
+
+    /** Prefer on-disk DEM + OSM for UI / cache gates; wire size is demEstimateMaxBytes. */
+    val totalEstimateBytes: Long get() = osmEstimateBytes + demEstimateMinBytes
+    val totalWireBytes: Long get() = osmEstimateBytes + demEstimateMaxBytes
 }
 
 object PrepareEstimator {
-    private const val OSM_BYTES_PER_SQ_KM = 120_000L
-    private const val DEM_TILE_MIN_BYTES = 13L * 1024 * 1024
-    private const val DEM_TILE_MAX_BYTES = 50L * 1024 * 1024
+    /** Sparse place/peak density for city|town|village|peak only (bytes per km²). */
+    private const val OSM_BYTES_PER_SQ_KM = 80L
+    private const val EQUATORIAL_KM_PER_DEG = 111.32
+    private const val MIN_OSM_BYTES = 64_000L
 
-    fun estimate(centerLat: Double, centerLon: Double, radiusM: Double): DownloadEstimate {
-        val bbox = RegionBounds.boundingBox(centerLat, centerLon, radiusM)
-        val areaSqKm = estimateAreaSqKm(bbox)
-        val demTileCount = DemTileId.intersectingTiles(bbox).size
+    fun estimateForCells(cells: List<Pair<Int, Int>>): DownloadEstimate {
+        val demDisk = Glo90TileDimensions.totalDiskBytes(cells)
+        val demWire = Glo90TileDimensions.totalWireBytes(cells)
+        val osmEstimate =
+            max(
+                MIN_OSM_BYTES,
+                cells.sumOf { (tileLat, _) ->
+                    val midLat = tileLat + 0.5
+                    val heightKm = EQUATORIAL_KM_PER_DEG
+                    val widthKm = EQUATORIAL_KM_PER_DEG * cos(Math.toRadians(midLat)).coerceAtLeast(0.01)
+                    (heightKm * widthKm * OSM_BYTES_PER_SQ_KM).toLong()
+                }
+            )
         return DownloadEstimate(
-            osmEstimateBytes = max(512_000L, (areaSqKm * OSM_BYTES_PER_SQ_KM).toLong()),
-            demTileCount = demTileCount,
-            demEstimateMinBytes = demTileCount * DEM_TILE_MIN_BYTES,
-            demEstimateMaxBytes = demTileCount * DEM_TILE_MAX_BYTES
+            osmEstimateBytes = osmEstimate,
+            demTileCount = cells.size,
+            demEstimateMinBytes = demDisk,
+            demEstimateMaxBytes = demWire
         )
     }
 
-    private fun estimateAreaSqKm(bbox: BoundingBox): Double {
-        val latSpanKm = (bbox.maxLat - bbox.minLat) * 111.32
-        val lonSpanKm = (bbox.maxLon - bbox.minLon) * 111.32 *
-            kotlin.math.cos(Math.toRadians((bbox.minLat + bbox.maxLat) / 2.0))
-        return latSpanKm * lonSpanKm
+    /** @deprecated Use [estimateForCells]. */
+    fun estimate(centerLat: Double, centerLon: Double, radiusM: Double): DownloadEstimate {
+        val bbox = com.nofar.core.model.GeoMathBounds.boundingBox(centerLat, centerLon, radiusM)
+        return estimateForCells(DemTileId.intersectingTiles(bbox))
     }
 }

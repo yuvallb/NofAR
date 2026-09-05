@@ -1,10 +1,13 @@
+@file:Suppress("TooGenericExceptionCaught")
+
 package com.nofar.core.visibility
 
 import android.util.Log
 import com.nofar.core.common.DispatcherProvider
 import com.nofar.core.data.preferences.UserPreferencesRepository
+import com.nofar.core.data.repository.CoverageSetRepository
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.Region
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.UserLocation
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -25,7 +28,8 @@ import kotlinx.coroutines.sync.withLock
 class VisibilityPassScheduler
 @Inject
 constructor(
-    private val visibilityUseCase: RegionVisibilityComputer,
+    private val visibilityUseCase: CoverageVisibilityComputer,
+    private val coverageSetRepository: CoverageSetRepository,
     private val userPreferencesRepository: UserPreferencesRepository,
     private val dispatchers: DispatcherProvider
 ) {
@@ -45,7 +49,8 @@ constructor(
     private val _warnings = MutableStateFlow<Set<VisibilityWarning>>(emptySet())
     val warnings: StateFlow<Set<VisibilityWarning>> = _warnings.asStateFlow()
 
-    private var activeRegions: List<Region> = emptyList()
+    private var activeCoverageSets: List<CoverageSet> = emptyList()
+    private var activeCellIds: Set<String> = emptySet()
     private var lastPassAtMillis: Long = VisibilityPassPolicy.NO_PASS_YET
     private var lastPassLocation: UserLocation? = null
     private var sequenceNumber: Long = 0L
@@ -62,23 +67,26 @@ constructor(
         periodicRefreshEnabled = periodicRefresh
     }
 
-    fun setActiveRegions(regions: List<Region>) {
-        activeRegions = regions
+    fun setActiveCoverageSets(coverageSets: List<CoverageSet>) {
+        activeCoverageSets = coverageSets
+        activeCellIds = emptySet()
         lastPassAtMillis = VisibilityPassPolicy.NO_PASS_YET
         lastPassLocation = null
         lastObserverLocation?.let { location ->
-            triggerPass(force = true, location = location, regions = regions)
+            triggerPass(force = true, location = location, coverageSets = coverageSets)
         }
     }
+
+    /** @deprecated Use [setActiveCoverageSets]. */
+    fun setActiveRegions(coverageSets: List<CoverageSet>) = setActiveCoverageSets(coverageSets)
 
     fun seedObserverLocation(location: UserLocation) {
         lastObserverLocation = location
     }
 
-    /** Forces a visibility pass with the last known observer location (e.g. preference change). */
     fun requestPass(force: Boolean = true) {
         lastObserverLocation?.let { location ->
-            triggerPass(force = force, location = location, regions = activeRegions)
+            triggerPass(force = force, location = location, coverageSets = activeCoverageSets)
         }
     }
 
@@ -123,28 +131,29 @@ constructor(
         _horizonProfile.value = null
         _horizonEyeSource.value = null
         _warnings.value = emptySet()
-        activeRegions = emptyList()
+        activeCoverageSets = emptyList()
+        activeCellIds = emptySet()
         lastPassAtMillis = VisibilityPassPolicy.NO_PASS_YET
         lastPassLocation = null
         lastObserverLocation = null
     }
 
     private fun onLocationUpdate(location: UserLocation) {
-        if (activeRegions.isEmpty()) return
+        if (activeCoverageSets.isEmpty()) return
         if (shouldSchedulePass(location, force = false)) {
-            triggerPass(force = false, location = location, regions = activeRegions)
+            triggerPass(force = false, location = location, coverageSets = activeCoverageSets)
         }
     }
 
     private fun triggerPass(
         force: Boolean,
         location: UserLocation? = lastObserverLocation,
-        regions: List<Region> = activeRegions
+        coverageSets: List<CoverageSet> = activeCoverageSets
     ) {
-        val currentRegions = regions
+        val currentCoverageSets = coverageSets
         val currentLocation = location
         val launchScope = scope
-        if (currentRegions.isEmpty() || currentLocation == null || launchScope == null) {
+        if (currentCoverageSets.isEmpty() || currentLocation == null || launchScope == null) {
             return
         }
         if (!force && !shouldSchedulePass(currentLocation, force = false)) {
@@ -158,9 +167,19 @@ constructor(
                 val result =
                     runCatching {
                         val computeHorizonProfile = userPreferencesRepository.showHorizonOutline.first()
+                        val cellIds =
+                            if (activeCellIds.isEmpty()) {
+                                coverageSetRepository
+                                    .getCellIdsForCoverageSets(currentCoverageSets.map { it.id })
+                                    .toSet()
+                                    .also { activeCellIds = it }
+                            } else {
+                                activeCellIds
+                            }
                         mutex.withLock {
-                            visibilityUseCase.computeForRegions(
-                                regions = currentRegions,
+                            visibilityUseCase.computeForCoverageSets(
+                                coverageSets = currentCoverageSets,
+                                cellIds = cellIds,
                                 location = currentLocation,
                                 computeHorizonProfile = computeHorizonProfile
                             )
@@ -168,7 +187,7 @@ constructor(
                     }.getOrElse { error ->
                         Log.e(
                             TAG,
-                            "Visibility pass failed for ${currentRegions.size} region(s)",
+                            "Visibility pass failed for ${currentCoverageSets.size} coverage set(s)",
                             error
                         )
                         VisibilityResult(

@@ -2,7 +2,7 @@
 
 **Tagline:** *point, explore, discover*
 
-NofAR is an offline-first Android AR app for hikers and travelers. Users download OSM place/peak data and Copernicus DEM tiles for circular regions, then point their phone at the horizon in **Explore** mode to see terrain-aware labels for visible peaks and settlements.
+NofAR is an offline-first Android AR app for hikers and travelers. Users download OSM place/peak data and Copernicus GLO-90 DEM cells (country packs or a local 3×3 ring), then point their phone at the horizon in **Explore** mode to see terrain-aware labels for visible peaks and settlements.
 
 - **Platform:** Android only (min SDK 26)
 - **License:** Apache 2.0
@@ -80,7 +80,8 @@ These are non-negotiable for MVP — do not introduce alternatives without expli
 | Offline Explore/Home | No network calls outside **Prepare** mode |
 | No ARCore | Must not be a hard dependency (F-Droid / reproducible builds) |
 | Privacy | No analytics, crash reporting that phones home, or tracking SDKs |
-| Regions | Circular only (5–20 km radius); no polygon regions |
+| Coverage | 1° cell sets (country packs or local 3×3 ring); no circular regions |
+| DEM source | Copernicus GLO-90 int16 `.bin` rasters (Prepare-only GeoTIFF decode) |
 | DEM at runtime | Explore reads flat `.bin` rasters only — **no GeoTIFF/COG parsing** in Explore |
 | Visibility | Live DEM raycast (~50–100 candidates), not precomputed horizon grids |
 | Overpass | Streaming JSON parse (never load full response into memory); three-mirror failover |
@@ -103,7 +104,7 @@ These are non-negotiable for MVP — do not introduce alternatives without expli
 
 - AR render pass ≥ 30 FPS — **must not** touch DEM/DB/raycasting on the render thread.
 - Two-cadence design: high-frequency overlay render vs. low-frequency visibility pass (≤ 200 ms, at most every 2 s or 20 m movement).
-- Spatial query < 50 ms for ≤ 10,000 entities per region.
+- Spatial query < 50 ms for ≤ 10,000 entities per coverage set.
 
 ### Phase workflow
 

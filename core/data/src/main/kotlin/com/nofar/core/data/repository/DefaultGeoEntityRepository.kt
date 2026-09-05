@@ -39,21 +39,15 @@ constructor(
         .queryWithinRadius(lat, lon, radiusM, resolutionLevel)
         .map { it.asExternalModel() }
 
-    override suspend fun queryWithinRadiusForRegion(
-        regionId: UUID,
-        regionCenterLat: Double,
-        regionCenterLon: Double,
-        regionRadiusM: Double,
+    override suspend fun queryWithinRadiusForCoverageSet(
+        coverageSetId: UUID,
         lat: Double,
         lon: Double,
         radiusM: Double,
         resolutionLevel: ResolutionLevel
     ): List<GeoEntity> = spatialQuery
-        .queryWithinRadiusForRegion(
-            regionId = regionId.toString(),
-            regionCenterLat = regionCenterLat,
-            regionCenterLon = regionCenterLon,
-            regionRadiusM = regionRadiusM,
+        .queryWithinRadiusForCoverageSet(
+            coverageSetId = coverageSetId.toString(),
             lat = lat,
             lon = lon,
             radiusM = radiusM,

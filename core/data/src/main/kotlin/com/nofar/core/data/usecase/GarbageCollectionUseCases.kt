@@ -1,11 +1,10 @@
 package com.nofar.core.data.usecase
 
+import com.nofar.core.data.repository.CoverageSetRepository
 import com.nofar.core.data.repository.DemTileRepository
-import com.nofar.core.data.repository.RegionRepository
+import com.nofar.core.database.dao.CoverageCellDao
+import com.nofar.core.database.dao.CoverageEntityDao
 import com.nofar.core.database.dao.GeoEntityDao
-import com.nofar.core.database.dao.RegionDao
-import com.nofar.core.database.dao.RegionEntityCoverageDao
-import com.nofar.core.database.dao.TileCoverageDao
 import com.nofar.core.model.DownloadStatus
 import java.util.UUID
 import javax.inject.Inject
@@ -13,35 +12,38 @@ import javax.inject.Inject
 data class TileEvictionResult(val tilesEvicted: Int, val bytesFreed: Long)
 
 /**
- * Deletes a region and garbage-collects entities and DEM tiles per Requirements §5.3.
+ * Deletes a coverage set and garbage-collects entities and DEM tiles per Requirements §5.3.
  */
-class RegionDeletionUseCase
+class CoverageSetDeletionUseCase
 @Inject
 constructor(
-    private val regionDao: RegionDao,
-    private val regionEntityCoverageDao: RegionEntityCoverageDao,
+    private val coverageSetRepository: CoverageSetRepository,
+    private val coverageEntityDao: CoverageEntityDao,
     private val geoEntityDao: GeoEntityDao,
-    private val tileCoverageDao: TileCoverageDao,
+    private val coverageCellDao: CoverageCellDao,
     private val demTileRepository: DemTileRepository
 ) {
-    suspend fun execute(regionId: UUID) {
-        val regionIdString = regionId.toString()
-        val tileIds = tileCoverageDao.getTileIdsForRegion(regionIdString)
+    suspend fun execute(coverageSetId: UUID) {
+        val coverageSetIdString = coverageSetId.toString()
+        val cellIds = coverageCellDao.getCellIdsForCoverageSet(coverageSetIdString)
 
-        geoEntityDao.deleteEntitiesExclusiveToRegion(regionIdString)
-        regionEntityCoverageDao.deleteForRegion(regionIdString)
-        tileCoverageDao.deleteForRegion(regionIdString)
+        geoEntityDao.deleteEntitiesExclusiveToCoverageSet(coverageSetIdString)
+        coverageEntityDao.deleteForCoverageSet(coverageSetIdString)
+        coverageCellDao.deleteForCoverageSet(coverageSetIdString)
 
-        tileIds.forEach { tileId ->
+        cellIds.forEach { tileId ->
             demTileRepository.decrementRefCount(tileId)
             if (demTileRepository.getTile(tileId)?.refCount == 0) {
                 demTileRepository.evictTile(tileId)
             }
         }
 
-        regionDao.deleteById(regionIdString)
+        coverageSetRepository.deleteCoverageSet(coverageSetId)
     }
 }
+
+/** @deprecated Use [CoverageSetDeletionUseCase]. */
+typealias RegionDeletionUseCase = CoverageSetDeletionUseCase
 
 class EvictUnusedDemTilesUseCase
 @Inject
@@ -78,14 +80,15 @@ constructor(private val demTileRepository: DemTileRepository) {
 
 /**
  * Evicts least-recently-used tiles regardless of reference count after user confirmation.
- * Affected regions are marked [DownloadStatus.PARTIAL].
+ * Affected coverage sets are marked [DownloadStatus.PARTIAL]. Cell geometry is retained so
+ * the set can be repaired / re-downloaded.
  */
 class ForceLruEvictionUseCase
 @Inject
 constructor(
     private val demTileRepository: DemTileRepository,
-    private val tileCoverageDao: TileCoverageDao,
-    private val regionRepository: RegionRepository
+    private val coverageCellDao: CoverageCellDao,
+    private val coverageSetRepository: CoverageSetRepository
 ) {
     suspend fun execute(thresholdBytes: Long): TileEvictionResult {
         var evicted = 0
@@ -94,12 +97,12 @@ constructor(
         val candidates = demTileRepository.getAllLruCandidates()
         for (tile in candidates) {
             if (totalBytes <= thresholdBytes) break
-            val affectedRegionIds = tileCoverageDao.getRegionIdsForTile(tile.tileId)
-            tileCoverageDao.deleteForTile(tile.tileId)
+            val affectedCoverageSetIds = coverageCellDao.getCoverageSetIdsForCell(tile.tileId)
+            // Keep coverage_cell rows — they are the set geometry in v2.
             demTileRepository.evictTile(tile.tileId)
-            affectedRegionIds.forEach { regionId ->
-                regionRepository.updateDownloadStatus(
-                    id = UUID.fromString(regionId),
+            affectedCoverageSetIds.forEach { coverageSetId ->
+                coverageSetRepository.updateDownloadStatus(
+                    id = UUID.fromString(coverageSetId),
                     status = DownloadStatus.PARTIAL,
                     progressPct = 100
                 )

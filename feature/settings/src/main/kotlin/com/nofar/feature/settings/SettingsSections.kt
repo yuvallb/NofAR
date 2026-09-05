@@ -266,7 +266,7 @@ private fun SettingsStorageSection(
         color = NofARColors.TextPrimary
     )
     Text(
-        text = "Regions: ${uiState.regionCount}",
+        text = "Coverage sets: ${uiState.coverageSetCount}",
         style = MaterialTheme.typography.bodyMedium,
         color = NofARColors.TextPrimary
     )

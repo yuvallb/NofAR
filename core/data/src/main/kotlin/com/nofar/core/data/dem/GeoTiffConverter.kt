@@ -54,20 +54,20 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         return GeoTiffConversionResult(
             width = directory.width,
             height = directory.height,
-            noDataValue = DemBinaryFormat.DEFAULT_NO_DATA_VALUE,
+            noDataValue = DemBinaryFormat.HEADER_NO_DATA_VALUE,
             sizeBytes = outputFile.length()
         )
     }
 
     /**
      * Rewrites the source raster's own no-data sentinel (GDAL_NODATA, e.g. Copernicus GLO-30's
-     * `-32767`) to [DemBinaryFormat.DEFAULT_NO_DATA_VALUE], which is what the `.bin` header declares.
+     * `-32767`) to [DemBinaryFormat.HEADER_NO_DATA_VALUE], which is what the `.bin` header declares.
      *
      * Without this the sentinel survived into Explore as a real elevation, and because the skyline eye
      * comes from the DEM pixel under the observer it produced a near-vertical horizon.
      */
     private fun normalizeNoData(elevations: FloatArray, sourceNoDataValue: Float?) {
-        val canonical = DemBinaryFormat.DEFAULT_NO_DATA_VALUE
+        val canonical = DemBinaryFormat.HEADER_NO_DATA_VALUE
         for (index in elevations.indices) {
             val value = elevations[index]
             val isNoData = !value.isFinite() || (sourceNoDataValue != null && value == sourceNoDataValue)
@@ -486,7 +486,7 @@ class DefaultGeoTiffConverter : GeoTiffConverter {
         private const val MAX_RASTER_DIMENSION = 10_000
 
         /** Align with DEM download cap in DefaultDemTileFetcher. */
-        private const val MAX_INPUT_BYTES: Long = 80L * 1024 * 1024
+        private const val MAX_INPUT_BYTES: Long = 16L * 1024 * 1024
 
         private const val TAG_IMAGE_WIDTH = 256
         private const val TAG_IMAGE_LENGTH = 257

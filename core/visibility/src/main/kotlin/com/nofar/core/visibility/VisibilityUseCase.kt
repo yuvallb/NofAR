@@ -1,17 +1,16 @@
 package com.nofar.core.visibility
 
 import android.util.Log
+import com.nofar.core.data.dem.CoverageDemTileResolver
 import com.nofar.core.data.dem.DemTileReader
-import com.nofar.core.data.dem.RegionDemTileResolver
+import com.nofar.core.data.repository.CoverageSetRepository
 import com.nofar.core.data.repository.DemTileRepository
 import com.nofar.core.data.repository.GeoEntityRepository
-import com.nofar.core.database.dao.TileCoverageDao
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.ContributingRegions
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.GeoEntityType
-import com.nofar.core.model.Region
-import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.GeoMathBounds
 import com.nofar.core.model.ResolutionLevel
 import com.nofar.core.model.UserLocation
 import javax.inject.Inject
@@ -21,35 +20,44 @@ class VisibilityUseCase
 constructor(
     private val geoEntityRepository: GeoEntityRepository,
     private val demTileRepository: DemTileRepository,
-    private val tileCoverageDao: TileCoverageDao,
+    private val coverageSetRepository: CoverageSetRepository,
     private val visibilityEngine: VisibilityEngine,
     private val observerElevationResolver: ObserverElevationResolver,
     private val horizonProfileComputer: HorizonProfileComputer
-) : RegionVisibilityComputer {
-    override suspend fun computeForRegions(
-        regions: List<Region>,
+) : CoverageVisibilityComputer {
+    override suspend fun computeForCoverageSets(
+        coverageSets: List<CoverageSet>,
+        cellIds: Set<String>,
         location: UserLocation,
         computeHorizonProfile: Boolean
-    ): VisibilityResult = computeForRegions(regions, location, AppConfig.defaultResolutionLevel, computeHorizonProfile)
+    ): VisibilityResult = computeForCoverageSets(
+        coverageSets,
+        cellIds,
+        location,
+        AppConfig.defaultResolutionLevel,
+        computeHorizonProfile
+    )
 
-    suspend fun computeForRegion(
-        region: Region,
+    suspend fun computeForCoverageSet(
+        coverageSet: CoverageSet,
+        cellIds: Set<String>,
         location: UserLocation,
         resolutionLevel: ResolutionLevel = AppConfig.defaultResolutionLevel
-    ): VisibilityResult = computeForRegions(listOf(region), location, resolutionLevel)
+    ): VisibilityResult = computeForCoverageSets(listOf(coverageSet), cellIds, location, resolutionLevel)
 
-    suspend fun computeForRegions(
-        regions: List<Region>,
+    suspend fun computeForCoverageSets(
+        coverageSets: List<CoverageSet>,
+        cellIds: Set<String>,
         location: UserLocation,
         resolutionLevel: ResolutionLevel,
         computeHorizonProfile: Boolean = true
     ): VisibilityResult {
-        if (regions.isEmpty()) {
+        if (coverageSets.isEmpty()) {
             return VisibilityResult(entities = emptyList(), computationTimeMs = 0L, hereContext = HereContext())
         }
 
         val warnings = mutableSetOf<VisibilityWarning>()
-        val demReaders = openDemReaders(regions, warnings)
+        val demReaders = openDemReaders(cellIds, warnings)
         val sampler = DemElevationSampler(demReaders)
         val observerDemGroundM = sampler.elevationAt(location.latitude, location.longitude)
         val observerElevation =
@@ -59,7 +67,7 @@ constructor(
             )
         observerElevation.warning?.let { warnings += it }
 
-        val candidateQuery = queryCandidates(regions, location, resolutionLevel, warnings)
+        val candidateQuery = queryCandidates(coverageSets, location, resolutionLevel, warnings)
         val hereContext =
             HereContextResolver.resolve(
                 observerLat = location.latitude,
@@ -67,14 +75,14 @@ constructor(
                 entities = candidateQuery.allEntities
             )
         val candidates = candidateQuery.candidates
-        val collectionRadiusM = ContributingRegions.maxHorizonRadiusM(regions, location.latitude, location.longitude)
+        val collectionRadiusM = AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M
         val request =
             VisibilityRequest(
                 observerLat = location.latitude,
                 observerLon = location.longitude,
                 observerElevationM = observerElevation.elevationM,
                 eyeHeightM = AppConfig.EYE_HEIGHT_METERS,
-                regionId = regions.first().id,
+                regionId = coverageSets.first().id,
                 radiusM = collectionRadiusM,
                 resolutionLevel = resolutionLevel,
                 demReaders = demReaders,
@@ -152,29 +160,17 @@ constructor(
     )
 
     private suspend fun queryCandidates(
-        regions: List<Region>,
+        coverageSets: List<CoverageSet>,
         location: UserLocation,
         resolutionLevel: ResolutionLevel,
         warnings: MutableSet<VisibilityWarning>
     ): CandidateQueryResult {
         val entitiesById = LinkedHashMap<String, GeoEntity>()
-        for (region in regions) {
-            val collectionRadiusM = RegionBounds.dataCollectionRadiusM(region)
-            val observerToCenterM =
-                RegionBounds.haversineDistanceM(
-                    location.latitude,
-                    location.longitude,
-                    region.centerLat,
-                    region.centerLon
-                )
-            // Reach every point still inside the collection circle from the observer.
-            val queryRadiusM = collectionRadiusM + observerToCenterM
+        val queryRadiusM = AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M
+        for (coverageSet in coverageSets) {
             val entities =
-                geoEntityRepository.queryWithinRadiusForRegion(
-                    regionId = region.id,
-                    regionCenterLat = region.centerLat,
-                    regionCenterLon = region.centerLon,
-                    regionRadiusM = collectionRadiusM,
+                geoEntityRepository.queryWithinRadiusForCoverageSet(
+                    coverageSetId = coverageSet.id,
                     lat = location.latitude,
                     lon = location.longitude,
                     radiusM = queryRadiusM,
@@ -186,7 +182,7 @@ constructor(
         if (entitiesById.isEmpty()) {
             Log.w(
                 TAG,
-                "No visibility candidates for ${regions.size} region(s) at " +
+                "No visibility candidates for ${coverageSets.size} coverage set(s) at " +
                     "${location.latitude},${location.longitude}"
             )
         }
@@ -213,17 +209,10 @@ constructor(
     }
 
     private suspend fun openDemReaders(
-        regions: List<Region>,
+        cellIds: Set<String>,
         warnings: MutableSet<VisibilityWarning>
     ): Map<String, DemTileReader> {
-        val expectedTileIds = LinkedHashSet<String>()
-        for (region in regions) {
-            expectedTileIds +=
-                RegionDemTileResolver.resolveExpectedTileIds(
-                    region = region,
-                    tileCoverageDao = tileCoverageDao
-                )
-        }
+        val expectedTileIds = CoverageDemTileResolver.cellIdsToTileIds(cellIds.toList()).toSet()
         val readers = LinkedHashMap<String, DemTileReader>()
         for (tileId in expectedTileIds) {
             demTileRepository.ensureRegisteredFromBin(tileId)
@@ -242,7 +231,7 @@ constructor(
 
     private fun GeoEntity.toCandidate(location: UserLocation): VisibilityCandidate {
         val distanceM =
-            RegionBounds.haversineDistanceM(
+            GeoMathBounds.haversineDistanceM(
                 location.latitude,
                 location.longitude,
                 lat,
@@ -267,10 +256,6 @@ constructor(
     }
 }
 
-/**
- * Caps visibility candidates: nearest peaks up to [peakBudget], then nearest non-peaks to fill
- * [maxCandidates].
- */
 internal object VisibilityCandidateSelector {
     fun select(
         entities: Collection<GeoEntity>,
@@ -303,7 +288,7 @@ internal object VisibilityCandidateSelector {
         return selectedPeaks + places.take(remaining)
     }
 
-    private fun distanceM(location: UserLocation, entity: GeoEntity): Double = RegionBounds.haversineDistanceM(
+    private fun distanceM(location: UserLocation, entity: GeoEntity): Double = GeoMathBounds.haversineDistanceM(
         location.latitude,
         location.longitude,
         entity.lat,
@@ -311,11 +296,6 @@ internal object VisibilityCandidateSelector {
     )
 }
 
-/**
- * Attaches (or skips) the skyline sweep for a pass. Extracted to file scope so the skip-when-disabled
- * behavior (H-P1-11) and the "profile is actually computed" invariant (H-P1-16) are unit-testable
- * without the full repository/DAO graph.
- */
 internal fun buildHorizonProfile(
     horizonProfileComputer: HorizonProfileComputer,
     computeHorizonProfile: Boolean,

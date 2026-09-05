@@ -61,6 +61,12 @@ object HorizonProjector {
         while (headingDelta <= halfHorizontalFov + SCREEN_AZIMUTH_STEP_DEG * 0.01f) {
             val bearingDeg = normalizeAzimuthDeg(trueAzimuthDeg + headingDelta)
             val elevationAngleDeg = profile.sampleElevationDeg(bearingDeg).toDouble()
+            if (elevationAngleDeg.isNaN()) {
+                appendSegment(segments, currentSegment)
+                currentSegment = mutableListOf()
+                headingDelta += SCREEN_AZIMUTH_STEP_DEG
+                continue
+            }
             val relativeElevation = elevationAngleDeg - cameraElevationDeg.toDouble()
             if (abs(relativeElevation) > halfVerticalFovDeg) {
                 // H-DEC-1 Option A: the skyline is outside the vertical frustum here. Omit the point and

@@ -18,11 +18,11 @@ constructor(
     private val orchestrator: PrepareDownloadOrchestrator
 ) : CoroutineWorker(context, params) {
     override suspend fun doWork(): androidx.work.ListenableWorker.Result {
-        val regionId =
-            inputData.getString(KEY_REGION_ID)?.let(UUID::fromString)
+        val coverageSetId =
+            inputData.getString(KEY_COVERAGE_SET_ID)?.let(UUID::fromString)
                 ?: return androidx.work.ListenableWorker.Result.failure()
 
-        return orchestrator.download(regionId).fold(
+        return orchestrator.download(coverageSetId).fold(
             onSuccess = { androidx.work.ListenableWorker.Result.success() },
             onFailure = { error ->
                 if (error is IOException && runAttemptCount < MAX_ATTEMPTS) {
@@ -35,7 +35,7 @@ constructor(
     }
 
     companion object {
-        const val KEY_REGION_ID = "region_id"
+        const val KEY_COVERAGE_SET_ID = "coverage_set_id"
         const val UNIQUE_WORK_PREFIX = "prepare_download_"
         private const val MAX_ATTEMPTS = 3
     }

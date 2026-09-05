@@ -29,6 +29,7 @@ constructor(private val dispatchers: DispatcherProvider) :
             )
         }
 
+    @Suppress("ReturnCount")
     private fun toVisibleEntity(
         request: VisibilityRequest,
         candidate: VisibilityCandidate,
@@ -54,7 +55,8 @@ constructor(private val dispatchers: DispatcherProvider) :
             } else {
                 candidate.entity.lat to candidate.entity.lon
             }
-        val targetElevationM = resolveTargetElevationM(candidate, sampler, targetLat, targetLon)
+        val targetElevationM =
+            resolveTargetElevationM(candidate, sampler, targetLat, targetLon) ?: return null
         val isVisible =
             rayDistanceM <= request.radiusM &&
                 rayMarcher.isTargetVisible(
@@ -90,12 +92,11 @@ constructor(private val dispatchers: DispatcherProvider) :
         sampler: DemElevationSampler,
         targetLat: Double,
         targetLon: Double
-    ): Double {
+    ): Double? {
         candidate.entity.elevation?.let { elevation ->
             if (candidate.entity.footprintRadiusM == null) return elevation.toDouble()
         }
         return sampler.elevationAt(targetLat, targetLon)?.toDouble()
             ?: candidate.entity.elevation?.toDouble()
-            ?: 0.0
     }
 }

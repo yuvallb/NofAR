@@ -1,4 +1,4 @@
-@file:Suppress("LoopWithTooManyJumpStatements")
+@file:Suppress("ReturnCount", "LoopWithTooManyJumpStatements")
 
 package com.nofar.core.data.prepare
 
@@ -84,6 +84,9 @@ constructor(
     }
 
     private fun sampleElevation(entity: GeoEntity, readers: MutableMap<String, DemTileReader>): Float? {
+        if (entity.type == com.nofar.core.model.GeoEntityType.PEAK) {
+            return samplePeakElevation(entity, readers)
+        }
         val (tileLat, tileLon) = DemTileId.coordinatesForPoint(entity.lat, entity.lon)
         val tileId = DemTileId.fromCoordinates(tileLat, tileLon)
         val reader =
@@ -91,5 +94,34 @@ constructor(
                 readers[tileId] = opened
             } ?: return null
         return reader.elevationAt(entity.lat, entity.lon)
+    }
+
+    /**
+     * Peak elevations use the max of a 3×3 window of DEM samples around the peak pixel
+     * (neighboring raster pixels, not neighboring 1° cells).
+     */
+    private fun samplePeakElevation(entity: GeoEntity, readers: MutableMap<String, DemTileReader>): Float? {
+        val (tileLat, tileLon) = DemTileId.coordinatesForPoint(entity.lat, entity.lon)
+        val tileId = DemTileId.fromCoordinates(tileLat, tileLon)
+        val reader =
+            readers[tileId] ?: demTileRepository.openReader(tileId)?.also { opened ->
+                readers[tileId] = opened
+            } ?: return null
+
+        val degPerPixelX = 1.0 / reader.width
+        val degPerPixelY = 1.0 / reader.height
+        var best: Float? = null
+        for (dy in -1..1) {
+            for (dx in -1..1) {
+                val sampleLat = entity.lat + dy * degPerPixelY
+                val sampleLon = entity.lon + dx * degPerPixelX
+                val sample = reader.elevationAt(sampleLat, sampleLon) ?: continue
+                if (sample.isFinite() && (best == null || sample > best!!)) {
+                    best = sample
+                }
+            }
+        }
+        // Fall back to single-pixel if neighbors fall outside the tile edge.
+        return best ?: reader.elevationAt(entity.lat, entity.lon)
     }
 }

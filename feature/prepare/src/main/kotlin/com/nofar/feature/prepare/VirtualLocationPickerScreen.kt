@@ -103,7 +103,8 @@ private fun VirtualLocationPickerMapSection(
             PreparePointPickerMap(
                 selectedLat = lat,
                 selectedLon = lon,
-                downloadedRegions = uiState.eligibleRegions,
+                downloadedCoverageSets = uiState.eligibleRegions,
+                downloadedCellIdsBySet = uiState.cellIdsBySet.mapValues { it.value.toList() },
                 mapRecenterNonce = uiState.mapRecenterNonce,
                 onMapTap = onMapTap,
                 visibilityMask = uiState.visibilityMask,

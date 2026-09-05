@@ -3,7 +3,7 @@ package com.nofar.core.visibility
 import com.nofar.core.model.AppConfig
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.GeoEntityType
-import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.GeoMathBounds
 
 data class HereContext(val place: GeoEntity? = null, val peak: GeoEntity? = null) {
     val entityIds: Set<String> =
@@ -52,7 +52,7 @@ object HereContextResolver {
         entity.footprintRadiusM ?: AppConfig.FOOTPRINT_RADIUS_MIN_M
 
     private fun distanceM(observerLat: Double, observerLon: Double, entity: GeoEntity): Double =
-        RegionBounds.haversineDistanceM(observerLat, observerLon, entity.lat, entity.lon)
+        GeoMathBounds.haversineDistanceM(observerLat, observerLon, entity.lat, entity.lon)
 
     private fun placeComparator(observerLat: Double, observerLon: Double): Comparator<GeoEntity> = compareBy(
         { entity -> effectiveFootprintRadiusM(entity) },

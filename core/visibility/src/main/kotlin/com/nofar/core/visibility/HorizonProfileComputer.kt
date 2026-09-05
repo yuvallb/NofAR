@@ -1,7 +1,6 @@
 package com.nofar.core.visibility
 
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.RegionBounds
 import javax.inject.Inject
 import kotlin.math.floor
 
@@ -53,15 +52,14 @@ constructor() {
      * Sweeps a full-360° skyline profile.
      *
      * @param maxRadiusM outward reach of each azimuth ray. Passed from the caller so it matches the
-     * Explore entity-collection radius (H-DEC-3): region radius + [AppConfig.DATA_COLLECTION_RADIUS_PADDING_M].
+     * Explore entity-collection radius: [AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M].
      */
     fun sweep(
         observerLat: Double,
         observerLon: Double,
         observerEyeM: Double,
         sampler: DemSampler,
-        maxRadiusM: Double =
-            RegionBounds.dataCollectionRadiusM(AppConfig.REGION_RADIUS_MAX_KM * 1_000.0)
+        maxRadiusM: Double = AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M
     ): HorizonProfile {
         val azimuthStepDeg = AppConfig.HORIZON_AZIMUTH_STEP_DEG
         val bucketCount = (360f / azimuthStepDeg).toInt()
@@ -151,7 +149,7 @@ constructor() {
         samples: List<Pair<Double, Double>>
     ): Double {
         if (groundElevationM == null || samples.size < 2) {
-            return 0.0
+            return Double.NaN
         }
         val eyeHeightM = observerEyeM - groundElevationM
         val horizonIndex = rayMarcher.findHorizonIndexWithDistances(samples, eyeHeightM)

@@ -5,17 +5,18 @@ import android.os.StatFs
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nofar.core.data.preferences.UserPreferencesRepository
-import com.nofar.core.data.repository.HomeRegionMetadataRepository
-import com.nofar.core.data.repository.RegionRepository
+import com.nofar.core.data.repository.CoverageSetRepository
+import com.nofar.core.data.repository.HomeCoverageSetMetadataRepository
 import com.nofar.core.data.repository.StorageRepository
-import com.nofar.core.data.usecase.InsideRegionUseCase
-import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
-import com.nofar.core.data.usecase.RegionDeletionUseCase
+import com.nofar.core.data.usecase.CoverageSetDeletionUseCase
+import com.nofar.core.data.usecase.CoverageSetRepairUseCase
+import com.nofar.core.data.usecase.InsideCoverageUseCase
+import com.nofar.core.designsystem.component.CoverageSetCardState
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.LocationAccessState
-import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
 import com.nofar.core.sensors.DeclinationCorrector
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,14 +35,14 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class HomeUiState(
-    val regions: List<com.nofar.core.designsystem.component.RegionCardState> = emptyList(),
-    val insideRegionIds: Set<UUID> = emptySet(),
+    val coverageSets: List<CoverageSetCardState> = emptyList(),
+    val insideCoverageSetIds: Set<UUID> = emptySet(),
     val enterExploreEnabled: Boolean = false,
     val demCacheBytes: Long = 0L,
     val entitiesDbBytes: Long = 0L,
     val freeSpaceBytes: Long = 0L,
-    val deleteConfirmRegion: Region? = null,
-    val navigateToExploreRegionId: UUID? = null,
+    val deleteConfirmCoverageSet: CoverageSet? = null,
+    val navigateToExploreCoverageSetId: UUID? = null,
     val snackbarMessage: String? = null,
     val locationAccessState: LocationAccessState = LocationAccessState.NOT_REQUESTED,
     val waitingForGpsFix: Boolean = false,
@@ -55,19 +56,19 @@ class HomeViewModel
 @Inject
 constructor(
     @ApplicationContext private val context: Context,
-    private val regionRepository: RegionRepository,
+    private val coverageSetRepository: CoverageSetRepository,
     private val storageRepository: StorageRepository,
-    private val regionDeletionUseCase: RegionDeletionUseCase,
-    private val insideRegionUseCase: InsideRegionUseCase,
-    private val metadataRepository: HomeRegionMetadataRepository,
-    private val regionCoverageRepairUseCase: RegionCoverageRepairUseCase,
+    private val coverageSetDeletionUseCase: CoverageSetDeletionUseCase,
+    private val insideCoverageUseCase: InsideCoverageUseCase,
+    private val metadataRepository: HomeCoverageSetMetadataRepository,
+    private val coverageSetRepairUseCase: CoverageSetRepairUseCase,
     private val locationRepository: LocationRepository,
     private val locationController: LocationController,
     private val declinationCorrector: DeclinationCorrector,
     private val userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
     private val currentLocation = MutableStateFlow<UserLocation?>(null)
-    private val insideExploreRegions = MutableStateFlow<List<Region>>(emptyList())
+    private val insideExploreCoverageSets = MutableStateFlow<List<CoverageSet>>(emptyList())
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
     private val exploreNavigation = HomeExploreNavigation(_uiState)
@@ -77,21 +78,26 @@ constructor(
         locationController.acquire(HOME_LOCATION_TOKEN)
         viewModelScope.launch {
             combine(
-                regionRepository.observeAllRegions(),
+                coverageSetRepository.observeAllCoverageSets(),
                 currentLocation
-            ) { regions, location -> regions to location }
+            ) { coverageSets, location -> coverageSets to location }
                 .flowOn(Dispatchers.IO)
-                .mapLatest { (regions, location) ->
-                    regions.forEach { region ->
-                        runCatching { regionCoverageRepairUseCase.repairIfNeeded(region) }
+                .mapLatest { (coverageSets, location) ->
+                    coverageSets.forEach { set ->
+                        runCatching { coverageSetRepairUseCase.repairIfNeeded(set) }
                     }
-                    val insideExplore = HomeRegionLogic.exploreEligibleInside(regions, location)
-                    insideExploreRegions.value = insideExplore
+                    val cellIdsBySet =
+                        coverageSets.associate { set ->
+                            set.id to coverageSetRepository.getCellIdsForCoverageSet(set.id).toSet()
+                        }
+                    val insideExplore = HomeCoverageLogic.exploreEligibleInside(coverageSets, location, cellIdsBySet)
+                    insideExploreCoverageSets.value = insideExplore
                     val cards =
-                        buildHomeRegionCards(
-                            insideRegionUseCase = insideRegionUseCase,
+                        buildHomeCoverageSetCards(
+                            insideCoverageUseCase = insideCoverageUseCase,
                             metadataRepository = metadataRepository,
-                            regions = regions,
+                            coverageSetRepository = coverageSetRepository,
+                            coverageSets = coverageSets,
                             location = location
                         )
                     Triple(cards, insideExplore, location)
@@ -103,14 +109,14 @@ constructor(
                         val exploreAnother =
                             !state.simpleModeEnabled &&
                                 cards.any { card ->
-                                    card.region.downloadStatus == DownloadStatus.READY ||
-                                        card.region.downloadStatus == DownloadStatus.PARTIAL
+                                    card.coverageSet.downloadStatus == DownloadStatus.READY ||
+                                        card.coverageSet.downloadStatus == DownloadStatus.PARTIAL
                                 }
                         state.copy(
-                            regions = cards,
+                            coverageSets = cards,
                             loading = false,
-                            insideRegionIds = insideExplore.map { it.id }.toSet(),
-                            enterExploreEnabled = HomeRegionLogic.isEnterExploreEnabled(insideExplore),
+                            insideCoverageSetIds = insideExplore.map { it.id }.toSet(),
+                            enterExploreEnabled = HomeCoverageLogic.isEnterExploreEnabled(insideExplore),
                             waitingForGpsFix = waitingForFix,
                             exploreAnotherLocationEnabled = exploreAnother
                         )
@@ -119,7 +125,7 @@ constructor(
         }
         viewModelScope.launch {
             locationRepository.locationFlow
-                .sample(INSIDE_REGION_THROTTLE_MS)
+                .sample(INSIDE_COVERAGE_THROTTLE_MS)
                 .collect { location ->
                     currentLocation.value = location
                     _uiState.update { state ->
@@ -143,9 +149,9 @@ constructor(
                         simpleModeEnabled = simpleMode,
                         exploreAnotherLocationEnabled =
                         !simpleMode &&
-                            state.regions.any { card ->
-                                card.region.downloadStatus == DownloadStatus.READY ||
-                                    card.region.downloadStatus == DownloadStatus.PARTIAL
+                            state.coverageSets.any { card ->
+                                card.coverageSet.downloadStatus == DownloadStatus.READY ||
+                                    card.coverageSet.downloadStatus == DownloadStatus.PARTIAL
                             }
                     )
                 }
@@ -159,7 +165,7 @@ constructor(
             seedCachedLocation()
         } else {
             currentLocation.value = null
-            insideExploreRegions.value = emptyList()
+            insideExploreCoverageSets.value = emptyList()
             locationRepository.onPermissionRevoked()
             declinationCorrector.clearSeedLocation()
         }
@@ -170,7 +176,7 @@ constructor(
             state.copy(
                 locationAccessState = if (waiting) LocationAccessState.WAITING_FOR_FIX else accessState,
                 waitingForGpsFix = waiting,
-                insideRegionIds = emptySet(),
+                insideCoverageSetIds = emptySet(),
                 enterExploreEnabled = false
             )
         }
@@ -194,34 +200,34 @@ constructor(
     }
 
     fun onGlobalEnterExploreClicked() {
-        exploreNavigation.onGlobalEnterExplore(insideExploreRegions.value)
+        exploreNavigation.onGlobalEnterExplore(insideExploreCoverageSets.value)
     }
 
     fun onExploreNavigationHandled() {
         exploreNavigation.onExploreNavigationHandled()
     }
 
-    fun onDeleteClicked(regionId: UUID) {
+    fun onDeleteClicked(coverageSetId: UUID) {
         viewModelScope.launch {
-            regionRepository.getRegion(regionId)?.let { region ->
-                _uiState.update { it.copy(deleteConfirmRegion = region) }
+            coverageSetRepository.getCoverageSet(coverageSetId)?.let { coverageSet ->
+                _uiState.update { it.copy(deleteConfirmCoverageSet = coverageSet) }
             }
         }
     }
 
-    fun confirmDeleteRegion() {
-        val region = _uiState.value.deleteConfirmRegion ?: return
+    fun confirmDeleteCoverageSet() {
+        val coverageSet = _uiState.value.deleteConfirmCoverageSet ?: return
         viewModelScope.launch {
-            regionDeletionUseCase.execute(region.id)
+            coverageSetDeletionUseCase.execute(coverageSet.id)
             _uiState.update {
-                it.copy(deleteConfirmRegion = null, snackbarMessage = "${region.name} deleted")
+                it.copy(deleteConfirmCoverageSet = null, snackbarMessage = "${coverageSet.name} deleted")
             }
             refreshStorageStats()
         }
     }
 
-    fun dismissDeleteRegion() {
-        _uiState.update { it.copy(deleteConfirmRegion = null) }
+    fun dismissDeleteCoverageSet() {
+        _uiState.update { it.copy(deleteConfirmCoverageSet = null) }
     }
 
     fun onSnackbarShown() {
@@ -235,7 +241,7 @@ constructor(
 
     companion object {
         private const val HOME_LOCATION_TOKEN = "home"
-        private const val INSIDE_REGION_THROTTLE_MS = 1_000L
+        private const val INSIDE_COVERAGE_THROTTLE_MS = 1_000L
     }
 }
 

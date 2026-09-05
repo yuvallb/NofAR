@@ -52,7 +52,7 @@ class TerrainRayMarcherTest {
 
         targets.forEach { (targetLat, targetLon) ->
             val distanceM =
-                com.nofar.core.model.RegionBounds.haversineDistanceM(
+                com.nofar.core.model.GeoMathBounds.haversineDistanceM(
                     observerLat,
                     observerLon,
                     targetLat,
@@ -99,7 +99,7 @@ class TerrainRayMarcherTest {
         trackReaders(singleTileReaders(reader, tileLat, tileLon))
         val sampler = singleTileReaders(reader, tileLat, tileLon).toSampler()
         val distanceM =
-            com.nofar.core.model.RegionBounds.haversineDistanceM(
+            com.nofar.core.model.GeoMathBounds.haversineDistanceM(
                 observerLat,
                 observerLon,
                 peakLat,
@@ -143,7 +143,7 @@ class TerrainRayMarcherTest {
         val peakLat = tileLat + 0.72
         val peakLon = tileLon + 0.5
         val distanceM =
-            com.nofar.core.model.RegionBounds.haversineDistanceM(
+            com.nofar.core.model.GeoMathBounds.haversineDistanceM(
                 observerLat,
                 observerLon,
                 peakLat,
@@ -197,7 +197,7 @@ class TerrainRayMarcherTest {
         val targetLat = 32.55
         val targetLon = 35.55
         val distanceM =
-            com.nofar.core.model.RegionBounds.haversineDistanceM(
+            com.nofar.core.model.GeoMathBounds.haversineDistanceM(
                 observerLat,
                 observerLon,
                 targetLat,
@@ -224,6 +224,54 @@ class TerrainRayMarcherTest {
                 observerEyeM = 101.7,
                 targetElevationM = 150.0,
                 rayStepM = 100.0,
+                sampler = sampler
+            )
+
+        assertThat(visible).isFalse()
+    }
+
+    @Test
+    fun distantOccluderBeyondNearField_stillBlocksTarget() {
+        // 40 km ray would leave a gap with the old 256×100 m cap; near/far stepping must sample it.
+        val observerLat = 32.0
+        val observerLon = 35.0
+        val targetLat = 32.36
+        val targetLon = 35.0
+        val distanceM =
+            com.nofar.core.model.GeoMathBounds.haversineDistanceM(
+                observerLat,
+                observerLon,
+                targetLat,
+                targetLon
+            )
+        assertThat(distanceM).isGreaterThan(35_000.0)
+        val occluderDistanceM = 40_000.0
+        val sampler =
+            DemSampler { lat, lon ->
+                val distanceFromObserver =
+                    com.nofar.core.model.GeoMathBounds.haversineDistanceM(
+                        observerLat,
+                        observerLon,
+                        lat,
+                        lon
+                    )
+                when {
+                    distanceFromObserver < 500.0 -> 100f
+                    kotlin.math.abs(distanceFromObserver - occluderDistanceM) < 800.0 -> 2_000f
+                    else -> 100f
+                }
+            }
+
+        val visible =
+            rayMarcher.isTargetVisible(
+                observerLat = observerLat,
+                observerLon = observerLon,
+                targetLat = targetLat,
+                targetLon = targetLon,
+                totalDistanceM = distanceM,
+                observerEyeM = 101.7,
+                targetElevationM = 150.0,
+                rayStepM = AppConfig.VISIBILITY_RAY_STEP_METERS,
                 sampler = sampler
             )
 

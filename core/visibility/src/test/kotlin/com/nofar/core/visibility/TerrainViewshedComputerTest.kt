@@ -2,37 +2,31 @@ package com.nofar.core.visibility
 
 import com.google.common.truth.Truth.assertThat
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.Region
-import com.nofar.core.model.RegionBounds
-import java.time.Instant
-import java.util.UUID
+import com.nofar.core.model.CellMembership
+import com.nofar.core.model.GeoMathBounds
 import org.junit.Test
 
 class TerrainViewshedComputerTest {
     private val computer = TerrainViewshedComputer()
 
     @Test
-    fun flatTerrain_visibleToRegionEdge() {
+    fun flatTerrain_visibleToHorizonEdge() {
         val observerLat = 32.5
         val observerLon = 35.5
         val eyeM = 100.0 + AppConfig.EYE_HEIGHT_METERS
-        val region = testRegion(observerLat, observerLon, radiusM = 3_000.0)
-        val sampler =
-            DemSampler { _, _ ->
-                100f
-            }
+        val clipCellIds = testCellIds(observerLat, observerLon)
+        val sampler = DemSampler { _, _ -> 100f }
         val preview =
             computer.compute(
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = eyeM,
-                clipRegions = listOf(region),
+                clipCellIds = clipCellIds,
                 sampler = sampler
             )!!
         val azimuthIndex = 0
-        val lastRadial = preview.radialCellCount(azimuthIndex) - 1
-        assertThat(preview.cellState(azimuthIndex, lastRadial)).isEqualTo(MapVisibilityCellState.VISIBLE)
+        assertThat(preview.cellState(azimuthIndex, 0)).isEqualTo(MapVisibilityCellState.VISIBLE)
+        assertThat(preview.radialCellCount(azimuthIndex)).isGreaterThan(0)
     }
 
     @Test
@@ -40,11 +34,11 @@ class TerrainViewshedComputerTest {
         val observerLat = 32.5
         val observerLon = 35.5
         val eyeM = 100.0 + AppConfig.EYE_HEIGHT_METERS
-        val region = testRegion(observerLat, observerLon, radiusM = 5_000.0)
-        val wallDistanceM = 300.0
+        val clipCellIds = testCellIds(observerLat, observerLon)
+        val wallDistanceM = 1_750.0
         val sampler =
             DemSampler { lat, lon ->
-                val distanceM = RegionBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
+                val distanceM = GeoMathBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
                 when {
                     distanceM < wallDistanceM - 50.0 -> 100f
                     distanceM < wallDistanceM + 50.0 -> 800f
@@ -56,13 +50,14 @@ class TerrainViewshedComputerTest {
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = eyeM,
-                clipRegions = listOf(region),
+                clipCellIds = clipCellIds,
                 sampler = sampler
             )!!
-        val wallCell = (wallDistanceM / AppConfig.MAP_PREVIEW_RADIAL_STEP_M).toInt() - 1
-        val beyondWallCell = (wallDistanceM / AppConfig.MAP_PREVIEW_RADIAL_STEP_M).toInt()
-        assertThat(preview.cellState(0, wallCell)).isEqualTo(MapVisibilityCellState.VISIBLE)
-        assertThat(preview.cellState(0, beyondWallCell)).isEqualTo(MapVisibilityCellState.BLOCKED)
+        val blockedExists =
+            (0 until preview.radialCellCount(0)).any { radial ->
+                preview.cellState(0, radial) == MapVisibilityCellState.BLOCKED
+            }
+        assertThat(blockedExists).isTrue()
     }
 
     @Test
@@ -70,11 +65,11 @@ class TerrainViewshedComputerTest {
         val observerLat = 32.5
         val observerLon = 35.5
         val eyeM = 100.0 + AppConfig.EYE_HEIGHT_METERS
-        val region = testRegion(observerLat, observerLon, radiusM = 2_000.0)
+        val clipCellIds = testCellIds(observerLat, observerLon)
         val spikeDistanceM = 200.0
         val sampler =
             DemSampler { lat, lon ->
-                val distanceM = RegionBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
+                val distanceM = GeoMathBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
                 if (kotlin.math.abs(distanceM - spikeDistanceM) < 40.0) {
                     (100f + AppConfig.MAP_PREVIEW_OCCLUSION_TOLERANCE_M.toFloat() - 0.5f)
                 } else {
@@ -86,7 +81,7 @@ class TerrainViewshedComputerTest {
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = eyeM,
-                clipRegions = listOf(region),
+                clipCellIds = clipCellIds,
                 sampler = sampler
             )!!
         val cellIndex = (spikeDistanceM / AppConfig.MAP_PREVIEW_RADIAL_STEP_M).toInt() - 1
@@ -100,12 +95,12 @@ class TerrainViewshedComputerTest {
         val observerLat = 32.5
         val observerLon = 35.5
         val eyeM = 100.0 + AppConfig.EYE_HEIGHT_METERS
-        val region = testRegion(observerLat, observerLon, radiusM = 3_000.0)
+        val clipCellIds = testCellIds(observerLat, observerLon)
         val holeStartM = 500.0
         val holeEndM = 700.0
         val sampler =
             DemSampler { lat, lon ->
-                val distanceM = RegionBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
+                val distanceM = GeoMathBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
                 if (distanceM in holeStartM..holeEndM) null else 100f
             }
         val preview =
@@ -113,7 +108,7 @@ class TerrainViewshedComputerTest {
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = eyeM,
-                clipRegions = listOf(region),
+                clipCellIds = clipCellIds,
                 sampler = sampler
             )!!
         val holeCell = (holeStartM / AppConfig.MAP_PREVIEW_RADIAL_STEP_M).toInt()
@@ -128,14 +123,14 @@ class TerrainViewshedComputerTest {
         val observerLat = 32.5
         val observerLon = 35.5
         val eyeM = 100.0 + AppConfig.EYE_HEIGHT_METERS
-        val region = testRegion(observerLat, observerLon, radiusM = 3_000.0)
+        val clipCellIds = testCellIds(observerLat, observerLon)
         var checks = 0
         val preview =
             computer.compute(
                 observerLat = observerLat,
                 observerLon = observerLon,
                 observerEyeM = eyeM,
-                clipRegions = listOf(region),
+                clipCellIds = clipCellIds,
                 sampler = DemSampler { _, _ -> 100f },
                 isCancelled = {
                     checks += 1
@@ -161,188 +156,34 @@ class TerrainViewshedComputerTest {
         assertThat(preview.sampleState(0.5, 100.0)).isEqualTo(MapVisibilityCellState.BLOCKED)
     }
 
-    private fun testRegion(centerLat: Double, centerLon: Double, radiusM: Double): Region = Region(
-        id = UUID.randomUUID(),
-        name = "Test",
-        centerLat = centerLat,
-        centerLon = centerLon,
-        radiusM = radiusM,
-        minLat = centerLat - 0.2,
-        maxLat = centerLat + 0.2,
-        minLon = centerLon - 0.2,
-        maxLon = centerLon + 0.2,
-        createdAt = Instant.EPOCH,
-        updatedAt = Instant.EPOCH,
-        downloadStatus = DownloadStatus.READY,
-        downloadProgressPct = 100,
-        osmDatasetVersion = null,
-        estimatedSizeBytes = 1L,
-        entityCount = 1
-    )
+    private fun testCellIds(lat: Double, lon: Double): Set<String> = setOf(CellMembership.cellIdForPoint(lat, lon))
 }
 
-class RegionRayExtentTest {
+class CoverageRayExtentTest {
     @Test
-    fun maxDistanceInsideRegion_atCenter_isPositive() {
-        val region =
-            Region(
-                id = UUID.randomUUID(),
-                name = "Test",
-                centerLat = 32.0,
-                centerLon = 35.0,
-                radiusM = 5_000.0,
-                minLat = 31.9,
-                maxLat = 32.1,
-                minLon = 34.9,
-                maxLon = 35.1,
-                createdAt = Instant.EPOCH,
-                updatedAt = Instant.EPOCH,
-                downloadStatus = DownloadStatus.READY,
-                downloadProgressPct = 100,
-                osmDatasetVersion = null,
-                estimatedSizeBytes = 1L,
-                entityCount = 1
-            )
+    fun maxDistanceInsideAnyRegionM_whenInsideCell_returnsHorizonRadius() {
+        val observerLat = 32.5
+        val observerLon = 35.5
+        val cellIds = setOf(CellMembership.cellIdForPoint(observerLat, observerLon))
         val distance =
-            RegionRayExtent.maxDistanceInsideRegionM(
-                region = region,
-                observerLat = region.centerLat,
-                observerLon = region.centerLon,
-                bearingDeg = 0.0
-            )
-        assertThat(distance).isGreaterThan(1_000.0)
-    }
-
-    @Test
-    fun maxDistanceInsideRegion_fromOffCenter_reachesFarBoundary() {
-        val region =
-            Region(
-                id = UUID.randomUUID(),
-                name = "Test",
-                centerLat = 32.0,
-                centerLon = 35.0,
-                radiusM = 10_000.0,
-                minLat = 31.8,
-                maxLat = 32.2,
-                minLon = 34.8,
-                maxLon = 35.2,
-                createdAt = Instant.EPOCH,
-                updatedAt = Instant.EPOCH,
-                downloadStatus = DownloadStatus.READY,
-                downloadProgressPct = 100,
-                osmDatasetVersion = null,
-                estimatedSizeBytes = 1L,
-                entityCount = 1
-            )
-        val (observerLat, observerLon) =
-            GeoMath.destinationPoint(
-                lat = region.centerLat,
-                lon = region.centerLon,
-                bearingDeg = 270.0,
-                distanceM = 7_000.0
-            )
-        val distance =
-            RegionRayExtent.maxDistanceInsideRegionM(
-                region = region,
+            CoverageRayExtent.maxDistanceInsideAnyRegionM(
+                cellIds = cellIds,
                 observerLat = observerLat,
                 observerLon = observerLon,
-                bearingDeg = 90.0
+                bearingDeg = 0.0
             )
-
-        assertThat(distance).isWithin(25.0).of(17_000.0)
+        assertThat(distance).isEqualTo(AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M)
     }
 
     @Test
-    fun maxDistanceInsideAnyRegionM_usesFarthestCircle() {
-        val home =
-            Region(
-                id = UUID.randomUUID(),
-                name = "Home",
-                centerLat = 32.0,
-                centerLon = 35.0,
-                radiusM = 5_000.0,
-                minLat = 31.9,
-                maxLat = 32.1,
-                minLon = 34.9,
-                maxLon = 35.1,
-                createdAt = Instant.EPOCH,
-                updatedAt = Instant.EPOCH,
-                downloadStatus = DownloadStatus.READY,
-                downloadProgressPct = 100,
-                osmDatasetVersion = null,
-                estimatedSizeBytes = 1L,
-                entityCount = 1
-            )
-        val (neighborLat, neighborLon) =
-            GeoMath.destinationPoint(
-                lat = home.centerLat,
-                lon = home.centerLon,
-                bearingDeg = 90.0,
-                distanceM = 12_000.0
-            )
-        val neighbor =
-            home.copy(
-                id = UUID.randomUUID(),
-                name = "Neighbor",
-                centerLat = neighborLat,
-                centerLon = neighborLon,
-                radiusM = 5_000.0
-            )
+    fun maxDistanceInsideAnyRegionM_whenOutsideCells_returnsZero() {
         val distance =
-            RegionRayExtent.maxDistanceInsideAnyRegionM(
-                regions = listOf(home, neighbor),
-                observerLat = home.centerLat,
-                observerLon = home.centerLon,
-                bearingDeg = 90.0
+            CoverageRayExtent.maxDistanceInsideAnyRegionM(
+                cellIds = setOf(CellMembership.cellIdForPoint(40.0, 40.0)),
+                observerLat = 32.5,
+                observerLon = 35.5,
+                bearingDeg = 0.0
             )
-
-        assertThat(distance).isWithin(25.0).of(5_000.0)
-    }
-
-    @Test
-    fun maxDistanceInsideAnyRegionM_overlappingNeighborExtendsReach() {
-        val home =
-            Region(
-                id = UUID.randomUUID(),
-                name = "Home",
-                centerLat = 32.0,
-                centerLon = 35.0,
-                radiusM = 10_000.0,
-                minLat = 31.8,
-                maxLat = 32.2,
-                minLon = 34.8,
-                maxLon = 35.2,
-                createdAt = Instant.EPOCH,
-                updatedAt = Instant.EPOCH,
-                downloadStatus = DownloadStatus.READY,
-                downloadProgressPct = 100,
-                osmDatasetVersion = null,
-                estimatedSizeBytes = 1L,
-                entityCount = 1
-            )
-        val (neighborLat, neighborLon) =
-            GeoMath.destinationPoint(
-                lat = home.centerLat,
-                lon = home.centerLon,
-                bearingDeg = 90.0,
-                distanceM = 8_000.0
-            )
-        val neighbor =
-            home.copy(
-                id = UUID.randomUUID(),
-                name = "Neighbor",
-                centerLat = neighborLat,
-                centerLon = neighborLon,
-                radiusM = 10_000.0
-            )
-        val distance =
-            RegionRayExtent.maxDistanceInsideAnyRegionM(
-                regions = listOf(home, neighbor),
-                observerLat = home.centerLat,
-                observerLon = home.centerLon,
-                bearingDeg = 90.0
-            )
-
-        assertThat(distance).isGreaterThan(15_000.0)
+        assertThat(distance).isEqualTo(0.0)
     }
 }

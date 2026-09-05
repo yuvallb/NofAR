@@ -24,8 +24,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -49,7 +47,6 @@ import com.nofar.core.designsystem.component.NofARPrimaryButton
 import com.nofar.core.designsystem.component.NofARSecondaryOutlinedButton
 import com.nofar.core.designsystem.theme.NofARColors
 import com.nofar.core.designsystem.util.NofARFormatters
-import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.LabelLanguage
 import com.nofar.core.ui.LabelLanguageDropdown
@@ -97,10 +94,10 @@ fun PrepareScreen(
 
     Column(modifier = modifier.fillMaxSize()) {
         val title =
-            if (isDownloading && uiState.regionName.isNotBlank()) {
-                "Downloading: ${uiState.regionName}"
+            if (isDownloading && uiState.coverageSetName.isNotBlank()) {
+                "Downloading: ${uiState.coverageSetName}"
             } else {
-                "Prepare Region"
+                "Prepare maps"
             }
         NofARBackTopBar(
             title = title,
@@ -152,7 +149,6 @@ fun PrepareScreen(
                 },
                 onRegionNameChanged = viewModel::onRegionNameChanged,
                 onLabelLanguageChanged = viewModel::onLabelLanguageChanged,
-                onRadiusChanged = viewModel::onRadiusChanged,
                 onDownloadClicked = viewModel::onDownloadClicked,
                 onRetry = viewModel::retryDownload,
                 modifier = Modifier.weight(1f)
@@ -183,8 +179,8 @@ private fun PrepareHelpDialog(onDismiss: () -> Unit) {
         title = { Text("Prepare help") },
         text = {
             Text(
-                "Tap the map to place a circular region, adjust the radius, then download " +
-                    "OpenStreetMap places and elevation tiles for offline Explore. " +
+                "Tap 1° cells on the map to add or remove coverage, then download " +
+                    "OpenStreetMap places and GLO-90 elevation for offline Explore. " +
                     "Downloads require a network connection and only run in Prepare mode."
             )
         },
@@ -203,7 +199,6 @@ private fun DefineRegionContent(
     onMoveToCurrentLocation: () -> Unit,
     onRegionNameChanged: (String) -> Unit,
     onLabelLanguageChanged: (LabelLanguage) -> Unit,
-    onRadiusChanged: (Double) -> Unit,
     onDownloadClicked: () -> Unit,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier
@@ -212,9 +207,10 @@ private fun DefineRegionContent(
         PrepareRegionMap(
             centerLat = uiState.centerLat,
             centerLon = uiState.centerLon,
-            radiusKm = uiState.radiusKm,
-            downloadedRegions = uiState.downloadedRegions,
-            excludeRegionId = uiState.regionId ?: uiState.existingRegion?.id,
+            selectedCellIds = uiState.selectedCellIds,
+            downloadedCoverageSets = uiState.downloadedCoverageSets,
+            downloadedCellIdsBySet = uiState.downloadedCellIdsBySet,
+            excludeRegionId = uiState.coverageSetId ?: uiState.existingCoverageSet?.id,
             mapRecenterNonce = uiState.mapRecenterNonce,
             onMapTap = onMapTap,
             modifier = Modifier.fillMaxSize()
@@ -245,9 +241,9 @@ private fun DefineRegionContent(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             OutlinedTextField(
-                value = uiState.regionName,
+                value = uiState.coverageSetName,
                 onValueChange = onRegionNameChanged,
-                label = { Text("Region name") },
+                label = { Text("Coverage name") },
                 isError = uiState.nameError != null,
                 supportingText = uiState.nameError?.let { { Text(it) } },
                 singleLine = true,
@@ -275,18 +271,6 @@ private fun DefineRegionContent(
                 )
             }
 
-            Slider(
-                value = uiState.radiusKm.toFloat(),
-                onValueChange = { onRadiusChanged(it.toDouble()) },
-                valueRange = AppConfig.REGION_RADIUS_MIN_KM.toFloat()..AppConfig.REGION_RADIUS_MAX_KM.toFloat(),
-                colors =
-                SliderDefaults.colors(
-                    thumbColor = NofARColors.PrimaryYellow,
-                    activeTrackColor = NofARColors.PrimaryYellow,
-                    inactiveTrackColor = NofARColors.SurfaceVariant
-                )
-            )
-
             val demBytes = (uiState.estimateBytes * 0.57).toLong().coerceAtLeast(0L)
             val osmBytes = (uiState.estimateBytes - demBytes).coerceAtLeast(0L)
             NofAREstimatePanel(
@@ -304,12 +288,12 @@ private fun DefineRegionContent(
                     NofARPrimaryButton(text = "RETRY", onClick = onRetry, modifier = Modifier.fillMaxWidth())
                 }
                 PrepareDownloadUiState.COMPLETE -> {
-                    val status = uiState.existingRegion?.downloadStatus ?: DownloadStatus.READY
+                    val status = uiState.existingCoverageSet?.downloadStatus ?: DownloadStatus.READY
                     Text(
                         text =
                         when (status) {
                             DownloadStatus.PARTIAL -> "Download complete with partial DEM coverage."
-                            DownloadStatus.READY -> "Region is ready for Explore."
+                            DownloadStatus.READY -> "Maps are ready for Explore."
                             else -> "Download complete."
                         },
                         color = NofARColors.TextSecondary
@@ -322,7 +306,7 @@ private fun DefineRegionContent(
                 }
                 else -> {
                     val label =
-                        if (uiState.existingRegion?.downloadStatus == DownloadStatus.PARTIAL) {
+                        if (uiState.existingCoverageSet?.downloadStatus == DownloadStatus.PARTIAL) {
                             "RE-DOWNLOAD DATA"
                         } else {
                             "DOWNLOAD DATA"
@@ -342,7 +326,7 @@ private fun DownloadingContent(uiState: PrepareUiState, onCancelDownload: () -> 
 
     Column(modifier = modifier.fillMaxSize()) {
         NofARDownloadPipeline(
-            regionName = uiState.regionName,
+            regionName = uiState.coverageSetName,
             steps = steps,
             overallPercent = overallPercent,
             estimatedTimeRemaining = null,
@@ -393,7 +377,7 @@ private fun CellularWarningDialog(
         text = {
             Column {
                 Text(
-                    "This region requires $demTileCount DEM tiles " +
+                    "This download requires $demTileCount DEM cells " +
                         "(~${NofARFormatters.formatMegabytes(estimateBytes)}). " +
                         "Download over cellular or wait for Wi-Fi?"
                 )

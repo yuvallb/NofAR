@@ -7,13 +7,13 @@ import com.nofar.core.data.network.NetworkConnectivityMonitor
 import com.nofar.core.data.osm.OverpassStreamParser
 import com.nofar.core.data.preferences.DefaultUserPreferencesRepository
 import com.nofar.core.data.preferences.UserPreferencesRepository
+import com.nofar.core.data.repository.CoverageSetRepository
+import com.nofar.core.data.repository.DefaultCoverageSetRepository
 import com.nofar.core.data.repository.DefaultDemTileRepository
 import com.nofar.core.data.repository.DefaultGeoEntityRepository
-import com.nofar.core.data.repository.DefaultRegionRepository
 import com.nofar.core.data.repository.DefaultStorageRepository
 import com.nofar.core.data.repository.DemTileRepository
 import com.nofar.core.data.repository.GeoEntityRepository
-import com.nofar.core.data.repository.RegionRepository
 import com.nofar.core.data.repository.StorageRepository
 import dagger.Binds
 import dagger.Module
@@ -27,7 +27,7 @@ import javax.inject.Singleton
 abstract class DataModule {
     @Binds
     @Singleton
-    abstract fun bindRegionRepository(impl: DefaultRegionRepository): RegionRepository
+    abstract fun bindCoverageSetRepository(impl: DefaultCoverageSetRepository): CoverageSetRepository
 
     @Binds
     @Singleton

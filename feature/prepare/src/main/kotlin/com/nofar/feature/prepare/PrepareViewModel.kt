@@ -1,4 +1,4 @@
-@file:Suppress("TooManyFunctions")
+@file:Suppress("TooManyFunctions", "LargeClass", "ReturnCount", "LongMethod")
 
 package com.nofar.feature.prepare
 
@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.nofar.core.data.network.NetworkConnectivityMonitor
 import com.nofar.core.data.preferences.UserPreferencesRepository
+import com.nofar.core.data.prepare.CoverageNameResolver
 import com.nofar.core.data.prepare.DownloadPolicy
 import com.nofar.core.data.prepare.PrepareDownloadError
 import com.nofar.core.data.prepare.PrepareDownloadOrchestrator
@@ -16,17 +17,18 @@ import com.nofar.core.data.prepare.PreparePhase
 import com.nofar.core.data.prepare.PrepareProgress
 import com.nofar.core.data.prepare.PrepareWorkState
 import com.nofar.core.data.prepare.RegionNamePolicy
-import com.nofar.core.data.repository.HomeRegionMetadataRepository
-import com.nofar.core.data.repository.RegionRepository
-import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
+import com.nofar.core.data.repository.CoverageSetRepository
+import com.nofar.core.data.repository.HomeCoverageSetMetadataRepository
+import com.nofar.core.data.usecase.QuickCoverageDownloadUseCase
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.AppConfig
+import com.nofar.core.model.CellMembership
+import com.nofar.core.model.CoverageSet
+import com.nofar.core.model.DemTileId
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.LabelLanguage
 import com.nofar.core.model.LocationAccessState
-import com.nofar.core.model.Region
-import com.nofar.core.model.RegionBounds
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.util.UUID
@@ -51,14 +53,15 @@ enum class PrepareDownloadUiState {
 data class PrepareUiState(
     val step: PrepareStep = PrepareStep.DEFINE,
     val downloadUiState: PrepareDownloadUiState = PrepareDownloadUiState.IDLE,
-    val regionName: String = "",
+    val coverageSetName: String = "",
     val centerLat: Double = 32.0,
     val centerLon: Double = 35.0,
-    val radiusKm: Double = 10.0,
-    val regionId: UUID? = null,
-    val existingRegion: Region? = null,
+    val selectedCellIds: Set<String> = emptySet(),
+    val coverageSetId: UUID? = null,
+    val existingCoverageSet: CoverageSet? = null,
     /** READY/PARTIAL regions drawn on the map (excludes the region being edited). */
-    val downloadedRegions: List<Region> = emptyList(),
+    val downloadedCoverageSets: List<CoverageSet> = emptyList(),
+    val downloadedCellIdsBySet: Map<UUID, List<String>> = emptyMap(),
     val labelLanguage: LabelLanguage = LabelLanguage.DEFAULT,
     val labelLanguageLocked: Boolean = false,
     val estimateBytes: Long = 0L,
@@ -84,9 +87,9 @@ enum class PrepareStep {
 class PrepareViewModel
 @Inject
 constructor(
-    private val regionRepository: RegionRepository,
-    private val metadataRepository: HomeRegionMetadataRepository,
-    private val quickRegionDownloadUseCase: QuickRegionDownloadUseCase,
+    private val coverageSetRepository: CoverageSetRepository,
+    private val metadataRepository: HomeCoverageSetMetadataRepository,
+    private val quickCoverageDownloadUseCase: QuickCoverageDownloadUseCase,
     private val downloadScheduler: PrepareDownloadScheduler,
     private val orchestrator: PrepareDownloadOrchestrator,
     private val downloadPreferences: UserPreferencesRepository,
@@ -98,14 +101,14 @@ constructor(
     private val _uiState = MutableStateFlow(PrepareUiState())
     val uiState: StateFlow<PrepareUiState> = _uiState.asStateFlow()
     private val editingExistingRegion =
-        savedStateHandle.get<String>("regionId")?.takeIf { it.isNotBlank() } != null
+        savedStateHandle.get<String>("coverageSetId")?.takeIf { it.isNotBlank() } != null
     private var hasSetInitialLocation = false
     private var pendingRecenterOnLocation = false
 
     init {
         locationController.acquire(PREPARE_LOCATION_TOKEN)
         observeDownloadedRegions()
-        savedStateHandle.get<String>("regionId")?.takeIf { it.isNotBlank() }?.let { id ->
+        savedStateHandle.get<String>("coverageSetId")?.takeIf { it.isNotBlank() }?.let { id ->
             loadExistingRegion(UUID.fromString(id))
             hasSetInitialLocation = true
         }
@@ -120,7 +123,8 @@ constructor(
                             lat = location.latitude,
                             lon = location.longitude,
                             recenterMap = true,
-                            suggestName = true
+                            suggestName = true,
+                            seedLocalCellsIfEmpty = true
                         )
                         hasSetInitialLocation = true
                     }
@@ -131,7 +135,8 @@ constructor(
                             lat = location.latitude,
                             lon = location.longitude,
                             recenterMap = true,
-                            suggestName = !hasSetInitialLocation
+                            suggestName = !hasSetInitialLocation,
+                            seedLocalCellsIfEmpty = true
                         )
                         pendingRecenterOnLocation = false
                         hasSetInitialLocation = true
@@ -157,39 +162,45 @@ constructor(
         val centerLat = PrepareRouteBuilder.parseDouble(savedStateHandle.get("centerLat"))
         val centerLon = PrepareRouteBuilder.parseDouble(savedStateHandle.get("centerLon"))
         if (centerLat == null || centerLon == null) return
-        val radiusM = PrepareRouteBuilder.parseDouble(savedStateHandle.get("radiusM"))
         val name = PrepareRouteBuilder.parseName(savedStateHandle.get("name"))
         setRegionCenter(
             lat = centerLat,
             lon = centerLon,
             recenterMap = true,
-            suggestName = name.isNullOrBlank()
+            suggestName = name.isNullOrBlank(),
+            seedLocalCellsIfEmpty = true
         )
         if (!name.isNullOrBlank()) {
-            _uiState.update { it.copy(regionName = name.take(40)) }
-        }
-        if (radiusM != null) {
-            onRadiusChanged(radiusM / 1000.0)
+            _uiState.update { it.copy(coverageSetName = name.take(40)) }
         }
         hasSetInitialLocation = true
     }
 
     private fun observeDownloadedRegions() {
         viewModelScope.launch {
-            regionRepository.observeAllRegions().collect { regions ->
+            coverageSetRepository.observeAllCoverageSets().collect { regions ->
                 val downloaded =
                     regions.filter { region ->
                         region.downloadStatus == DownloadStatus.READY ||
                             region.downloadStatus == DownloadStatus.PARTIAL
                     }
-                _uiState.update { it.copy(downloadedRegions = downloaded) }
+                val cellIdsBySet =
+                    downloaded.associate { set ->
+                        set.id to coverageSetRepository.getCellIdsForCoverageSet(set.id)
+                    }
+                _uiState.update {
+                    it.copy(
+                        downloadedCoverageSets = downloaded,
+                        downloadedCellIdsBySet = cellIdsBySet
+                    )
+                }
             }
         }
     }
 
     private suspend fun pollDownloadProgressFromDb() {
-        val regionId = _uiState.value.regionId ?: return
-        val region = regionRepository.getRegion(regionId) ?: return
+        val coverageSetId = _uiState.value.coverageSetId ?: return
+        val region = coverageSetRepository.getCoverageSet(coverageSetId) ?: return
         when (region.downloadStatus) {
             DownloadStatus.DOWNLOADING -> {
                 _uiState.update { state ->
@@ -199,17 +210,17 @@ constructor(
                         state
                     } else {
                         val syncedName =
-                            if (RegionNamePolicy.isUserProvidedName(state.regionName)) {
-                                state.regionName
+                            if (RegionNamePolicy.isUserProvidedName(state.coverageSetName)) {
+                                state.coverageSetName
                             } else {
                                 region.name
                             }
                         state.copy(
-                            regionName = syncedName,
+                            coverageSetName = syncedName,
                             progress =
                             state.progress?.copy(overallPercent = region.downloadProgressPct)
                                 ?: PrepareProgress(
-                                    regionId = regionId,
+                                    coverageSetId = coverageSetId,
                                     phase = PreparePhase.OSM,
                                     overallPercent = region.downloadProgressPct
                                 ),
@@ -239,7 +250,8 @@ constructor(
                         lat = location.latitude,
                         lon = location.longitude,
                         recenterMap = true,
-                        suggestName = true
+                        suggestName = true,
+                        seedLocalCellsIfEmpty = true
                     )
                     hasSetInitialLocation = true
                 } else if (pendingRecenterOnLocation) {
@@ -247,7 +259,8 @@ constructor(
                         lat = location.latitude,
                         lon = location.longitude,
                         recenterMap = true,
-                        suggestName = false
+                        suggestName = false,
+                        seedLocalCellsIfEmpty = true
                     )
                     pendingRecenterOnLocation = false
                 }
@@ -274,7 +287,8 @@ constructor(
                 lat = location.latitude,
                 lon = location.longitude,
                 recenterMap = true,
-                suggestName = false
+                suggestName = false,
+                seedLocalCellsIfEmpty = true
             )
         } else {
             pendingRecenterOnLocation = true
@@ -288,23 +302,60 @@ constructor(
     }
 
     fun onMapTap(lat: Double, lon: Double) {
-        setRegionCenter(lat = lat, lon = lon, recenterMap = false, suggestName = true)
+        val clampedLat = lat.coerceIn(AppConfig.MAP_CENTER_LAT_MIN, AppConfig.MAP_CENTER_LAT_MAX)
+        val clampedLon = lon.coerceIn(AppConfig.MAP_CENTER_LON_MIN, AppConfig.MAP_CENTER_LON_MAX)
+        val cellId = CellMembership.cellIdForPoint(clampedLat, clampedLon)
+        _uiState.update { state ->
+            val selectedCellIds =
+                if (cellId in state.selectedCellIds) {
+                    state.selectedCellIds - cellId
+                } else {
+                    state.selectedCellIds + cellId
+                }
+            val name =
+                if (state.coverageSetName.isBlank()) {
+                    RegionNamePolicy.formatAutoName(clampedLat, clampedLon)
+                } else {
+                    state.coverageSetName
+                }
+            state.copy(
+                centerLat = clampedLat,
+                centerLon = clampedLon,
+                selectedCellIds = selectedCellIds,
+                coverageSetName = name,
+                step = PrepareStep.DEFINE,
+                errorMessage = null
+            )
+        }
+        refreshEstimate()
     }
 
-    private fun setRegionCenter(lat: Double, lon: Double, recenterMap: Boolean, suggestName: Boolean) {
+    private fun setRegionCenter(
+        lat: Double,
+        lon: Double,
+        recenterMap: Boolean,
+        suggestName: Boolean,
+        seedLocalCellsIfEmpty: Boolean = false
+    ) {
         val clampedLat = lat.coerceIn(AppConfig.MAP_CENTER_LAT_MIN, AppConfig.MAP_CENTER_LAT_MAX)
         val clampedLon = lon.coerceIn(AppConfig.MAP_CENTER_LON_MIN, AppConfig.MAP_CENTER_LON_MAX)
         _uiState.update {
             val name =
-                if (suggestName && it.regionName.isBlank()) {
-                    "Region near ${"%.2f".format(clampedLat)}, ${"%.2f".format(clampedLon)}"
+                if (suggestName && it.coverageSetName.isBlank()) {
+                    RegionNamePolicy.formatAutoName(clampedLat, clampedLon)
                 } else {
-                    it.regionName
+                    it.coverageSetName
                 }
             it.copy(
                 centerLat = clampedLat,
                 centerLon = clampedLon,
-                regionName = name,
+                selectedCellIds =
+                if (seedLocalCellsIfEmpty && it.selectedCellIds.isEmpty()) {
+                    CellMembership.localDownloadCellIds(clampedLat, clampedLon).toSet()
+                } else {
+                    it.selectedCellIds
+                },
+                coverageSetName = name,
                 mapRecenterNonce = if (recenterMap) it.mapRecenterNonce + 1 else it.mapRecenterNonce,
                 waitingForGpsFix = false,
                 locationAccessState =
@@ -320,17 +371,10 @@ constructor(
         refreshEstimate()
     }
 
-    fun onRadiusChanged(radiusKm: Double) {
-        val clamped =
-            radiusKm.coerceIn(AppConfig.REGION_RADIUS_MIN_KM, AppConfig.REGION_RADIUS_MAX_KM)
-        _uiState.update { it.copy(radiusKm = clamped) }
-        refreshEstimate()
-    }
-
     fun onRegionNameChanged(name: String) {
         _uiState.update {
             it.copy(
-                regionName = name.take(40),
+                coverageSetName = name.take(40),
                 nameError = validateName(name)
             )
         }
@@ -346,16 +390,12 @@ constructor(
 
     fun refreshEstimate() {
         val state = _uiState.value
-        val estimate =
-            PrepareEstimator.estimate(
-                state.centerLat,
-                state.centerLon,
-                RegionBounds.dataCollectionRadiusM(state.radiusKm * 1000)
-            )
+        val cells = state.selectedCellIds.mapNotNull(DemTileId::parse)
+        val estimate = cells.takeIf { it.isNotEmpty() }?.let(PrepareEstimator::estimateForCells)
         _uiState.update {
             it.copy(
-                estimateBytes = estimate.totalEstimateBytes,
-                demTileCount = estimate.demTileCount,
+                estimateBytes = estimate?.totalEstimateBytes ?: 0L,
+                demTileCount = estimate?.demTileCount ?: 0,
                 step = PrepareStep.ESTIMATE
             )
         }
@@ -363,9 +403,18 @@ constructor(
 
     fun onDownloadClicked() {
         val state = _uiState.value
-        val nameError = validateName(state.regionName)
+        val nameError = validateName(state.coverageSetName)
         if (nameError != null) {
             _uiState.update { it.copy(nameError = nameError) }
+            return
+        }
+        if (state.selectedCellIds.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    downloadUiState = PrepareDownloadUiState.ERROR,
+                    errorMessage = "Select at least one map cell before downloading."
+                )
+            }
             return
         }
         if (!networkConnectivityMonitor.isNetworkAvailable()) {
@@ -423,13 +472,13 @@ constructor(
     }
 
     fun cancelDownload() {
-        val regionId = _uiState.value.regionId ?: return
-        downloadScheduler.cancel(regionId)
+        val coverageSetId = _uiState.value.coverageSetId ?: return
+        downloadScheduler.cancel(coverageSetId)
         orchestrator.cancel()
         viewModelScope.launch {
-            val region = regionRepository.getRegion(regionId)
+            val region = coverageSetRepository.getCoverageSet(coverageSetId)
             // Query coverage without region geometry so we only count linked tiles, not expected ones.
-            val metadata = metadataRepository.getMetadata(regionId)
+            val metadata = metadataRepository.getMetadata(coverageSetId)
             val status =
                 PrepareCancelStatus.resolve(
                     region = region,
@@ -437,8 +486,8 @@ constructor(
                     hasTileCoverage = metadata.tileCount > 0,
                     liveEntityCount = metadata.liveEntityCount
                 )
-            regionRepository.updateDownloadStatus(
-                regionId,
+            coverageSetRepository.updateDownloadStatus(
+                coverageSetId,
                 status,
                 _uiState.value.progress?.overallPercent ?: 0
             )
@@ -467,51 +516,50 @@ constructor(
             }
 
             val state = _uiState.value
-            val regionId =
-                state.regionId ?: UUID.randomUUID().also { id ->
-                    _uiState.update { it.copy(regionId = id) }
+            val coverageSetId =
+                state.coverageSetId ?: UUID.randomUUID().also { id ->
+                    _uiState.update { it.copy(coverageSetId = id) }
                 }
             // Ensure the worker reads the language selected in Prepare, not a stale Settings value.
             downloadPreferences.setPreferredLabelLanguage(state.labelLanguage)
-            val region = buildRegionRecord(regionId)
-            quickRegionDownloadUseCase.syncAndEnqueue(region).getOrThrow()
+            val cellIds = state.selectedCellIds.sorted()
+            val coverageSet =
+                runCatching { buildCoverageSetRecord(coverageSetId, cellIds) }.getOrElse { error ->
+                    showDownloadStartError(error)
+                    return@launch
+                }
+            quickCoverageDownloadUseCase.syncAndEnqueue(coverageSet, cellIds).getOrElse { error ->
+                showDownloadStartError(error)
+                return@launch
+            }
             // Keep UI language in sync with what was persisted for this download.
             _uiState.update {
                 it.copy(
-                    regionId = regionId,
-                    existingRegion = region.copy(downloadStatus = DownloadStatus.DOWNLOADING),
+                    coverageSetId = coverageSetId,
+                    existingCoverageSet = coverageSet.copy(downloadStatus = DownloadStatus.DOWNLOADING),
                     downloadUiState = PrepareDownloadUiState.DOWNLOADING
                 )
             }
 
-            downloadScheduler.observeWorkState(regionId).collect { workState ->
-                applyWorkState(regionId, workState)
+            downloadScheduler.observeWorkState(coverageSetId).collect { workState ->
+                applyWorkState(coverageSetId, workState)
             }
         }
     }
 
-    private suspend fun buildRegionRecord(regionId: UUID): Region {
+    private suspend fun buildCoverageSetRecord(coverageSetId: UUID, cellIds: List<String>): CoverageSet {
         val state = _uiState.value
         val now = Instant.now()
-        val radiusM = state.radiusKm * 1000
-        val bbox = RegionBounds.boundingBox(state.centerLat, state.centerLon, radiusM)
-        val estimate =
-            PrepareEstimator.estimate(
-                state.centerLat,
-                state.centerLon,
-                RegionBounds.dataCollectionRadiusM(radiusM)
-            )
-        val existing = regionRepository.getRegion(regionId)
-        return Region(
-            id = regionId,
-            name = state.regionName.trim(),
-            centerLat = state.centerLat,
-            centerLon = state.centerLon,
-            radiusM = radiusM,
-            minLat = bbox.minLat,
-            maxLat = bbox.maxLat,
-            minLon = bbox.minLon,
-            maxLon = bbox.maxLon,
+        require(cellIds.isNotEmpty()) { "Select at least one map cell before downloading." }
+        val cells =
+            cellIds.map { cellId ->
+                requireNotNull(DemTileId.parse(cellId)) { "Invalid coverage cell: $cellId" }
+            }
+        val estimate = PrepareEstimator.estimateForCells(cells)
+        val existing = coverageSetRepository.getCoverageSet(coverageSetId)
+        return CoverageSet(
+            id = coverageSetId,
+            name = state.coverageSetName.trim(),
             createdAt = existing?.createdAt ?: now,
             updatedAt = now,
             downloadStatus = existing?.downloadStatus ?: DownloadStatus.NOT_DOWNLOADED,
@@ -523,27 +571,31 @@ constructor(
         )
     }
 
-    private fun loadExistingRegion(regionId: UUID) {
+    private fun loadExistingRegion(coverageSetId: UUID) {
         viewModelScope.launch {
-            val region = regionRepository.getRegion(regionId) ?: return@launch
+            val region = coverageSetRepository.getCoverageSet(coverageSetId) ?: return@launch
+            val cellIds = coverageSetRepository.getCellIdsForCoverageSet(coverageSetId)
+            val (centerLat, centerLon) =
+                cellIds.takeIf { it.isNotEmpty() }?.let(CoverageNameResolver::referenceCenterFromCellIds)
+                    ?: (_uiState.value.centerLat to _uiState.value.centerLon)
+            val estimate =
+                cellIds.mapNotNull(DemTileId::parse)
+                    .takeIf { it.isNotEmpty() }
+                    ?.let(PrepareEstimator::estimateForCells)
             // Prefer Settings default for the next download; Explore keeps the stored language
             // until this region is re-downloaded.
             val preferredLanguage = downloadPreferences.preferredLabelLanguage.first()
             _uiState.update {
                 it.copy(
-                    regionId = region.id,
-                    existingRegion = region,
-                    regionName = region.name,
-                    centerLat =
-                    region.centerLat.coerceIn(AppConfig.MAP_CENTER_LAT_MIN, AppConfig.MAP_CENTER_LAT_MAX),
-                    centerLon =
-                    region.centerLon.coerceIn(AppConfig.MAP_CENTER_LON_MIN, AppConfig.MAP_CENTER_LON_MAX),
-                    radiusKm =
-                    (region.radiusM / 1000.0).coerceIn(
-                        AppConfig.REGION_RADIUS_MIN_KM,
-                        AppConfig.REGION_RADIUS_MAX_KM
-                    ),
-                    estimateBytes = region.estimatedSizeBytes,
+                    coverageSetId = region.id,
+                    existingCoverageSet = region,
+                    coverageSetName = region.name,
+                    centerLat = centerLat,
+                    centerLon = centerLon,
+                    selectedCellIds = cellIds.toSet(),
+                    estimateBytes = estimate?.totalEstimateBytes ?: region.estimatedSizeBytes,
+                    demTileCount = estimate?.demTileCount ?: 0,
+                    mapRecenterNonce = it.mapRecenterNonce + 1,
                     labelLanguage = preferredLanguage,
                     labelLanguageLocked = region.downloadStatus == DownloadStatus.DOWNLOADING,
                     downloadUiState =
@@ -567,7 +619,7 @@ constructor(
                     progress =
                     if (region.downloadStatus == DownloadStatus.DOWNLOADING) {
                         PrepareProgress(
-                            regionId = region.id,
+                            coverageSetId = region.id,
                             phase = PreparePhase.OSM,
                             overallPercent = region.downloadProgressPct
                         )
@@ -577,23 +629,33 @@ constructor(
                 )
             }
             if (region.downloadStatus == DownloadStatus.DOWNLOADING) {
-                downloadScheduler.observeWorkState(regionId).collect { workState ->
-                    applyWorkState(regionId, workState)
+                downloadScheduler.observeWorkState(coverageSetId).collect { workState ->
+                    applyWorkState(coverageSetId, workState)
                 }
             }
         }
     }
 
-    private suspend fun applyWorkState(regionId: UUID, workState: PrepareWorkState?) {
+    private fun showDownloadStartError(error: Throwable) {
+        _uiState.update {
+            it.copy(
+                downloadUiState = PrepareDownloadUiState.ERROR,
+                step = PrepareStep.ESTIMATE,
+                errorMessage = error.message ?: "Unable to start download."
+            )
+        }
+    }
+
+    private suspend fun applyWorkState(coverageSetId: UUID, workState: PrepareWorkState?) {
         when (workState) {
             PrepareWorkState.SUCCEEDED -> {
-                val region = regionRepository.getRegion(regionId)
+                val region = coverageSetRepository.getCoverageSet(coverageSetId)
                 if (region != null) {
                     markDownloadComplete(region)
                 }
             }
             PrepareWorkState.FAILED -> {
-                val region = regionRepository.getRegion(regionId)
+                val region = coverageSetRepository.getCoverageSet(coverageSetId)
                 when (region?.downloadStatus) {
                     DownloadStatus.READY, DownloadStatus.PARTIAL -> markDownloadComplete(region)
                     else -> {
@@ -605,7 +667,7 @@ constructor(
                                 downloadUiState = PrepareDownloadUiState.ERROR,
                                 step = PrepareStep.ESTIMATE,
                                 errorMessage = typed.toUserMessage(),
-                                existingRegion = region,
+                                existingCoverageSet = region,
                                 progress = null
                             )
                         }
@@ -626,19 +688,19 @@ constructor(
         }
     }
 
-    private fun markDownloadComplete(region: Region) {
+    private fun markDownloadComplete(region: CoverageSet) {
         _uiState.update {
             val syncedName =
-                if (RegionNamePolicy.isUserProvidedName(it.regionName)) {
-                    it.regionName
+                if (RegionNamePolicy.isUserProvidedName(it.coverageSetName)) {
+                    it.coverageSetName
                 } else {
                     region.name
                 }
             it.copy(
-                regionName = syncedName,
+                coverageSetName = syncedName,
                 downloadUiState = PrepareDownloadUiState.COMPLETE,
                 step = PrepareStep.COMPLETE,
-                existingRegion = region,
+                existingCoverageSet = region,
                 progress = null,
                 errorMessage = null
             )

@@ -6,17 +6,22 @@
   `tile_coverage`). Includes `region.label_language`, `region_entity_coverage.display_name`,
   `geo_entity.footprint_radius_m`, and `geo_entity.elevation` as INTEGER meters.
 
-Pre-publish schema history was flattened into this baseline. Production `DatabaseModule`
-registers `NofARDatabaseMigrations.ALL` and does **not** call `fallbackToDestructiveMigration`.
+- **2** — cell-based coverage (`coverage_set`, `coverage_cell`, `coverage_entity`). Migrates each
+  v1 circular `region` to a `coverage_set` with 1° cells intersecting the old collection disk
+  (`radiusM + DATA_COLLECTION_RADIUS_PADDING_M`). Drops `region`, `tile_coverage`, and
+  `region_entity_coverage`. Keeps `geo_entity`, `dem_tile`, and the R-Tree objects unchanged.
+
+Pre-publish schema history was flattened into v1. Production `DatabaseModule` registers
+`NofARDatabaseMigrations.ALL` and does **not** call `fallbackToDestructiveMigration`.
 Add a new `Migration` before bumping `@Database(version = …)`.
 
-Room-managed tables:
+Room-managed tables (v2):
 
-- `region` — circular AOI metadata with derived bounding box columns
+- `coverage_set` — named coverage download metadata (no center/radius/bbox columns)
+- `coverage_cell` — coverage set ↔ 1° cell junction (geometry); app code maintains `dem_tile.ref_count`
+- `coverage_entity` — coverage set ↔ entity junction (`ON DELETE CASCADE` from coverage_set and geo_entity)
 - `geo_entity` — global deduplicated OSM entities (`row_id` integer PK, `id` unique OSM key)
-- `region_entity_coverage` — region ↔ entity junction for garbage collection
 - `dem_tile` — global DEM tile metadata with reference counts
-- `tile_coverage` — region ↔ tile junction for reference counting
 
 Additional SQLite objects created in `RTreeCallback.onCreate` / migrations:
 

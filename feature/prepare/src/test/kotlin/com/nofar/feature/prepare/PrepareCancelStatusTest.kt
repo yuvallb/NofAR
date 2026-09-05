@@ -3,8 +3,8 @@ package com.nofar.feature.prepare
 import com.google.common.truth.Truth.assertThat
 import com.nofar.core.data.prepare.PreparePhase
 import com.nofar.core.data.prepare.PrepareProgress
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.Region
 import java.time.Instant
 import java.util.UUID
 import org.junit.Test
@@ -58,22 +58,18 @@ class PrepareCancelStatusTest {
         assertThat(status).isEqualTo(DownloadStatus.PARTIAL)
     }
 
-    private fun sampleRegion(status: DownloadStatus, entityCount: Int): Region = Region(
-        id = UUID.randomUUID(),
-        name = "Test",
-        centerLat = 32.0,
-        centerLon = 35.0,
-        radiusM = 10_000.0,
-        minLat = 31.9,
-        maxLat = 32.1,
-        minLon = 34.9,
-        maxLon = 35.1,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now(),
-        downloadStatus = status,
-        downloadProgressPct = 20,
-        osmDatasetVersion = null,
-        estimatedSizeBytes = 1L,
-        entityCount = entityCount
-    )
+    private fun sampleRegion(status: DownloadStatus, entityCount: Int): CoverageSet {
+        val now = Instant.now()
+        return CoverageSet(
+            id = UUID.randomUUID(),
+            name = "Test",
+            createdAt = now,
+            updatedAt = now,
+            downloadStatus = status,
+            downloadProgressPct = 20,
+            osmDatasetVersion = null,
+            estimatedSizeBytes = 1L,
+            entityCount = entityCount
+        )
+    }
 }

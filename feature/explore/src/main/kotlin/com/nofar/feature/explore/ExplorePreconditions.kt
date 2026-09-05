@@ -1,9 +1,9 @@
 package com.nofar.feature.explore
 
 import com.nofar.core.model.CompassCalibrationState
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.LocationAccessState
-import com.nofar.core.model.Region
 
 enum class ExploreGate {
     READY,
@@ -23,7 +23,7 @@ object ExplorePreconditions {
         waitingForGpsFix: Boolean,
         cameraGranted: Boolean,
         calibrationState: CompassCalibrationState,
-        activeRegion: Region?,
+        activeCoverageSet: CoverageSet?,
         graceExpired: Boolean,
         simpleModeEnabled: Boolean,
         regionDownloadNeeded: Boolean,
@@ -41,7 +41,7 @@ object ExplorePreconditions {
             permissionGate != null -> permissionGate
             simpleModeEnabled ->
                 resolveSimpleModeGate(regionDownloadNeeded, regionDownloading)
-            else -> resolveAdvancedRegionGate(activeRegion)
+            else -> resolveAdvancedRegionGate(activeCoverageSet)
         }
     }
 
@@ -84,14 +84,15 @@ object ExplorePreconditions {
         else -> ExploreGate.READY
     }
 
-    private fun resolveAdvancedRegionGate(activeRegion: Region?): ExploreGate = if (activeRegion == null ||
-        (
-            activeRegion.downloadStatus != DownloadStatus.READY &&
-                activeRegion.downloadStatus != DownloadStatus.PARTIAL
-            )
-    ) {
-        ExploreGate.REGION_MISSING
-    } else {
-        ExploreGate.READY
-    }
+    private fun resolveAdvancedRegionGate(activeCoverageSet: CoverageSet?): ExploreGate =
+        if (activeCoverageSet == null ||
+            (
+                activeCoverageSet.downloadStatus != DownloadStatus.READY &&
+                    activeCoverageSet.downloadStatus != DownloadStatus.PARTIAL
+                )
+        ) {
+            ExploreGate.REGION_MISSING
+        } else {
+            ExploreGate.READY
+        }
 }

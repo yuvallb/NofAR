@@ -2,7 +2,7 @@ package com.nofar.core.sensors
 
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.GeoMathBounds
 import com.nofar.core.model.UserLocation
 import javax.inject.Inject
 
@@ -48,7 +48,7 @@ constructor(
         }
     }
 
-    private fun movedSignificantly(from: UserLocation, to: UserLocation): Boolean = RegionBounds.haversineDistanceM(
+    private fun movedSignificantly(from: UserLocation, to: UserLocation): Boolean = GeoMathBounds.haversineDistanceM(
         from.latitude,
         from.longitude,
         to.latitude,

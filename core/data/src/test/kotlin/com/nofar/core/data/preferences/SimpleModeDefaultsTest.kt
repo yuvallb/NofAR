@@ -1,9 +1,9 @@
 package com.nofar.core.data.preferences
 
-import com.nofar.core.data.repository.RegionRepository
+import com.nofar.core.data.repository.CoverageSetRepository
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.LabelLanguage
-import com.nofar.core.model.Region
 import java.time.Instant
 import java.util.UUID
 import kotlinx.coroutines.flow.Flow
@@ -18,18 +18,18 @@ class SimpleModeDefaultsTest {
     @Test
     fun freshInstall_defaultsSimpleModeEnabled() = runTest {
         val prefs = FakeUserPreferencesRepository()
-        val regions = FakeRegionRepository(emptyList())
-        SimpleModeDefaultsInitializer(prefs, regions).ensureApplied()
+        val coverageSets = FakeCoverageSetRepository(emptyList())
+        SimpleModeDefaultsInitializer(prefs, coverageSets).ensureApplied()
 
         assertTrue(prefs.simpleModeEnabled.first())
         assertTrue(prefs.simpleModeDefaultsApplied.first())
     }
 
     @Test
-    fun existingRegions_defaultsSimpleModeDisabled() = runTest {
+    fun existingCoverageSets_defaultsSimpleModeDisabled() = runTest {
         val prefs = FakeUserPreferencesRepository()
-        val regions = FakeRegionRepository(listOf(sampleRegion()))
-        SimpleModeDefaultsInitializer(prefs, regions).ensureApplied()
+        val coverageSets = FakeCoverageSetRepository(listOf(sampleCoverageSet()))
+        SimpleModeDefaultsInitializer(prefs, coverageSets).ensureApplied()
 
         assertFalse(prefs.simpleModeEnabled.first())
     }
@@ -37,8 +37,8 @@ class SimpleModeDefaultsTest {
     @Test
     fun defaultsApplied_onlyOnce() = runTest {
         val prefs = FakeUserPreferencesRepository()
-        val regions = FakeRegionRepository(listOf(sampleRegion()))
-        val initializer = SimpleModeDefaultsInitializer(prefs, regions)
+        val coverageSets = FakeCoverageSetRepository(listOf(sampleCoverageSet()))
+        val initializer = SimpleModeDefaultsInitializer(prefs, coverageSets)
         initializer.ensureApplied()
         prefs.setSimpleModeEnabled(true)
         initializer.ensureApplied()
@@ -46,24 +46,20 @@ class SimpleModeDefaultsTest {
         assertTrue(prefs.simpleModeEnabled.first())
     }
 
-    private fun sampleRegion(): Region = Region(
-        id = UUID.randomUUID(),
-        name = "Existing",
-        centerLat = 32.0,
-        centerLon = 35.0,
-        radiusM = 10_000.0,
-        minLat = 31.9,
-        maxLat = 32.1,
-        minLon = 34.9,
-        maxLon = 35.1,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now(),
-        downloadStatus = DownloadStatus.READY,
-        downloadProgressPct = 100,
-        osmDatasetVersion = null,
-        estimatedSizeBytes = 1L,
-        entityCount = 1
-    )
+    private fun sampleCoverageSet(): CoverageSet {
+        val now = Instant.now()
+        return CoverageSet(
+            id = UUID.randomUUID(),
+            name = "Existing",
+            createdAt = now,
+            updatedAt = now,
+            downloadStatus = DownloadStatus.READY,
+            downloadProgressPct = 100,
+            osmDatasetVersion = null,
+            estimatedSizeBytes = 1L,
+            entityCount = 1
+        )
+    }
 
     private class FakeUserPreferencesRepository : UserPreferencesRepository {
         private val simpleMode = MutableStateFlow(false)
@@ -75,6 +71,7 @@ class SimpleModeDefaultsTest {
         override val keepRawGeoTiff: Flow<Boolean> = MutableStateFlow(false)
         override val simpleModeEnabled: Flow<Boolean> = simpleMode
         override val simpleModeDefaultsApplied: Flow<Boolean> = defaultsApplied
+        override val demV4UpgradeApplied: Flow<Boolean> = MutableStateFlow(false)
         override val preferredLabelLanguage: Flow<LabelLanguage> = MutableStateFlow(LabelLanguage.DEFAULT)
         override val showHorizonOutline: Flow<Boolean> = MutableStateFlow(true)
         override val horizonAzimuthOffsetDeg: Flow<Float> = MutableStateFlow(0f)
@@ -97,6 +94,8 @@ class SimpleModeDefaultsTest {
             defaultsApplied.value = true
         }
 
+        override suspend fun markDemV4UpgradeApplied() = Unit
+
         override suspend fun setPreferredLabelLanguage(language: LabelLanguage) = Unit
 
         override suspend fun ensurePreferredLabelLanguageInitialized(detected: LabelLanguage) = Unit
@@ -108,20 +107,24 @@ class SimpleModeDefaultsTest {
         override suspend fun setShowLabelElevation(enabled: Boolean) = Unit
     }
 
-    private class FakeRegionRepository(private val regions: List<Region>) : RegionRepository {
-        override fun observeAllRegions(): Flow<List<Region>> = MutableStateFlow(regions)
+    private class FakeCoverageSetRepository(private val coverageSets: List<CoverageSet>) : CoverageSetRepository {
+        override fun observeAllCoverageSets(): Flow<List<CoverageSet>> = MutableStateFlow(coverageSets)
 
-        override suspend fun getRegion(id: UUID): Region? = regions.firstOrNull { it.id == id }
+        override suspend fun getCoverageSet(id: UUID): CoverageSet? = coverageSets.firstOrNull { it.id == id }
 
-        override suspend fun createRegion(region: Region) = Unit
+        override suspend fun createCoverageSet(coverageSet: CoverageSet) = Unit
 
-        override suspend fun updateRegion(region: Region) = Unit
+        override suspend fun updateCoverageSet(coverageSet: CoverageSet) = Unit
 
-        override suspend fun updateRegionName(id: UUID, name: String) = Unit
+        override suspend fun updateCoverageSetName(id: UUID, name: String) = Unit
 
-        override suspend fun deleteRegion(id: UUID) = Unit
+        override suspend fun deleteCoverageSet(id: UUID) = Unit
 
-        override suspend fun regionsContainingPoint(lat: Double, lon: Double): List<Region> = emptyList()
+        override suspend fun coverageSetsContainingPoint(lat: Double, lon: Double): List<CoverageSet> = emptyList()
+
+        override suspend fun getCellIdsForCoverageSet(id: UUID): List<String> = emptyList()
+
+        override suspend fun getCellIdsForCoverageSets(ids: List<UUID>): List<String> = emptyList()
 
         override suspend fun updateDownloadStatus(
             id: UUID,
@@ -133,6 +136,6 @@ class SimpleModeDefaultsTest {
 
         override suspend fun hasActiveDownload(): Boolean = false
 
-        override suspend fun findDownloadingRegion(): Region? = null
+        override suspend fun findDownloadingCoverageSet(): CoverageSet? = null
     }
 }

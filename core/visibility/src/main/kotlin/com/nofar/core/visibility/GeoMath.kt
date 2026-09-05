@@ -35,7 +35,14 @@ internal object GeoMath {
                     cos(angularDistance) - sin(phi1) * sin(phi2)
                 )
 
-        return Math.toDegrees(phi2) to Math.toDegrees(lambda2)
+        return Math.toDegrees(phi2) to normalizeLon(Math.toDegrees(lambda2))
+    }
+
+    private fun normalizeLon(lon: Double): Double {
+        var wrapped = lon % 360.0
+        if (wrapped < -180.0) wrapped += 360.0
+        if (wrapped > 180.0) wrapped -= 360.0
+        return wrapped
     }
 
     fun buildRaySampleCount(totalDistanceM: Double, stepM: Double): Int {

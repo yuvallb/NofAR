@@ -6,10 +6,10 @@ import java.util.UUID
 
 const val PREPARE_ROUTE = "prepare"
 const val PREPARE_ROUTE_WITH_ARG =
-    "prepare?regionId={regionId}&centerLat={centerLat}&centerLon={centerLon}&radiusM={radiusM}&name={name}"
+    "prepare?coverageSetId={coverageSetId}&centerLat={centerLat}&centerLon={centerLon}&radiusM={radiusM}&name={name}"
 
 data class PrepareNavArgs(
-    val regionId: UUID? = null,
+    val coverageSetId: UUID? = null,
     val centerLat: Double? = null,
     val centerLon: Double? = null,
     val radiusM: Double? = null,
@@ -18,7 +18,7 @@ data class PrepareNavArgs(
 
 object PrepareRouteBuilder {
     fun build(
-        regionId: UUID? = null,
+        coverageSetId: UUID? = null,
         centerLat: Double? = null,
         centerLon: Double? = null,
         radiusM: Double? = null,
@@ -29,8 +29,8 @@ object PrepareRouteBuilder {
                 ?.let { URLEncoder.encode(it, UTF_8) }
                 .orEmpty()
         return buildString {
-            append("prepare?regionId=")
-            append(regionId?.toString().orEmpty())
+            append("prepare?coverageSetId=")
+            append(coverageSetId?.toString().orEmpty())
             append("&centerLat=")
             append(centerLat?.toString().orEmpty())
             append("&centerLon=")
@@ -43,7 +43,7 @@ object PrepareRouteBuilder {
     }
 
     fun build(args: PrepareNavArgs): String = build(
-        regionId = args.regionId,
+        coverageSetId = args.coverageSetId,
         centerLat = args.centerLat,
         centerLon = args.centerLon,
         radiusM = args.radiusM,

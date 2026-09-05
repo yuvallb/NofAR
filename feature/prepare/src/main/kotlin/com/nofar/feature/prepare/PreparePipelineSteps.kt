@@ -65,7 +65,7 @@ private fun postProcessPipelineStep(uiState: PrepareUiState): PipelineStep {
 private fun finalizePipelineStep(uiState: PrepareUiState): PipelineStep {
     val progress = uiState.progress
     return PipelineStep(
-        title = "Finalizing Region",
+        title = "Finalizing coverage",
         state =
         when {
             uiState.downloadUiState == PrepareDownloadUiState.COMPLETE -> PipelineStepState.COMPLETE

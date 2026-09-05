@@ -54,6 +54,7 @@ class PreferredLabelLanguageInitializerTest {
         override val keepRawGeoTiff: Flow<Boolean> = MutableStateFlow(false)
         override val simpleModeEnabled: Flow<Boolean> = MutableStateFlow(false)
         override val simpleModeDefaultsApplied: Flow<Boolean> = MutableStateFlow(false)
+        override val demV4UpgradeApplied: Flow<Boolean> = MutableStateFlow(false)
         override val preferredLabelLanguage: Flow<LabelLanguage> =
             storedLanguage.map { it ?: LabelLanguage.DEFAULT }
         override val showHorizonOutline: Flow<Boolean> = MutableStateFlow(true)
@@ -72,6 +73,8 @@ class PreferredLabelLanguageInitializerTest {
         override suspend fun setSimpleModeEnabled(enabled: Boolean) = Unit
 
         override suspend fun markSimpleModeDefaultsApplied() = Unit
+
+        override suspend fun markDemV4UpgradeApplied() = Unit
 
         override suspend fun setPreferredLabelLanguage(language: LabelLanguage) {
             storedLanguage.value = language

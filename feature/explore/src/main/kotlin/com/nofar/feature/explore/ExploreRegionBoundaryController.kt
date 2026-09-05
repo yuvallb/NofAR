@@ -1,8 +1,7 @@
 package com.nofar.feature.explore
 
 import com.nofar.core.model.AppConfig
-import com.nofar.core.model.Region
-import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.CellMembership
 import com.nofar.core.model.UserLocation
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
@@ -27,20 +26,14 @@ internal class ExploreRegionBoundaryController {
     val isOutsideGraceActive: Boolean
         get() = regionExitStartedAtMillis != null
 
-    fun onLocation(location: UserLocation, region: Region?): RegionBoundaryUiState =
-        onLocation(location, listOfNotNull(region))
-
-    fun onLocation(location: UserLocation, regions: List<Region>): RegionBoundaryUiState {
-        if (regions.isEmpty()) {
+    fun onLocation(location: UserLocation, activeCellIds: Set<String>): RegionBoundaryUiState {
+        if (activeCellIds.isEmpty()) {
             insideActiveRegion = false
             regionExitStartedAtMillis = null
             return RegionBoundaryUiState(insideActiveRegion = false)
         }
 
-        insideActiveRegion =
-            regions.any { region ->
-                RegionBounds.containsPoint(region, location.latitude, location.longitude)
-            }
+        insideActiveRegion = CellMembership.hasCell(activeCellIds, location.latitude, location.longitude)
 
         return if (insideActiveRegion) {
             regionExitStartedAtMillis = null

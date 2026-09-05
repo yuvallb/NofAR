@@ -3,9 +3,11 @@ package com.nofar.feature.home
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.nofar.core.designsystem.component.CoverageSetCardState
+import com.nofar.core.model.CellMembership
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.Region
-import com.nofar.core.model.RegionBounds
+import com.nofar.core.model.UserLocation
 import java.time.Instant
 import java.util.UUID
 import org.junit.Test
@@ -16,7 +18,7 @@ class HomeOfflineInstrumentedTest {
     @Test
     fun homeUiState_buildsWithoutNetworkAccess() {
         val state = HomeUiState(loading = false)
-        assertThat(state.regions).isEmpty()
+        assertThat(state.coverageSets).isEmpty()
         assertThat(state.enterExploreEnabled).isFalse()
     }
 
@@ -27,30 +29,37 @@ class HomeOfflineInstrumentedTest {
     }
 
     @Test
-    fun regionCardLogic_worksFullyOffline() {
-        val region = offlineReadyRegion()
+    fun coverageSetCardLogic_worksFullyOffline() {
+        val coverageSet = offlineReadyCoverageSet()
+        val cellIds = setOf(CellMembership.cellIdForPoint(32.0, 35.0))
+        val location =
+            UserLocation(
+                latitude = 32.0,
+                longitude = 35.0,
+                altitudeMeters = null,
+                accuracyMeters = 10f,
+                timestampMillis = 0L
+            )
+        val insideExplore =
+            HomeCoverageLogic.exploreEligibleInside(
+                coverageSets = listOf(coverageSet),
+                location = location,
+                cellIdsBySet = mapOf(coverageSet.id to cellIds)
+            )
         val card =
-            com.nofar.core.designsystem.component.RegionCardState(
-                region = region,
-                isYouAreHere = HomeRegionLogic.shouldShowYouAreHere(region, isInside = true)
+            CoverageSetCardState(
+                coverageSet = coverageSet,
+                isYouAreHere = HomeCoverageLogic.shouldShowYouAreHere(coverageSet, isInside = true)
             )
         assertThat(card.isYouAreHere).isTrue()
-        assertThat(HomeRegionLogic.isEnterExploreEnabled(listOf(region))).isTrue()
+        assertThat(HomeCoverageLogic.isEnterExploreEnabled(insideExplore)).isTrue()
     }
 
-    private fun offlineReadyRegion(): Region {
-        val box = RegionBounds.boundingBox(32.0, 35.0, 10_000.0)
+    private fun offlineReadyCoverageSet(): CoverageSet {
         val now = Instant.now()
-        return Region(
+        return CoverageSet(
             id = UUID.randomUUID(),
             name = "Offline",
-            centerLat = 32.0,
-            centerLon = 35.0,
-            radiusM = 10_000.0,
-            minLat = box.minLat,
-            maxLat = box.maxLat,
-            minLon = box.minLon,
-            maxLon = box.maxLon,
             createdAt = now,
             updatedAt = now,
             downloadStatus = DownloadStatus.READY,

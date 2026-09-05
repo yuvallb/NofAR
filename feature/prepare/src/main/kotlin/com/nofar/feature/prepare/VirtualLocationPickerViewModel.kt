@@ -2,13 +2,14 @@ package com.nofar.feature.prepare
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.nofar.core.data.repository.RegionRepository
+import com.nofar.core.data.repository.CoverageSetRepository
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.LocationAccessState
-import com.nofar.core.model.Region
 import com.nofar.core.visibility.VirtualLocationMapPreviewUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.util.UUID
 import javax.inject.Inject
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +22,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class VirtualLocationPickerUiState(
-    val eligibleRegions: List<Region> = emptyList(),
+    val eligibleRegions: List<CoverageSet> = emptyList(),
+    val cellIdsBySet: Map<UUID, Set<String>> = emptyMap(),
     val selectedLat: Double? = null,
     val selectedLon: Double? = null,
     val selectionValid: Boolean = false,
@@ -36,7 +38,7 @@ data class VirtualLocationPickerUiState(
 class VirtualLocationPickerViewModel
 @Inject
 constructor(
-    private val regionRepository: RegionRepository,
+    private val coverageSetRepository: CoverageSetRepository,
     private val locationRepository: LocationRepository,
     private val locationController: LocationController,
     private val mapPreviewUseCase: VirtualLocationMapPreviewUseCase
@@ -48,12 +50,17 @@ constructor(
     init {
         locationController.acquire(PICKER_LOCATION_TOKEN)
         viewModelScope.launch {
-            regionRepository.observeAllRegions().collect { regions ->
+            coverageSetRepository.observeAllCoverageSets().collect { regions ->
                 val eligible = VirtualLocationSelectionLogic.exploreEligible(regions)
+                val cellIdsBySet =
+                    eligible.associate { set ->
+                        set.id to coverageSetRepository.getCellIdsForCoverageSet(set.id).toSet()
+                    }
                 val device = locationRepository.lastLocation
                 val center =
                     VirtualLocationSelectionLogic.initialMapCenter(
                         regions = eligible,
+                        cellIdsBySet = cellIdsBySet,
                         deviceLat = device?.latitude,
                         deviceLon = device?.longitude
                     )
@@ -62,13 +69,14 @@ constructor(
                     val lon = state.selectedLon ?: center?.second
                     val selection =
                         if (lat != null && lon != null) {
-                            VirtualLocationSelectionLogic.resolveSelection(eligible, lat, lon)
+                            VirtualLocationSelectionLogic.resolveSelection(eligible, cellIdsBySet, lat, lon)
                         } else {
                             null
                         }
                     val validSelection = selection != null
                     state.copy(
                         eligibleRegions = eligible,
+                        cellIdsBySet = cellIdsBySet,
                         selectedLat = lat,
                         selectedLon = lon,
                         selectionValid = validSelection,
@@ -94,6 +102,7 @@ constructor(
                     val sel =
                         VirtualLocationSelectionLogic.resolveSelection(
                             eligible,
+                            cellIdsBySet,
                             current.selectedLat,
                             current.selectedLon
                         )
@@ -114,7 +123,8 @@ constructor(
     }
 
     fun onMapTap(lat: Double, lon: Double) {
-        val eligible = _uiState.value.eligibleRegions
+        val state = _uiState.value
+        val eligible = state.eligibleRegions
         if (eligible.isEmpty()) {
             _uiState.update {
                 it.copy(
@@ -123,7 +133,7 @@ constructor(
             }
             return
         }
-        val selection = VirtualLocationSelectionLogic.resolveSelection(eligible, lat, lon)
+        val selection = VirtualLocationSelectionLogic.resolveSelection(eligible, state.cellIdsBySet, lat, lon)
         if (selection == null) {
             _uiState.update {
                 it.copy(
@@ -151,7 +161,7 @@ constructor(
         val lat = state.selectedLat
         val lon = state.selectedLon
         return if (lat != null && lon != null) {
-            VirtualLocationSelectionLogic.resolveSelection(state.eligibleRegions, lat, lon)
+            VirtualLocationSelectionLogic.resolveSelection(state.eligibleRegions, state.cellIdsBySet, lat, lon)
         } else {
             null
         }
@@ -164,14 +174,15 @@ constructor(
                 var producedMask: MapVisibilityPreviewMask? = null
                 try {
                     val state = _uiState.value
-                    val contributingRegions =
-                        state.eligibleRegions.filter { selection.contributingRegionIds.contains(it.id) }
-                    val clipRegions =
-                        state.eligibleRegions.filter { selection.contributingRegionIds.contains(it.id) }
+                    val cellIds =
+                        VirtualLocationSelectionLogic.cellIdsForSelection(
+                            state.cellIdsBySet,
+                            selection.contributingCoverageSetIds
+                        )
                     val preview =
                         mapPreviewUseCase.compute(
-                            regions = contributingRegions,
-                            clipRegions = clipRegions,
+                            cellIds = cellIds,
+                            clipCellIds = cellIds,
                             observerLat = selection.lat,
                             observerLon = selection.lon
                         )
@@ -226,31 +237,31 @@ constructor(
         super.onCleared()
     }
 
-    companion object {
-        private const val PICKER_LOCATION_TOKEN = "virtual_location_picker"
+    private companion object {
+        const val PICKER_LOCATION_TOKEN = "virtual_location_picker"
     }
 }
 
 internal object VirtualLocationPickerMessages {
     const val NO_DOWNLOADED_REGIONS: String =
-        "No downloaded regions yet. Open Prepare and download map data before exploring another location."
+        "No downloaded coverage yet. Open Prepare and download map data before exploring another location."
 
     const val OUTSIDE_ACTIVE_REGION: String =
-        "That point is outside your downloaded regions. Pan to a green circle or use Prepare to download this area."
+        "That point is outside your downloaded coverage. Pan to a highlighted cell or use Prepare to download this area."
 
     const val ANALYZING_VISIBILITY: String = "Analyzing terrain visibility from this point…"
 
     const val ELEVATION_REFRESH_REQUIRED: String =
-        "Elevation data needs refreshing. Open Prepare and download this region again."
+        "Elevation data needs refreshing. Open Prepare and download this coverage again."
 
     const val VALID_SELECTION_HINT: String =
         "Green = open view along the ground. Red = terrain blocks sight. Gray areas have no elevation data."
 
     const val TAP_HINT: String =
-        "Tap inside a downloaded region (green circle). The overlay shows what terrain you could see from that point."
+        "Tap inside downloaded coverage (highlighted cells). The overlay shows what terrain you could see from that point."
 
     fun helper(
-        eligibleRegions: List<Region>,
+        eligibleRegions: List<CoverageSet>,
         lat: Double?,
         lon: Double?,
         selectionValid: Boolean,

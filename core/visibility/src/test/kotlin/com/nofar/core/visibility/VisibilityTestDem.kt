@@ -38,7 +38,7 @@ internal object VisibilityTestDem {
                 val lat = tileLat + 1.0 - (row.toDouble() / (height - 1))
                 val lon = tileLon + (col.toDouble() / (width - 1))
                 val distanceM =
-                    com.nofar.core.model.RegionBounds.haversineDistanceM(
+                    com.nofar.core.model.GeoMathBounds.haversineDistanceM(
                         hillCenterLat,
                         hillCenterLon,
                         lat,

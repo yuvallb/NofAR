@@ -6,6 +6,7 @@ import androidx.room.Upsert
 import com.nofar.core.database.model.DemTileEntity
 
 @Dao
+@Suppress("TooManyFunctions")
 interface DemTileDao {
     @Query("SELECT * FROM dem_tile WHERE tile_id = :tileId LIMIT 1")
     suspend fun getById(tileId: String): DemTileEntity?
@@ -52,6 +53,9 @@ interface DemTileDao {
         """
     )
     suspend fun getAllLruCandidates(): List<DemTileEntity>
+
+    @Query("SELECT * FROM dem_tile")
+    suspend fun getAll(): List<DemTileEntity>
 
     @Query("SELECT COALESCE(SUM(size_bytes), 0) FROM dem_tile")
     suspend fun totalCacheSizeBytes(): Long

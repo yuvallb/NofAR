@@ -1,36 +1,26 @@
 package com.nofar.feature.prepare
 
 import com.google.common.truth.Truth.assertThat
-import com.nofar.core.model.AppConfig
+import com.nofar.core.model.CellMembership
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DownloadStatus
-import com.nofar.core.model.Region
 import java.time.Instant
 import java.util.UUID
 import org.junit.Test
 
 class VirtualLocationSelectionTest {
-    private val readyRegion =
-        Region(
-            id = UUID.randomUUID(),
-            name = "Ready",
-            centerLat = 32.0,
-            centerLon = 35.0,
-            radiusM = 12_000.0,
-            minLat = 31.9,
-            maxLat = 32.1,
-            minLon = 34.9,
-            maxLon = 35.1,
-            createdAt = Instant.EPOCH,
+    private val observerLat = 32.5
+    private val observerLon = 35.5
+    private val observerCell = CellMembership.cellIdForPoint(observerLat, observerLon)
+
+    private val readyCoverageSet =
+        sampleCoverageSet(
             updatedAt = Instant.parse("2026-01-02T00:00:00Z"),
-            downloadStatus = DownloadStatus.READY,
-            downloadProgressPct = 100,
-            osmDatasetVersion = null,
-            estimatedSizeBytes = 1L,
-            entityCount = 1
+            downloadStatus = DownloadStatus.READY
         )
 
-    private val partialRegion =
-        readyRegion.copy(
+    private val partialCoverageSet =
+        sampleCoverageSet(
             id = UUID.randomUUID(),
             name = "Partial",
             updatedAt = Instant.parse("2026-01-01T00:00:00Z"),
@@ -38,47 +28,29 @@ class VirtualLocationSelectionTest {
         )
 
     @Test
-    fun resolveSelection_equalRadiusRegions_prefersReadyThenNewest() {
+    fun resolveSelection_equalCells_prefersReadyThenNewest() {
+        val cellIdsBySet =
+            mapOf(
+                partialCoverageSet.id to setOf(observerCell),
+                readyCoverageSet.id to setOf(observerCell)
+            )
         val selection =
             VirtualLocationSelectionLogic.resolveSelection(
-                regions = listOf(partialRegion, readyRegion),
-                lat = readyRegion.centerLat,
-                lon = readyRegion.centerLon
+                regions = listOf(partialCoverageSet, readyCoverageSet),
+                cellIdsBySet = cellIdsBySet,
+                lat = observerLat,
+                lon = observerLon
             )
-        assertThat(selection?.primaryRegionId).isEqualTo(readyRegion.id)
+        assertThat(selection?.primaryCoverageSetId).isEqualTo(readyCoverageSet.id)
     }
 
     @Test
-    fun resolveSelection_overlappingRegions_prefersLargestReadyRegion() {
-        val smallerNewer =
-            readyRegion.copy(
-                id = UUID.randomUUID(),
-                radiusM = 10_000.0,
-                updatedAt = Instant.parse("2026-01-03T00:00:00Z")
-            )
-        val largerOlder =
-            readyRegion.copy(
-                id = UUID.randomUUID(),
-                radiusM = 20_000.0,
-                updatedAt = Instant.parse("2026-01-01T00:00:00Z")
-            )
-
+    fun resolveSelection_outsideCells_returnsNull() {
+        val cellIdsBySet = mapOf(readyCoverageSet.id to setOf(observerCell))
         val selection =
             VirtualLocationSelectionLogic.resolveSelection(
-                regions = listOf(smallerNewer, largerOlder),
-                lat = readyRegion.centerLat,
-                lon = readyRegion.centerLon
-            )
-
-        assertThat(selection?.primaryRegionId).isEqualTo(largerOlder.id)
-        assertThat(selection?.containingRegionIds).containsExactly(smallerNewer.id, largerOlder.id)
-    }
-
-    @Test
-    fun resolveSelection_outsideRegions_returnsNull() {
-        val selection =
-            VirtualLocationSelectionLogic.resolveSelection(
-                regions = listOf(readyRegion),
+                regions = listOf(readyCoverageSet),
+                cellIdsBySet = cellIdsBySet,
                 lat = 0.0,
                 lon = 0.0
             )
@@ -86,55 +58,57 @@ class VirtualLocationSelectionTest {
     }
 
     @Test
-    fun resolveSelection_includesContributingRegionsWithin300Km() {
-        val (neighborLat, neighborLon) =
-            destinationM(
-                lat = readyRegion.centerLat,
-                lon = readyRegion.centerLon,
-                bearingDeg = 90.0,
-                distanceM = 80_000.0
-            )
+    fun resolveSelection_includesContributingCoverageWithinQueryRadius() {
+        val neighborLat = 33.2
+        val neighborLon = 35.5
+        val neighborCell = CellMembership.cellIdForPoint(neighborLat, neighborLon)
         val neighbor =
-            readyRegion.copy(
+            sampleCoverageSet(
                 id = UUID.randomUUID(),
-                name = "Neighbor",
-                centerLat = neighborLat,
-                centerLon = neighborLon
+                name = "Neighbor"
             )
-
+        val cellIdsBySet =
+            mapOf(
+                readyCoverageSet.id to setOf(observerCell),
+                neighbor.id to setOf(neighborCell)
+            )
         val selection =
             VirtualLocationSelectionLogic.resolveSelection(
-                regions = listOf(readyRegion, neighbor),
-                lat = readyRegion.centerLat,
-                lon = readyRegion.centerLon
+                regions = listOf(readyCoverageSet, neighbor),
+                cellIdsBySet = cellIdsBySet,
+                lat = observerLat,
+                lon = observerLon
             )
-
-        assertThat(selection?.contributingRegionIds).containsExactly(readyRegion.id, neighbor.id)
+        assertThat(selection?.contributingCoverageSetIds).containsExactly(readyCoverageSet.id, neighbor.id)
     }
 
     @Test
     fun resolveSelection_invalidCoordinate_returnsNull() {
+        val cellIdsBySet = mapOf(readyCoverageSet.id to setOf(observerCell))
         assertThat(
-            VirtualLocationSelectionLogic.resolveSelection(listOf(readyRegion), lat = 91.0, lon = 0.0)
+            VirtualLocationSelectionLogic.resolveSelection(
+                listOf(readyCoverageSet),
+                cellIdsBySet,
+                lat = 91.0,
+                lon = 0.0
+            )
         ).isNull()
     }
 
-    private fun destinationM(lat: Double, lon: Double, bearingDeg: Double, distanceM: Double): Pair<Double, Double> {
-        val angularDistance = distanceM / AppConfig.EARTH_RADIUS_METERS
-        val bearing = Math.toRadians(bearingDeg)
-        val phi1 = Math.toRadians(lat)
-        val lambda1 = Math.toRadians(lon)
-        val phi2 =
-            kotlin.math.asin(
-                kotlin.math.sin(phi1) * kotlin.math.cos(angularDistance) +
-                    kotlin.math.cos(phi1) * kotlin.math.sin(angularDistance) * kotlin.math.cos(bearing)
-            )
-        val lambda2 =
-            lambda1 +
-                kotlin.math.atan2(
-                    kotlin.math.sin(bearing) * kotlin.math.sin(angularDistance) * kotlin.math.cos(phi1),
-                    kotlin.math.cos(angularDistance) - kotlin.math.sin(phi1) * kotlin.math.sin(phi2)
-                )
-        return Math.toDegrees(phi2) to Math.toDegrees(lambda2)
-    }
+    private fun sampleCoverageSet(
+        id: UUID = UUID.randomUUID(),
+        name: String = "Ready",
+        updatedAt: Instant = Instant.EPOCH,
+        downloadStatus: DownloadStatus = DownloadStatus.READY
+    ): CoverageSet = CoverageSet(
+        id = id,
+        name = name,
+        createdAt = Instant.EPOCH,
+        updatedAt = updatedAt,
+        downloadStatus = downloadStatus,
+        downloadProgressPct = 100,
+        osmDatasetVersion = null,
+        estimatedSizeBytes = 1L,
+        entityCount = 1
+    )
 }

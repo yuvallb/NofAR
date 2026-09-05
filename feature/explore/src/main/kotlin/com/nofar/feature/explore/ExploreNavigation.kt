@@ -14,7 +14,7 @@ fun NavGraphBuilder.exploreScreen(
         route = EXPLORE_ROUTE_WITH_ARGS,
         arguments =
         listOf(
-            navArgument("regionId") {
+            navArgument("coverageSetId") {
                 type = NavType.StringType
                 nullable = true
                 defaultValue = ""

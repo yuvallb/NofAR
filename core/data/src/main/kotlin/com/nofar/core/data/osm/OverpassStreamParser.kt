@@ -3,6 +3,7 @@
 package com.nofar.core.data.osm
 
 import com.nofar.core.model.ElevationSource
+import com.nofar.core.model.FootprintDefaults
 import com.nofar.core.model.GeoEntity
 import com.nofar.core.model.GeoEntityType
 import com.nofar.core.model.LabelLanguage
@@ -280,13 +281,14 @@ class OverpassStreamParser {
         id = element.entityId,
         osmType = element.osmType,
         // Persist the resolved display label so Explore shows the download-time language even
-        // if region_entity_coverage overlay is missing for any reason.
+        // if coverage_entity overlay is missing for any reason.
         name = element.name,
         type = element.type,
         lat = element.lat,
         lon = element.lon,
         elevation = element.elevation,
         elevationSource = element.elevation?.let { ElevationSource.OSM_TAG },
-        lastSeenAt = seenAt
+        lastSeenAt = seenAt,
+        footprintRadiusM = FootprintDefaults.radiusM(element.type)
     )
 }

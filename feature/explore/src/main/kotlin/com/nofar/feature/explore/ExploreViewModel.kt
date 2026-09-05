@@ -1,4 +1,4 @@
-@file:Suppress("TooManyFunctions", "LargeClass")
+@file:Suppress("TooManyFunctions", "LargeClass", "LongMethod")
 
 package com.nofar.feature.explore
 
@@ -9,23 +9,23 @@ import com.nofar.core.data.network.NetworkConnectivityMonitor
 import com.nofar.core.data.preferences.UserPreferencesRepository
 import com.nofar.core.data.prepare.DownloadPolicy
 import com.nofar.core.data.prepare.PrepareDownloadScheduler
-import com.nofar.core.data.repository.RegionRepository
-import com.nofar.core.data.usecase.ExploreRegionResolution
-import com.nofar.core.data.usecase.ExploreRegionResolver
-import com.nofar.core.data.usecase.InsideRegionUseCase
-import com.nofar.core.data.usecase.QuickRegionDownloadUseCase
-import com.nofar.core.data.usecase.QuickRegionProposal
-import com.nofar.core.data.usecase.RegionCoverageRepairUseCase
+import com.nofar.core.data.repository.CoverageSetRepository
+import com.nofar.core.data.usecase.CoverageSetRepairUseCase
+import com.nofar.core.data.usecase.ExploreCoverageResolution
+import com.nofar.core.data.usecase.ExploreCoverageResolver
+import com.nofar.core.data.usecase.InsideCoverageUseCase
+import com.nofar.core.data.usecase.QuickCoverageDownloadUseCase
+import com.nofar.core.data.usecase.QuickCoverageProposal
 import com.nofar.core.designsystem.component.HorizonOutlinePoint
 import com.nofar.core.location.LocationController
 import com.nofar.core.location.LocationRepository
 import com.nofar.core.model.AppConfig
+import com.nofar.core.model.CellMembership
 import com.nofar.core.model.CompassCalibrationState
-import com.nofar.core.model.ContributingRegions
+import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DeviceOrientation
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.LocationAccessState
-import com.nofar.core.model.Region
 import com.nofar.core.model.UserLocation
 import com.nofar.core.sensors.CompassCalibrationMonitor
 import com.nofar.core.sensors.DeclinationCorrector
@@ -70,11 +70,11 @@ constructor(
     private val declinationCorrector: DeclinationCorrector,
     private val visibilityPassScheduler: VisibilityPassScheduler,
     private val displayAltitudeResolver: DisplayAltitudeResolver,
-    private val regionRepository: RegionRepository,
-    private val regionCoverageRepairUseCase: RegionCoverageRepairUseCase,
-    private val insideRegionUseCase: InsideRegionUseCase,
+    private val coverageSetRepository: CoverageSetRepository,
+    private val coverageSetRepairUseCase: CoverageSetRepairUseCase,
+    private val insideCoverageUseCase: InsideCoverageUseCase,
     private val userPreferencesRepository: UserPreferencesRepository,
-    private val quickRegionDownloadUseCase: QuickRegionDownloadUseCase,
+    private val quickCoverageDownloadUseCase: QuickCoverageDownloadUseCase,
     private val downloadScheduler: PrepareDownloadScheduler,
     private val networkConnectivityMonitor: NetworkConnectivityMonitor,
     private val horizonAlignmentEngine: ExploreHorizonAlignmentEngine,
@@ -85,14 +85,14 @@ constructor(
 
     private val virtualExploreSession: VirtualExploreSession? =
         ExploreRouteBuilder.parseVirtualSession(
-            regionIdRaw = savedStateHandle.get<String>("regionId"),
+            coverageSetIdRaw = savedStateHandle.get<String>("coverageSetId"),
             virtualLatRaw = savedStateHandle.get<String>("virtualLat"),
             virtualLonRaw = savedStateHandle.get<String>("virtualLon")
         )
 
     private val requestedRegionId: UUID? =
         virtualExploreSession?.primaryRegionId
-            ?: ExploreRouteBuilder.parseRegionId(savedStateHandle.get<String>("regionId"))
+            ?: ExploreRouteBuilder.parseRegionId(savedStateHandle.get<String>("coverageSetId"))
 
     private val virtualObserverLocation: UserLocation? =
         virtualExploreSession?.let(::virtualObserverLocation)
@@ -103,19 +103,22 @@ constructor(
             scope = viewModelScope,
             displayAltitudeResolver = displayAltitudeResolver,
             uiState = _uiState,
-            activeRegion = { _uiState.value.activeRegion },
+            activeCellIds = { _uiState.value.activeCellIds },
             isVirtual = virtualExploreSession != null
         )
     private val downloadController =
         ExploreDownloadController(
             scope = viewModelScope,
-            regionRepository = regionRepository,
-            quickRegionDownloadUseCase = quickRegionDownloadUseCase,
+            coverageSetRepository = coverageSetRepository,
+            quickCoverageDownloadUseCase = quickCoverageDownloadUseCase,
             downloadScheduler = downloadScheduler,
             uiState = _uiState,
             onDownloadComplete = { _ ->
                 viewModelScope.launch {
-                    locationRepository.lastLocation?.let { applyRegionResolution(it) }
+                    locationRepository.lastLocation?.let { location ->
+                        applyRegionResolution(location)
+                        applyRegionBoundary(location, _uiState.value.activeCellIds)
+                    }
                 }
             },
             onRefreshGate = { refreshGate() }
@@ -189,9 +192,9 @@ constructor(
         }
         if (accessState == LocationAccessState.GRANTED) {
             virtualObserverLocation?.let { observer ->
-                altitudeController.scheduleResolve(observer, _uiState.value.activeRegions)
+                altitudeController.scheduleResolve(observer)
             } ?: locationRepository.lastLocation?.let { location ->
-                altitudeController.scheduleResolve(location, _uiState.value.activeRegions)
+                altitudeController.scheduleResolve(location)
             }
         } else {
             altitudeController.clearAltitude()
@@ -291,7 +294,7 @@ constructor(
         _uiState.update { it.copy(showCellularWarning = false) }
         viewModelScope.launch {
             autoDownloadGuard.clearOnSuccess(proposal)
-            downloadController.startDownload(proposal)
+            startConfirmedDownload(proposal)
         }
     }
 
@@ -306,11 +309,11 @@ constructor(
         _uiState.update { it.copy(showWifiOnlyBlocked = false) }
     }
 
-    private fun maybeAutoStartDownload(proposal: QuickRegionProposal) {
+    private fun maybeAutoStartDownload(proposal: QuickCoverageProposal) {
         val state = _uiState.value
         val canAutoStart =
             state.simpleModeEnabled &&
-                state.regionResolution !is ExploreRegionResolution.Downloading &&
+                state.regionResolution !is ExploreCoverageResolution.Downloading &&
                 !state.showCellularWarning &&
                 autoDownloadGuard.shouldAttempt(proposal, forceRetry = false)
         if (canAutoStart) {
@@ -318,7 +321,7 @@ constructor(
         }
     }
 
-    private suspend fun startDownloadWithPolicy(proposal: QuickRegionProposal, forceRetry: Boolean = false) {
+    private suspend fun startDownloadWithPolicy(proposal: QuickCoverageProposal, forceRetry: Boolean = false) {
         if (!forceRetry && !autoDownloadGuard.shouldAttempt(proposal, forceRetry = false)) return
         if (!networkConnectivityMonitor.isNetworkAvailable()) {
             autoDownloadGuard.markAttempted(proposal)
@@ -353,9 +356,19 @@ constructor(
             }
             DownloadPolicy.GateResult.Proceed -> {
                 autoDownloadGuard.clearOnSuccess(proposal)
-                downloadController.startDownload(proposal)
+                startConfirmedDownload(proposal)
             }
         }
+    }
+
+    private suspend fun startConfirmedDownload(proposal: QuickCoverageProposal) {
+        proposal.packCacheRaiseBytes?.let { requiredCacheBytes ->
+            val currentLimit = userPreferencesRepository.demCacheLimitBytes.first()
+            if (requiredCacheBytes > currentLimit) {
+                userPreferencesRepository.setDemCacheLimitBytes(requiredCacheBytes)
+            }
+        }
+        downloadController.startDownload(proposal)
     }
 
     override fun onCleared() {
@@ -423,13 +436,18 @@ constructor(
         val location = locationRepository.lastLocation
         if (location != null) {
             applyRegionResolution(location)
-            altitudeController.scheduleResolve(location, _uiState.value.activeRegions)
+            altitudeController.scheduleResolve(location)
             return
         }
         if (requestedRegionId != null) {
-            val region = regionRepository.getRegion(requestedRegionId)
+            val region = coverageSetRepository.getCoverageSet(requestedRegionId)
             if (region != null) {
-                applyActiveRegions(contributing = listOf(region), membership = listOf(region))
+                val cellIds = coverageSetRepository.getCellIdsForCoverageSet(region.id).toSet()
+                applyActiveRegions(
+                    contributing = listOf(region),
+                    membership = listOf(region),
+                    cellIds = cellIds
+                )
             }
         }
     }
@@ -437,34 +455,35 @@ constructor(
     private suspend fun resolveVirtualExplore(observer: UserLocation) {
         val session = virtualExploreSession ?: return
         val eligible =
-            insideRegionUseCase.exploreEligibleRegionsContainingPoint(
+            insideCoverageUseCase.exploreEligibleCoverageSetsContainingPoint(
                 observer.latitude,
                 observer.longitude
             )
         if (eligible.none { it.id == session.primaryRegionId }) {
-            applyActiveRegions(contributing = emptyList(), membership = emptyList())
+            applyActiveRegions(contributing = emptyList(), membership = emptyList(), cellIds = emptySet())
             refreshGate()
             return
         }
         applyRegionResolution(observer)
-        altitudeController.scheduleResolve(observer, _uiState.value.activeRegions)
+        altitudeController.scheduleResolve(observer)
     }
 
-    private suspend fun applyRegionResolution(location: UserLocation) {
+    private suspend fun applyRegionResolution(location: UserLocation, preserveActiveDuringGrace: Boolean = false) {
         val state = _uiState.value
         if (state.simpleModeEnabled) {
-            val regionsAtPoint =
-                regionRepository.regionsContainingPoint(location.latitude, location.longitude)
-            val downloadingRegion = regionRepository.findDownloadingRegion()
+            val coverageSetsAtPoint =
+                coverageSetRepository.coverageSetsContainingPoint(location.latitude, location.longitude)
+            val downloadingCoverageSet = coverageSetRepository.findDownloadingCoverageSet()
             val resolution =
-                ExploreRegionResolver.resolve(
-                    regionsAtPoint = regionsAtPoint,
-                    downloadingRegion = downloadingRegion,
+                ExploreCoverageResolver.resolve(
+                    coverageSetsAtPoint = coverageSetsAtPoint,
+                    downloadingCoverageSet = downloadingCoverageSet,
                     lat = location.latitude,
-                    lon = location.longitude
+                    lon = location.longitude,
+                    cacheLimitBytes = userPreferencesRepository.demCacheLimitBytes.first()
                 )
             when (resolution) {
-                is ExploreRegionResolution.Active -> {
+                is ExploreCoverageResolution.Active -> {
                     downloadController.stopObservation()
                     applyActiveRegions(selectRegionsForLocation(location))
                     _uiState.update {
@@ -476,19 +495,23 @@ constructor(
                         )
                     }
                 }
-                is ExploreRegionResolution.Downloading -> {
-                    applyActiveRegions(contributing = emptyList(), membership = emptyList())
+                is ExploreCoverageResolution.Downloading -> {
+                    if (!preserveActiveDuringGrace) {
+                        applyActiveRegions(contributing = emptyList(), membership = emptyList(), cellIds = emptySet())
+                    }
                     _uiState.update {
                         it.copy(
                             regionResolution = resolution,
                             downloadPrompt = null,
-                            downloadProgressPct = resolution.region.downloadProgressPct
+                            downloadProgressPct = resolution.coverageSet.downloadProgressPct
                         )
                     }
-                    downloadController.observeProgress(resolution.region.id)
+                    downloadController.observeProgress(resolution.coverageSet.id)
                 }
-                is ExploreRegionResolution.NeedsDownload -> {
-                    applyActiveRegions(contributing = emptyList(), membership = emptyList())
+                is ExploreCoverageResolution.NeedsDownload -> {
+                    if (!preserveActiveDuringGrace) {
+                        applyActiveRegions(contributing = emptyList(), membership = emptyList(), cellIds = emptySet())
+                    }
                     autoDownloadGuard.onProposalChanged(resolution.proposal)
                     _uiState.update {
                         it.copy(
@@ -503,60 +526,64 @@ constructor(
                 }
             }
         } else {
-            applyActiveRegions(selectRegionsForLocation(location))
+            val selection = selectRegionsForLocation(location)
+            if (!preserveActiveDuringGrace || selection.cellIds.isNotEmpty()) {
+                applyActiveRegions(selection)
+            }
             _uiState.update { it.copy(regionResolution = null, downloadPrompt = null) }
         }
         refreshGate()
     }
 
-    private suspend fun selectRegionsForLocation(location: UserLocation): RegionSelection {
-        val eligible =
-            regionRepository.observeAllRegions().first().filter {
-                it.downloadStatus == DownloadStatus.READY || it.downloadStatus == DownloadStatus.PARTIAL
-            }
-        val membership =
-            ContributingRegions
-                .membershipRegions(eligible, location.latitude, location.longitude)
-                .sortedByDescending { it.updatedAt }
-        val contributing =
-            ContributingRegions
-                .contributingRegions(eligible, location.latitude, location.longitude)
-                .sortedByDescending { it.updatedAt }
-        return RegionSelection(membership = membership, contributing = contributing)
+    private suspend fun selectRegionsForLocation(location: UserLocation): CoverageSetSelection {
+        val all = coverageSetRepository.observeAllCoverageSets().first()
+        return ExploreCoverageHelper.selectForLocation(
+            repository = coverageSetRepository,
+            allCoverageSets = all,
+            lat = location.latitude,
+            lon = location.longitude
+        )
     }
 
-    private data class RegionSelection(val membership: List<Region>, val contributing: List<Region>)
-
-    private fun applyActiveRegions(selection: RegionSelection) {
-        applyActiveRegions(contributing = selection.contributing, membership = selection.membership)
+    private fun applyActiveRegions(selection: CoverageSetSelection) {
+        applyActiveRegions(
+            contributing = selection.contributing,
+            membership = selection.membership,
+            cellIds = selection.cellIds
+        )
     }
 
-    private fun applyActiveRegions(contributing: List<Region>, membership: List<Region>) {
+    private fun applyActiveRegions(
+        contributing: List<CoverageSet>,
+        membership: List<CoverageSet>,
+        cellIds: Set<String>
+    ) {
         val primary =
             membership.firstOrNull { it.id == requestedRegionId }
                 ?: membership.maxByOrNull { it.updatedAt }
         visibilityPassScheduler.setActiveRegions(contributing)
         _uiState.update {
             it.copy(
-                activeRegion = primary,
-                activeRegions = contributing,
-                membershipRegions = membership,
-                activeRegionName = formatActiveRegionName(membership, primary),
+                activeCoverageSet = primary,
+                activeCoverageSets = contributing,
+                membershipCoverageSets = membership,
+                activeCellIds = cellIds,
+                activeCoverageSetName = formatActiveRegionName(membership, primary),
                 partialRegionWarning = contributing.any { region -> region.downloadStatus == DownloadStatus.PARTIAL }
             )
         }
         virtualObserverLocation?.let { observer ->
-            altitudeController.scheduleResolve(observer, contributing)
-        } ?: locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it, contributing) }
+            altitudeController.scheduleResolve(observer)
+        } ?: locationRepository.lastLocation?.let { altitudeController.scheduleResolve(it) }
         viewModelScope.launch(Dispatchers.IO) {
             contributing.forEach { active ->
-                runCatching { regionCoverageRepairUseCase.repairIfNeeded(active) }
+                runCatching { coverageSetRepairUseCase.repairIfNeeded(active) }
             }
             refreshGate()
         }
     }
 
-    private fun formatActiveRegionName(regions: List<Region>, primary: Region?): String? = when {
+    private fun formatActiveRegionName(regions: List<CoverageSet>, primary: CoverageSet?): String? = when {
         regions.isEmpty() -> null
         regions.size == 1 -> regions.single().name
         else -> regions.joinToString(" · ") { it.name }.ifBlank { primary?.name }
@@ -618,15 +645,19 @@ constructor(
         }
 
         viewModelScope.launch {
-            applyRegionResolution(location)
-            applyRegionBoundary(location, _uiState.value.membershipRegions)
+            val priorCellIds = _uiState.value.activeCellIds
+            val outsidePriorCoverage =
+                priorCellIds.isNotEmpty() &&
+                    !CellMembership.hasCell(priorCellIds, location.latitude, location.longitude)
+            applyRegionResolution(location, preserveActiveDuringGrace = outsidePriorCoverage)
+            applyRegionBoundary(location, _uiState.value.activeCellIds)
             refreshGate()
-            altitudeController.scheduleResolve(location, _uiState.value.activeRegions)
+            altitudeController.scheduleResolve(location)
         }
     }
 
-    private fun applyRegionBoundary(location: UserLocation, regions: List<Region>) {
-        val boundaryState = regionBoundaryController.onLocation(location, regions)
+    private fun applyRegionBoundary(location: UserLocation, activeCellIds: Set<String>) {
+        val boundaryState = regionBoundaryController.onLocation(location, activeCellIds)
         if (boundaryState.insideActiveRegion) {
             regionBoundaryController.stopGraceTicker()
             _uiState.update {
@@ -649,7 +680,9 @@ constructor(
                     showRegionExitBanner = graceState.showRegionExitBanner,
                     showGraceExpiredDialog = graceState.showGraceExpiredDialog,
                     regionExitGraceSecondsRemaining = graceState.regionExitGraceSecondsRemaining,
-                    activeRegionName = formatActiveRegionName(regions, it.activeRegion) ?: it.activeRegionName
+                    activeCoverageSetName =
+                    formatActiveRegionName(_uiState.value.membershipCoverageSets, it.activeCoverageSet)
+                        ?: it.activeCoverageSetName
                 )
             }
             refreshGate()
@@ -661,10 +694,11 @@ constructor(
         visibilityPassScheduler.setActiveRegions(emptyList())
         _uiState.update {
             it.copy(
-                activeRegion = null,
-                activeRegions = emptyList(),
-                membershipRegions = emptyList(),
-                activeRegionName = null,
+                activeCoverageSet = null,
+                activeCoverageSets = emptyList(),
+                membershipCoverageSets = emptyList(),
+                activeCellIds = emptySet(),
+                activeCoverageSetName = null,
                 showRegionExitBanner = false,
                 showGraceExpiredDialog = false,
                 regionExitGraceSecondsRemaining = 0
@@ -757,7 +791,7 @@ constructor(
 
     private fun updatePartialWarning(warnings: Set<VisibilityWarning>) {
         val regionPartial =
-            _uiState.value.activeRegions.any { it.downloadStatus == DownloadStatus.PARTIAL }
+            _uiState.value.activeCoverageSets.any { it.downloadStatus == DownloadStatus.PARTIAL }
         _uiState.update {
             it.copy(partialRegionWarning = regionPartial || VisibilityWarning.DEM_TILE_MISSING in warnings)
         }
@@ -765,18 +799,21 @@ constructor(
 
     private fun refreshGate() {
         val state = _uiState.value
-        val regionDownloadNeeded = state.regionResolution is ExploreRegionResolution.NeedsDownload
+        val graceActive = regionBoundaryController.isOutsideGraceActive
+        val regionDownloadNeeded =
+            !graceActive && state.regionResolution is ExploreCoverageResolution.NeedsDownload
         val gate =
             ExplorePreconditions.resolveGate(
                 locationAccessState = state.locationAccessState,
                 waitingForGpsFix = state.waitingForGpsFix,
                 cameraGranted = state.cameraGranted,
                 calibrationState = resolveCalibrationState(state.calibrationState),
-                activeRegion = state.activeRegion,
+                activeCoverageSet = state.activeCoverageSet,
                 graceExpired = state.showGraceExpiredDialog,
                 simpleModeEnabled = state.simpleModeEnabled,
                 regionDownloadNeeded = regionDownloadNeeded,
-                regionDownloading = state.regionResolution is ExploreRegionResolution.Downloading
+                regionDownloading =
+                !graceActive && state.regionResolution is ExploreCoverageResolution.Downloading
             )
         _uiState.update {
             it.copy(

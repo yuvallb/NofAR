@@ -1,9 +1,9 @@
 package com.nofar.core.database.dao
 
+import com.nofar.core.database.model.CoverageCellEntity
+import com.nofar.core.database.model.CoverageEntityEntity
 import com.nofar.core.database.model.GeoEntityElevationMerge
 import com.nofar.core.database.model.GeoEntityEntity
-import com.nofar.core.database.model.RegionEntityCoverageEntity
-import com.nofar.core.database.model.TileCoverageEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -56,23 +56,19 @@ constructor(private val geoEntityDao: GeoEntityDao) {
 class CoverageLinker
 @Inject
 constructor(
-    private val regionEntityCoverageDao: RegionEntityCoverageDao,
-    private val tileCoverageDao: TileCoverageDao,
-    private val regionIngestDao: RegionIngestDao
+    private val coverageEntityDao: CoverageEntityDao,
+    private val coverageCellDao: CoverageCellDao,
+    private val coverageIngestDao: CoverageIngestDao
 ) {
-    /**
-     * Persists a geo entity and its region coverage link in one Room [@Transaction]
-     * (compatible with BundledSQLiteDriver).
-     */
-    suspend fun upsertAndLinkEntity(regionId: String, entity: GeoEntityEntity, displayName: String) {
-        regionIngestDao.upsertAndLinkEntity(regionId, entity, displayName)
+    suspend fun upsertAndLinkEntity(coverageSetId: String, entity: GeoEntityEntity, displayName: String) {
+        coverageIngestDao.upsertAndLinkEntity(coverageSetId, entity, displayName)
     }
 
-    suspend fun linkEntities(regionId: String, entities: List<Pair<String, String>>) {
-        regionEntityCoverageDao.insertAll(
+    suspend fun linkEntities(coverageSetId: String, entities: List<Pair<String, String>>) {
+        coverageEntityDao.insertAll(
             entities.map { (entityId, displayName) ->
-                RegionEntityCoverageEntity(
-                    regionId = regionId,
+                CoverageEntityEntity(
+                    coverageSetId = coverageSetId,
                     entityId = entityId,
                     displayName = displayName
                 )
@@ -80,7 +76,7 @@ constructor(
         )
     }
 
-    suspend fun linkTiles(regionId: String, tileIds: List<String>) {
-        tileCoverageDao.insertAll(tileIds.map { TileCoverageEntity(regionId, it) })
+    suspend fun linkCells(coverageSetId: String, cellIds: List<String>) {
+        coverageCellDao.insertAll(cellIds.map { cellId -> CoverageCellEntity(coverageSetId, cellId) })
     }
 }

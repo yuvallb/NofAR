@@ -2,10 +2,12 @@ package com.nofar.core.database
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
+import com.nofar.core.database.model.CoverageCellEntity
+import com.nofar.core.database.model.CoverageEntityEntity
+import com.nofar.core.database.model.CoverageSetEntity
 import com.nofar.core.database.model.DemTileEntity
 import com.nofar.core.database.model.GeoEntityEntity
-import com.nofar.core.database.model.RegionEntity
-import com.nofar.core.database.model.RegionEntityCoverageEntity
+import com.nofar.core.model.AppConfig
 import com.nofar.core.model.DownloadStatus
 import com.nofar.core.model.GeoEntityType
 import com.nofar.core.model.ResolutionLevel
@@ -17,7 +19,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
-class RegionDaoTest {
+class CoverageSetDaoTest {
     private lateinit var fixtures: DatabaseTestFixtures
 
     @Before
@@ -31,36 +33,26 @@ class RegionDaoTest {
     }
 
     @Test
-    fun upsertAndReadRegion() = runTest {
-        val region = sampleRegion(name = "Galilee")
-        fixtures.regionDao.upsert(region)
-        val loaded = fixtures.regionDao.getById(region.id)
+    fun upsertAndReadCoverageSet() = runTest {
+        val coverageSet = sampleCoverageSet(name = "Galilee")
+        fixtures.coverageSetDao.upsert(coverageSet)
+        val loaded = fixtures.coverageSetDao.getById(coverageSet.id)
         assertThat(loaded?.name).isEqualTo("Galilee")
     }
 
     @Test
-    fun listRegions_sortedByUpdatedAtDesc() = runTest {
-        val older =
-            sampleRegion(
-                id = UUID.randomUUID().toString(),
-                name = "Older",
-                updatedAt = 1_000L
-            )
-        val newer =
-            sampleRegion(
-                id = UUID.randomUUID().toString(),
-                name = "Newer",
-                updatedAt = 2_000L
-            )
-        fixtures.regionDao.upsert(older)
-        fixtures.regionDao.upsert(newer)
-        assertThat(fixtures.regionDao.getAll().map { it.name }).containsExactly("Newer", "Older").inOrder()
+    fun listCoverageSets_sortedByUpdatedAtDesc() = runTest {
+        val older = sampleCoverageSet(id = UUID.randomUUID().toString(), name = "Older", updatedAt = 1_000L)
+        val newer = sampleCoverageSet(id = UUID.randomUUID().toString(), name = "Newer", updatedAt = 2_000L)
+        fixtures.coverageSetDao.upsert(older)
+        fixtures.coverageSetDao.upsert(newer)
+        assertThat(fixtures.coverageSetDao.getAll().map { it.name }).containsExactly("Newer", "Older").inOrder()
     }
 
     @Test
-    fun upsert_preservesEntityAndTileCoverage() = runTest {
-        val region = sampleRegion(name = "CoverageKeep")
-        fixtures.regionDao.upsert(region)
+    fun upsert_preservesEntityAndCellCoverage() = runTest {
+        val coverageSet = sampleCoverageSet(name = "CoverageKeep")
+        fixtures.coverageSetDao.upsert(coverageSet)
         fixtures.geoEntityUpserter.upsert(
             GeoEntityEntity(
                 id = "node/keep",
@@ -75,56 +67,47 @@ class RegionDaoTest {
             )
         )
         fixtures.coverageDao.insert(
-            RegionEntityCoverageEntity(region.id, "node/keep", displayName = "Keep")
+            CoverageEntityEntity(coverageSet.id, "node/keep", displayName = "Keep")
         )
-        val tileId = "Copernicus_DSM_COG_10_N32_00_E035_00_DEM"
+        val tileId = "Copernicus_DSM_COG_30_N32_00_E035_00_DEM"
         fixtures.demTileDao.upsert(
             DemTileEntity(
                 tileId = tileId,
                 filePath = "dem/$tileId.bin",
-                width = 3600,
-                height = 3600,
+                width = 1200,
+                height = 1200,
                 tileLat = 32,
                 tileLon = 35,
-                noDataValue = -9999f,
+                noDataValue = -32768f,
                 sizeBytes = 1000,
                 refCount = 1,
                 lastAccessedAt = System.currentTimeMillis()
             )
         )
-        fixtures.tileCoverageDao.insert(
-            com.nofar.core.database.model.TileCoverageEntity(region.id, tileId)
-        )
+        fixtures.coverageCellDao.insert(CoverageCellEntity(coverageSet.id, tileId))
 
-        fixtures.regionDao.upsert(region.copy(name = "CoverageKeep-Updated", entityCount = 1))
-        fixtures.regionDao.updateDownloadStatus(
-            regionId = region.id,
+        fixtures.coverageSetDao.upsert(coverageSet.copy(name = "CoverageKeep-Updated", entityCount = 1))
+        fixtures.coverageSetDao.updateDownloadStatus(
+            coverageSetId = coverageSet.id,
             status = DownloadStatus.PARTIAL.name,
             progressPct = 40,
             updatedAt = System.currentTimeMillis(),
             entityCount = 1
         )
 
-        assertThat(fixtures.coverageDao.getEntityIdsForRegion(region.id)).containsExactly("node/keep")
-        assertThat(fixtures.tileCoverageDao.getTileIdsForRegion(region.id)).containsExactly(tileId)
-        assertThat(fixtures.regionDao.getById(region.id)?.name).isEqualTo("CoverageKeep-Updated")
-        assertThat(fixtures.regionDao.getById(region.id)?.entityCount).isEqualTo(1)
+        assertThat(fixtures.coverageDao.getEntityIdsForCoverageSet(coverageSet.id)).containsExactly("node/keep")
+        assertThat(fixtures.coverageCellDao.getCellIdsForCoverageSet(coverageSet.id)).containsExactly(tileId)
+        assertThat(fixtures.coverageSetDao.getById(coverageSet.id)?.name).isEqualTo("CoverageKeep-Updated")
+        assertThat(fixtures.coverageSetDao.getById(coverageSet.id)?.entityCount).isEqualTo(1)
     }
 
-    private fun sampleRegion(
+    private fun sampleCoverageSet(
         id: String = UUID.randomUUID().toString(),
         name: String = "Test",
         updatedAt: Long = System.currentTimeMillis()
-    ): RegionEntity = RegionEntity(
+    ): CoverageSetEntity = CoverageSetEntity(
         id = id,
         name = name,
-        centerLat = 32.0,
-        centerLon = 35.0,
-        radiusM = 10_000.0,
-        minLat = 31.9,
-        maxLat = 32.1,
-        minLon = 34.9,
-        maxLon = 35.1,
         createdAt = updatedAt,
         updatedAt = updatedAt,
         downloadStatus = DownloadStatus.READY.name,
@@ -247,34 +230,31 @@ class GeoEntityDaoTest {
     }
 
     @Test
-    fun regionQuery_withoutCoverage_fallsBackToEntitiesInRegionBounds() = runTest {
+    fun coverageSetQuery_withoutCoverage_returnsEmpty() = runTest {
         fixtures.geoEntityUpserter.upsert(
             sampleEntity(
-                id = "node/fallback",
+                id = "node/orphan",
                 lat = 32.02,
                 lon = 35.02,
                 type = GeoEntityType.VILLAGE.name
             )
         )
-        val regionId = UUID.randomUUID().toString()
+        val coverageSetId = UUID.randomUUID().toString()
         val results =
-            fixtures.spatialQuery.queryWithinRadiusForRegion(
-                regionId = regionId,
-                regionCenterLat = 32.0,
-                regionCenterLon = 35.0,
-                regionRadiusM = 10_000.0,
+            fixtures.spatialQuery.queryWithinRadiusForCoverageSet(
+                coverageSetId = coverageSetId,
                 lat = 32.0,
                 lon = 35.0,
-                radiusM = 10_000.0,
+                radiusM = AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M,
                 resolutionLevel = ResolutionLevel.Medium
             )
 
-        assertThat(results.map { it.id }).contains("node/fallback")
+        assertThat(results).isEmpty()
     }
 
     @Test
-    fun regionQuery_withCoverage_fallsBackWhenRTreeEmpty() = runTest {
-        val regionId = UUID.randomUUID().toString()
+    fun coverageSetQuery_withCoverage_fallsBackWhenRTreeEmpty() = runTest {
+        val coverageSetId = UUID.randomUUID().toString()
         fixtures.geoEntityUpserter.upsert(
             sampleEntity(
                 id = "node/coverage-fallback",
@@ -284,8 +264,8 @@ class GeoEntityDaoTest {
             )
         )
         fixtures.coverageDao.insert(
-            RegionEntityCoverageEntity(
-                regionId = regionId,
+            CoverageEntityEntity(
+                coverageSetId = coverageSetId,
                 entityId = "node/coverage-fallback",
                 displayName = "Coverage Fallback"
             )
@@ -295,14 +275,11 @@ class GeoEntityDaoTest {
         )
 
         val results =
-            fixtures.spatialQuery.queryWithinRadiusForRegion(
-                regionId = regionId,
-                regionCenterLat = 32.0,
-                regionCenterLon = 35.0,
-                regionRadiusM = 10_000.0,
+            fixtures.spatialQuery.queryWithinRadiusForCoverageSet(
+                coverageSetId = coverageSetId,
                 lat = 32.0,
                 lon = 35.0,
-                radiusM = 10_000.0,
+                radiusM = AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M,
                 resolutionLevel = ResolutionLevel.Medium
             )
 
@@ -310,8 +287,8 @@ class GeoEntityDaoTest {
     }
 
     @Test
-    fun regionQuery_overlaysCoverageDisplayName() = runTest {
-        val regionId = UUID.randomUUID().toString()
+    fun coverageSetQuery_overlaysCoverageDisplayName() = runTest {
+        val coverageSetId = UUID.randomUUID().toString()
         fixtures.geoEntityUpserter.upsert(
             sampleEntity(
                 id = "node/localized",
@@ -321,22 +298,19 @@ class GeoEntityDaoTest {
             )
         )
         fixtures.coverageDao.insert(
-            RegionEntityCoverageEntity(
-                regionId = regionId,
+            CoverageEntityEntity(
+                coverageSetId = coverageSetId,
                 entityId = "node/localized",
                 displayName = "פסגה מקומית"
             )
         )
 
         val results =
-            fixtures.spatialQuery.queryWithinRadiusForRegion(
-                regionId = regionId,
-                regionCenterLat = 32.0,
-                regionCenterLon = 35.0,
-                regionRadiusM = 10_000.0,
+            fixtures.spatialQuery.queryWithinRadiusForCoverageSet(
+                coverageSetId = coverageSetId,
                 lat = 32.0,
                 lon = 35.0,
-                radiusM = 10_000.0,
+                radiusM = AppConfig.EXPLORE_ENTITY_QUERY_RADIUS_M,
                 resolutionLevel = ResolutionLevel.Medium
             )
 
@@ -345,23 +319,23 @@ class GeoEntityDaoTest {
     }
 
     @Test
-    fun deleteEntitiesExclusiveToRegion_keepsSharedEntities() = runTest {
-        val regionA = UUID.randomUUID().toString()
-        val regionB = UUID.randomUUID().toString()
+    fun deleteEntitiesExclusiveToCoverageSet_keepsSharedEntities() = runTest {
+        val coverageSetA = UUID.randomUUID().toString()
+        val coverageSetB = UUID.randomUUID().toString()
         fixtures.geoEntityUpserter.upsert(sampleEntity(id = "node/shared"))
         fixtures.geoEntityUpserter.upsert(sampleEntity(id = "node/only-a"))
         fixtures.coverageDao.insert(
-            RegionEntityCoverageEntity(regionA, "node/shared", displayName = "Shared")
+            CoverageEntityEntity(coverageSetA, "node/shared", displayName = "Shared")
         )
         fixtures.coverageDao.insert(
-            RegionEntityCoverageEntity(regionA, "node/only-a", displayName = "Only A")
+            CoverageEntityEntity(coverageSetA, "node/only-a", displayName = "Only A")
         )
         fixtures.coverageDao.insert(
-            RegionEntityCoverageEntity(regionB, "node/shared", displayName = "Shared")
+            CoverageEntityEntity(coverageSetB, "node/shared", displayName = "Shared")
         )
 
-        fixtures.geoEntityDao.deleteEntitiesExclusiveToRegion(regionA)
-        fixtures.coverageDao.deleteForRegion(regionA)
+        fixtures.geoEntityDao.deleteEntitiesExclusiveToCoverageSet(coverageSetA)
+        fixtures.coverageDao.deleteForCoverageSet(coverageSetA)
 
         assertThat(fixtures.geoEntityDao.getByOsmId("node/shared")).isNotNull()
         assertThat(fixtures.geoEntityDao.getByOsmId("node/only-a")).isNull()
@@ -401,16 +375,16 @@ class DemTileDaoTest {
 
     @Test
     fun refCountIncrementAndDecrement() = runTest {
-        val tileId = "Copernicus_DSM_COG_10_N32_00_E035_00_DEM"
+        val tileId = "Copernicus_DSM_COG_30_N32_00_E035_00_DEM"
         fixtures.demTileDao.upsert(
             DemTileEntity(
                 tileId = tileId,
                 filePath = "dem/$tileId.bin",
-                width = 3600,
-                height = 3600,
+                width = 1200,
+                height = 1200,
                 tileLat = 32,
                 tileLon = 35,
-                noDataValue = -9999f,
+                noDataValue = -32768f,
                 sizeBytes = 1000,
                 refCount = 1,
                 lastAccessedAt = System.currentTimeMillis()
@@ -423,57 +397,48 @@ class DemTileDaoTest {
     }
 
     @Test
-    fun upsert_preservesTileCoverageLinks() = runTest {
-        val region = sampleRegionForTile()
-        fixtures.regionDao.upsert(region)
-        val tileId = "Copernicus_DSM_COG_10_N33_00_E035_00_DEM"
+    fun upsert_preservesCellCoverageLinks() = runTest {
+        val coverageSet = sampleCoverageSetForTile()
+        fixtures.coverageSetDao.upsert(coverageSet)
+        val tileId = "Copernicus_DSM_COG_30_N33_00_E035_00_DEM"
         fixtures.demTileDao.upsert(
             DemTileEntity(
                 tileId = tileId,
                 filePath = "dem/$tileId.bin",
-                width = 3600,
-                height = 3600,
+                width = 1200,
+                height = 1200,
                 tileLat = 33,
                 tileLon = 35,
-                noDataValue = -9999f,
+                noDataValue = -32768f,
                 sizeBytes = 1000,
                 refCount = 1,
                 lastAccessedAt = System.currentTimeMillis()
             )
         )
-        fixtures.tileCoverageDao.insert(
-            com.nofar.core.database.model.TileCoverageEntity(region.id, tileId)
-        )
+        fixtures.coverageCellDao.insert(CoverageCellEntity(coverageSet.id, tileId))
 
         fixtures.demTileDao.upsert(
             DemTileEntity(
                 tileId = tileId,
                 filePath = "dem/$tileId.bin",
-                width = 3600,
-                height = 3600,
+                width = 1200,
+                height = 1200,
                 tileLat = 33,
                 tileLon = 35,
-                noDataValue = -9999f,
+                noDataValue = -32768f,
                 sizeBytes = 2000,
                 refCount = 2,
                 lastAccessedAt = System.currentTimeMillis()
             )
         )
 
-        assertThat(fixtures.tileCoverageDao.getTileIdsForRegion(region.id)).containsExactly(tileId)
+        assertThat(fixtures.coverageCellDao.getCellIdsForCoverageSet(coverageSet.id)).containsExactly(tileId)
         assertThat(fixtures.demTileDao.getById(tileId)?.sizeBytes).isEqualTo(2000)
     }
 
-    private fun sampleRegionForTile(): RegionEntity = RegionEntity(
+    private fun sampleCoverageSetForTile(): CoverageSetEntity = CoverageSetEntity(
         id = UUID.randomUUID().toString(),
-        name = "TileRegion",
-        centerLat = 33.0,
-        centerLon = 35.0,
-        radiusM = 10_000.0,
-        minLat = 32.9,
-        maxLat = 33.1,
-        minLon = 34.9,
-        maxLon = 35.1,
+        name = "TileCoverageSet",
         createdAt = System.currentTimeMillis(),
         updatedAt = System.currentTimeMillis(),
         downloadStatus = DownloadStatus.READY.name,
