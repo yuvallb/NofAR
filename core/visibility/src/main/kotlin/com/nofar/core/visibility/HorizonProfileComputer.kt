@@ -1,15 +1,16 @@
 package com.nofar.core.visibility
 
 import com.nofar.core.model.AppConfig
+import com.nofar.core.model.RegionBounds
 import javax.inject.Inject
 import kotlin.math.floor
 
 /**
  * Full-360° terrain skyline profile for Explore horizon outline rendering.
  *
- * Runs on the low-frequency visibility pass cadence. Tune [AppConfig.HORIZON_AZIMUTH_STEP_DEG],
- * [AppConfig.HORIZON_RAY_STEP_M], and [AppConfig.HORIZON_MAX_RADIUS_M] if the combined pass exceeds
- * the Requirements §8 visibility budget on low-end devices.
+ * Runs on the low-frequency visibility pass cadence. Tune [AppConfig.HORIZON_AZIMUTH_STEP_DEG] and
+ * [AppConfig.HORIZON_RAY_STEP_M] if the combined pass exceeds the Requirements §8 visibility budget
+ * on low-end devices.
  */
 data class HorizonProfile(val azimuthStepDeg: Float, val elevationAnglesDeg: FloatArray) {
     fun azimuthDegForIndex(index: Int): Float = index * azimuthStepDeg
@@ -51,15 +52,16 @@ constructor() {
     /**
      * Sweeps a full-360° skyline profile.
      *
-     * @param maxRadiusM outward reach of each azimuth ray. Passed from the caller so it can match the
-     * Explore entity-collection radius (H-DEC-3), capped at [AppConfig.HORIZON_MAX_RADIUS_M] for budget.
+     * @param maxRadiusM outward reach of each azimuth ray. Passed from the caller so it matches the
+     * Explore entity-collection radius (H-DEC-3): region radius + [AppConfig.DATA_COLLECTION_RADIUS_PADDING_M].
      */
     fun sweep(
         observerLat: Double,
         observerLon: Double,
         observerEyeM: Double,
         sampler: DemSampler,
-        maxRadiusM: Double = AppConfig.HORIZON_MAX_RADIUS_M
+        maxRadiusM: Double =
+            RegionBounds.dataCollectionRadiusM(AppConfig.REGION_RADIUS_MAX_KM * 1_000.0)
     ): HorizonProfile {
         val azimuthStepDeg = AppConfig.HORIZON_AZIMUTH_STEP_DEG
         val bucketCount = (360f / azimuthStepDeg).toInt()

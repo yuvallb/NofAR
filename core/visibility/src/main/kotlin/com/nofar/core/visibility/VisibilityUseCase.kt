@@ -128,7 +128,6 @@ constructor(
                 observerElevationM = observerElevationM,
                 demGroundM = observerDemGroundM
             )
-        val horizonMaxRadiusM = minOf(collectionRadiusM, AppConfig.HORIZON_MAX_RADIUS_M)
         val horizonProfile =
             buildHorizonProfile(
                 horizonProfileComputer = horizonProfileComputer,
@@ -137,7 +136,7 @@ constructor(
                 observerLon = location.longitude,
                 observerEyeM = observerEye.eyeM,
                 sampler = sampler,
-                maxRadiusM = horizonMaxRadiusM
+                maxRadiusM = collectionRadiusM
             )
         return visibilityResult.copy(
             horizonProfile = horizonProfile,

@@ -2,6 +2,7 @@ package com.nofar.core.visibility
 
 import com.google.common.truth.Truth.assertThat
 import com.nofar.core.model.AppConfig
+import com.nofar.core.model.RegionBounds
 import org.junit.Test
 
 /**
@@ -11,6 +12,8 @@ import org.junit.Test
 class BuildHorizonProfileTest {
     private val computer = HorizonProfileComputer()
     private val flatSampler = DemSampler { _, _ -> 100f }
+    private val maxCollectionRadiusM =
+        RegionBounds.dataCollectionRadiusM(AppConfig.REGION_RADIUS_MAX_KM * 1_000.0)
 
     @Test
     fun computeDisabled_returnsNull() {
@@ -22,7 +25,7 @@ class BuildHorizonProfileTest {
                 observerLon = 35.5,
                 observerEyeM = 100.0 + AppConfig.EYE_HEIGHT_METERS,
                 sampler = flatSampler,
-                maxRadiusM = AppConfig.HORIZON_MAX_RADIUS_M
+                maxRadiusM = maxCollectionRadiusM
             )
 
         assertThat(profile).isNull()
@@ -38,7 +41,7 @@ class BuildHorizonProfileTest {
                 observerLon = 35.5,
                 observerEyeM = 100.0 + AppConfig.EYE_HEIGHT_METERS,
                 sampler = flatSampler,
-                maxRadiusM = AppConfig.HORIZON_MAX_RADIUS_M
+                maxRadiusM = maxCollectionRadiusM
             )
 
         assertThat(profile).isNotNull()

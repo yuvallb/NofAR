@@ -220,10 +220,53 @@ class HorizonProfileComputerTest {
         val midpointM = targetDistanceM / 2.0
         val entityBulge = GeoMath.earthBulgeM(midpointM, targetDistanceM)
         val horizonBulgeSamePath = GeoMath.earthBulgeM(midpointM, targetDistanceM)
-        val horizonBulgeLongRay = GeoMath.earthBulgeM(midpointM, 15_000.0)
+        val horizonBulgeLongRay = GeoMath.earthBulgeM(midpointM, 25_000.0)
 
         assertThat(horizonBulgeSamePath).isWithin(1e-9).of(entityBulge)
         assertThat(horizonBulgeLongRay).isGreaterThan(entityBulge)
+    }
+
+    // Uncapping the skyline: a ridge beyond the old 15 km budget must appear once the sweep reaches
+    // the full collection radius (25 km for a max-size region).
+    @Test
+    fun farRidge_beyondOldCap_isAbsentAt15km_andPresentAt25km() {
+        val observerLat = 32.5
+        val observerLon = 35.5
+        val ridgeDistanceM = 18_000.0
+        val ridgeElevationM = 1_500f
+        val sampler =
+            DemSampler { lat, lon ->
+                val distanceM =
+                    RegionBounds.haversineDistanceM(observerLat, observerLon, lat, lon)
+                when {
+                    distanceM < 50.0 -> 100f
+                    kotlin.math.abs(distanceM - ridgeDistanceM) < AppConfig.HORIZON_RAY_STEP_M ->
+                        ridgeElevationM
+                    else -> 100f
+                }
+            }
+        val observerEyeM = 100.0 + AppConfig.EYE_HEIGHT_METERS
+
+        val cappedProfile =
+            computer.sweep(
+                observerLat = observerLat,
+                observerLon = observerLon,
+                observerEyeM = observerEyeM,
+                sampler = sampler,
+                maxRadiusM = 15_000.0
+            )
+        val fullProfile =
+            computer.sweep(
+                observerLat = observerLat,
+                observerLon = observerLon,
+                observerEyeM = observerEyeM,
+                sampler = sampler,
+                maxRadiusM = 25_000.0
+            )
+
+        val northBucket = azimuthBucketIndex(cappedProfile, bearingDeg = 0.0)
+        assertThat(cappedProfile.elevationAnglesDeg[northBucket]).isLessThan(1f)
+        assertThat(fullProfile.elevationAnglesDeg[northBucket]).isGreaterThan(2f)
     }
 
     // Device regression (screenshot: "mean 78.7° pitch 78.4°"). Documents *why* DemTileReader must reject

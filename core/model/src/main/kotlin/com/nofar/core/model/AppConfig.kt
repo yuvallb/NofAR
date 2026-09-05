@@ -196,17 +196,10 @@ object AppConfig {
     /**
      * Outward sample interval along each horizon azimuth ray (meters).
      * Coarser than [VISIBILITY_RAY_STEP_METERS] (100 m) on purpose: the skyline sweeps ~180 rays per
-     * pass, so a 150 m step keeps sample count ≈ maxRadius/step + 1 within the §8 visibility budget.
+     * pass, so a 150 m step keeps sample count ≈ collectionRadius/step + 1 within the §8 visibility
+     * budget (worst case ≈ floor(25_000 / 150) + 1 = 167 samples per ray).
      */
     const val HORIZON_RAY_STEP_M: Double = 150.0
-
-    /**
-     * Budget cap for the horizon skyline sweep radius (meters). The actual reach is
-     * `min(regionCollectionRadius, HORIZON_MAX_RADIUS_M)` (H-DEC-3): for the common 10 km region the
-     * 15 km collection radius is matched in full; larger regions cap here, so a peak label beyond the
-     * cap may sit slightly above the outline.
-     */
-    const val HORIZON_MAX_RADIUS_M: Double = 15_000.0
 
     /**
      * Multiplier applied to boundary radius-of-gyration when approximating place footprint (Prepare).

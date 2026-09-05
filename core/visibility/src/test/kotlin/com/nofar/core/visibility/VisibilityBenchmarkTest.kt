@@ -60,7 +60,7 @@ class VisibilityBenchmarkTest {
         assertThat(elapsedMs).isLessThan(2_000L)
     }
 
-    // H-P1-18: the full-360° skyline sweep (~180 rays × ~101 samples at defaults) must fit inside the
+    // H-P1-18: the full-360° skyline sweep (~180 rays × ~167 samples at defaults) must fit inside the
     // remaining §8 visibility budget. Device target is <200 ms as part of the pass; CI JVM is faster
     // but shared runners are noisy, so allow generous headroom and check p95 over repeated sweeps.
     @Test
