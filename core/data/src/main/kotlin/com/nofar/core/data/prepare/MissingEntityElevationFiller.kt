@@ -36,6 +36,7 @@ constructor(
     ): Result {
         val total = entityIds.size
         val readers = mutableMapOf<String, DemTileReader>()
+        val unreadableTiles = mutableSetOf<String>()
         var attempted = 0
         var filled = 0
         var skippedExisting = 0
@@ -50,7 +51,7 @@ constructor(
                     continue
                 }
                 attempted += 1
-                val sampled = sampleElevation(entity, readers)
+                val sampled = sampleElevation(entity, readers, unreadableTiles)
                 if (sampled == null) {
                     failed += 1
                     continue
@@ -83,16 +84,17 @@ constructor(
         else -> false
     }
 
-    private fun sampleElevation(entity: GeoEntity, readers: MutableMap<String, DemTileReader>): Float? {
+    private fun sampleElevation(
+        entity: GeoEntity,
+        readers: MutableMap<String, DemTileReader>,
+        unreadableTiles: MutableSet<String>
+    ): Float? {
         if (entity.type == com.nofar.core.model.GeoEntityType.PEAK) {
-            return samplePeakElevation(entity, readers)
+            return samplePeakElevation(entity, readers, unreadableTiles)
         }
         val (tileLat, tileLon) = DemTileId.coordinatesForPoint(entity.lat, entity.lon)
         val tileId = DemTileId.fromCoordinates(tileLat, tileLon)
-        val reader =
-            readers[tileId] ?: demTileRepository.openReader(tileId)?.also { opened ->
-                readers[tileId] = opened
-            } ?: return null
+        val reader = readerFor(tileId, readers, unreadableTiles) ?: return null
         return reader.elevationAt(entity.lat, entity.lon)
     }
 
@@ -100,13 +102,14 @@ constructor(
      * Peak elevations use the max of a 3×3 window of DEM samples around the peak pixel
      * (neighboring raster pixels, not neighboring 1° cells).
      */
-    private fun samplePeakElevation(entity: GeoEntity, readers: MutableMap<String, DemTileReader>): Float? {
+    private fun samplePeakElevation(
+        entity: GeoEntity,
+        readers: MutableMap<String, DemTileReader>,
+        unreadableTiles: MutableSet<String>
+    ): Float? {
         val (tileLat, tileLon) = DemTileId.coordinatesForPoint(entity.lat, entity.lon)
         val tileId = DemTileId.fromCoordinates(tileLat, tileLon)
-        val reader =
-            readers[tileId] ?: demTileRepository.openReader(tileId)?.also { opened ->
-                readers[tileId] = opened
-            } ?: return null
+        val reader = readerFor(tileId, readers, unreadableTiles) ?: return null
 
         val degPerPixelX = 1.0 / reader.width
         val degPerPixelY = 1.0 / reader.height
@@ -123,5 +126,21 @@ constructor(
         }
         // Fall back to single-pixel if neighbors fall outside the tile edge.
         return best ?: reader.elevationAt(entity.lat, entity.lon)
+    }
+
+    private fun readerFor(
+        tileId: String,
+        readers: MutableMap<String, DemTileReader>,
+        unreadableTiles: MutableSet<String>
+    ): DemTileReader? {
+        if (tileId in unreadableTiles) return null
+        readers[tileId]?.let { return it }
+        val opened = demTileRepository.openReader(tileId)
+        if (opened == null) {
+            unreadableTiles += tileId
+            return null
+        }
+        readers[tileId] = opened
+        return opened
     }
 }

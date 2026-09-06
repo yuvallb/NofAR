@@ -126,10 +126,11 @@ class MissingEntityElevationFillerTest {
                 elevationSource = null
             )
         val entities = mutableMapOf(entity.id to entity)
+        val demRepo = FakeDemTileRepository(emptyMap())
         val filler =
             MissingEntityElevationFiller(
                 FakeGeoEntityRepository(entities),
-                FakeDemTileRepository(emptyMap())
+                demRepo
             )
 
         val result = filler.fill(listOf(entity.id))
@@ -138,6 +139,40 @@ class MissingEntityElevationFillerTest {
         assertThat(result.filled).isEqualTo(0)
         assertThat(result.failed).isEqualTo(1)
         assertThat(entities.getValue(entity.id).elevation).isNull()
+        assertThat(demRepo.openAttempts.values.sum()).isEqualTo(1)
+    }
+
+    @Test
+    fun fill_missingTile_opensReaderOncePerTile() = runTest {
+        val first =
+            sampleEntity(
+                id = "node/a",
+                lat = 32.4,
+                lon = 35.4,
+                elevation = null,
+                elevationSource = null
+            )
+        val second =
+            sampleEntity(
+                id = "node/b",
+                lat = 32.6,
+                lon = 35.6,
+                elevation = null,
+                elevationSource = null
+            )
+        val entities = mutableMapOf(first.id to first, second.id to second)
+        val demRepo = FakeDemTileRepository(emptyMap())
+        val filler =
+            MissingEntityElevationFiller(
+                FakeGeoEntityRepository(entities),
+                demRepo
+            )
+
+        val result = filler.fill(listOf(first.id, second.id))
+
+        assertThat(result.attempted).isEqualTo(2)
+        assertThat(result.failed).isEqualTo(2)
+        assertThat(demRepo.openAttempts.values.sum()).isEqualTo(1)
     }
 
     private fun writeFlatTile(tileLat: Int, tileLon: Int, elevationM: Float): File {
@@ -198,7 +233,10 @@ private class FakeGeoEntityRepository(private val store: MutableMap<String, GeoE
     override suspend fun garbageCollectOrphans(): Int = 0
 }
 
-private class FakeDemTileRepository(private val binsByTileId: Map<String, File>) : DemTileRepository {
+private class FakeDemTileRepository(
+    private val binsByTileId: Map<String, File>,
+    val openAttempts: MutableMap<String, Int> = mutableMapOf()
+) : DemTileRepository {
     override suspend fun registerTile(tile: DemTile) = Unit
 
     override suspend fun getTile(tileId: String): DemTile? = null
@@ -207,7 +245,10 @@ private class FakeDemTileRepository(private val binsByTileId: Map<String, File>)
 
     override suspend fun ensureRegisteredFromBin(tileId: String): Boolean = isBinReadable(tileId)
 
-    override fun openReader(tileId: String): DemTileReader? = binsByTileId[tileId]?.let(DemTileReader::open)
+    override fun openReader(tileId: String): DemTileReader? {
+        openAttempts[tileId] = (openAttempts[tileId] ?: 0) + 1
+        return binsByTileId[tileId]?.let(DemTileReader::open)
+    }
 
     override suspend fun incrementRefCount(tileId: String) = Unit
 

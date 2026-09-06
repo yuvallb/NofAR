@@ -181,6 +181,37 @@ class GeoEntityDaoTest {
     }
 
     @Test
+    fun getIdsMissingElevationForCoverageSet_returnsOnlyNullElevations() = runTest {
+        val coverageSetId = UUID.randomUUID().toString()
+        fixtures.coverageSetDao.upsert(
+            CoverageSetEntity(
+                id = coverageSetId,
+                name = "MissingEle",
+                createdAt = 1L,
+                updatedAt = 1L,
+                downloadStatus = DownloadStatus.READY.name,
+                downloadProgressPct = 100,
+                osmDatasetVersion = null,
+                estimatedSizeBytes = 0,
+                entityCount = 2
+            )
+        )
+        fixtures.geoEntityUpserter.upsert(sampleEntity(id = "node/has-ele"))
+        fixtures.geoEntityUpserter.upsert(
+            sampleEntity(id = "node/no-ele").copy(elevation = null, elevationSource = null)
+        )
+        fixtures.coverageDao.insert(
+            CoverageEntityEntity(coverageSetId, "node/has-ele", displayName = "Has")
+        )
+        fixtures.coverageDao.insert(
+            CoverageEntityEntity(coverageSetId, "node/no-ele", displayName = "No")
+        )
+
+        assertThat(fixtures.geoEntityDao.getIdsMissingElevationForCoverageSet(coverageSetId))
+            .containsExactly("node/no-ele")
+    }
+
+    @Test
     fun rTreeQuery_returnsEntitiesWithinRadius() = runTest {
         repeat(20) { index ->
             fixtures.geoEntityUpserter.upsert(

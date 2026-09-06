@@ -77,6 +77,13 @@ class HomeCoverageLogicTest {
     }
 
     @Test
+    fun showsEmptyCoveragePrompt_onlyAfterLoadWithNoCoverageSets() {
+        assertFalse(HomeCoverageLogic.showsEmptyCoveragePrompt(loading = true, coverageSetCount = 0))
+        assertTrue(HomeCoverageLogic.showsEmptyCoveragePrompt(loading = false, coverageSetCount = 0))
+        assertFalse(HomeCoverageLogic.showsEmptyCoveragePrompt(loading = false, coverageSetCount = 1))
+    }
+
+    @Test
     fun exploreEligibleInside_filtersByCellMembership() {
         val location = userLocation(32.5, 35.5)
         val ready = sampleCoverageSet(downloadStatus = DownloadStatus.READY)

@@ -85,4 +85,14 @@ interface GeoEntityDao {
 
     @Query("SELECT COUNT(*) FROM geo_entity")
     suspend fun countAll(): Int
+
+    @Query(
+        """
+        SELECT g.id FROM geo_entity AS g
+        INNER JOIN coverage_entity AS c ON c.entity_id = g.id
+        WHERE c.coverage_set_id = :coverageSetId
+          AND g.elevation IS NULL
+        """
+    )
+    suspend fun getIdsMissingElevationForCoverageSet(coverageSetId: String): List<String>
 }

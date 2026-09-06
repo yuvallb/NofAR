@@ -51,6 +51,8 @@ internal object HomeCoverageLogic {
 
     fun isEnterExploreEnabled(insideExplore: List<CoverageSet>): Boolean = insideExplore.isNotEmpty()
 
+    fun showsEmptyCoveragePrompt(loading: Boolean, coverageSetCount: Int): Boolean = !loading && coverageSetCount == 0
+
     fun resolveExploreNavigation(insideExplore: List<CoverageSet>): ExploreNavigationDecision {
         val selected =
             insideExplore.maxWithOrNull(EXPLORE_COVERAGE_PREFERENCE)

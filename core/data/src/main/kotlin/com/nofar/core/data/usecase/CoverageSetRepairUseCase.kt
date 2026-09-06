@@ -12,6 +12,7 @@ import com.nofar.core.database.dao.CoverageCellDao
 import com.nofar.core.database.dao.CoverageEntityDao
 import com.nofar.core.database.dao.CoverageLinker
 import com.nofar.core.database.dao.DemTileDao
+import com.nofar.core.database.dao.GeoEntityDao
 import com.nofar.core.model.CellMembership
 import com.nofar.core.model.CoverageSet
 import com.nofar.core.model.DemTileId
@@ -29,6 +30,7 @@ constructor(
     private val coverageSetRepository: CoverageSetRepository,
     private val coverageEntityDao: CoverageEntityDao,
     private val coverageCellDao: CoverageCellDao,
+    private val geoEntityDao: GeoEntityDao,
     private val demTileDao: DemTileDao,
     private val demTileRepository: DemTileRepository,
     private val coverageLinker: CoverageLinker,
@@ -90,7 +92,7 @@ constructor(
     }
 
     private suspend fun fillMissingElevations(coverageSet: CoverageSet) {
-        val entityIds = coverageEntityDao.getEntityIdsForCoverageSet(coverageSet.id.toString())
+        val entityIds = geoEntityDao.getIdsMissingElevationForCoverageSet(coverageSet.id.toString())
         if (entityIds.isEmpty()) return
         elevationFiller.fill(entityIds, refreshDemSamples = false)
     }

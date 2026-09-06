@@ -11,13 +11,16 @@ class RTreeMaintenance
 @Inject
 constructor(private val spatialQuery: GeoEntitySpatialQuery) {
     private val backfillInFlight = AtomicBoolean(false)
+    private val backfillCompleted = AtomicBoolean(false)
 
     suspend fun backfillMissingEntriesIfNeeded() {
+        if (backfillCompleted.get()) return
         if (!backfillInFlight.compareAndSet(false, true)) return
         try {
             withContext(Dispatchers.IO) {
                 spatialQuery.backfillMissingRTreeEntries()
             }
+            backfillCompleted.set(true)
         } finally {
             backfillInFlight.set(false)
         }

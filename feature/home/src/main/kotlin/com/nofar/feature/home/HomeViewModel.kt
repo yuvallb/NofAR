@@ -76,16 +76,19 @@ constructor(
     init {
         seedCachedLocation()
         locationController.acquire(HOME_LOCATION_TOKEN)
+        viewModelScope.launch(Dispatchers.IO) {
+            coverageSetRepository.observeAllCoverageSets().collect { coverageSets ->
+                coverageSets.forEach { set ->
+                    runCatching { coverageSetRepairUseCase.repairIfNeeded(set) }
+                }
+            }
+        }
         viewModelScope.launch {
             combine(
                 coverageSetRepository.observeAllCoverageSets(),
                 currentLocation
             ) { coverageSets, location -> coverageSets to location }
-                .flowOn(Dispatchers.IO)
                 .mapLatest { (coverageSets, location) ->
-                    coverageSets.forEach { set ->
-                        runCatching { coverageSetRepairUseCase.repairIfNeeded(set) }
-                    }
                     val cellIdsBySet =
                         coverageSets.associate { set ->
                             set.id to coverageSetRepository.getCellIdsForCoverageSet(set.id).toSet()
@@ -102,6 +105,7 @@ constructor(
                         )
                     Triple(cards, insideExplore, location)
                 }
+                .flowOn(Dispatchers.IO)
                 .collect { (cards, insideExplore, location) ->
                     _uiState.update { state ->
                         val waitingForFix =

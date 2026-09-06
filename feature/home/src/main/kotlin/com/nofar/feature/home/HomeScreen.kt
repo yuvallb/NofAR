@@ -29,6 +29,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.nofar.core.designsystem.component.CoverageSetCardState
 import com.nofar.core.designsystem.component.NofARHomeTopBar
+import com.nofar.core.designsystem.component.NofARLoadingIndicator
 import com.nofar.core.designsystem.component.NofARPrimaryButton
 import com.nofar.core.designsystem.component.NofARRegionCard
 import com.nofar.core.designsystem.component.NofARRegionListDivider
@@ -148,6 +149,7 @@ private fun HomeScreenContent(
         NofARSectionHeader(title = "LOCAL COVERAGE")
         HomeRegionList(
             regions = uiState.coverageSets,
+            loading = uiState.loading,
             onPrepare = { regionId -> onNavigateToPrepare(regionId) },
             onAddRegion = { onNavigateToPrepare(null) },
             onDelete = onDelete,
@@ -199,12 +201,13 @@ private fun GlobalEnterExploreSection(
 @Composable
 private fun HomeRegionList(
     regions: List<CoverageSetCardState>,
+    loading: Boolean,
     onPrepare: (UUID) -> Unit,
     onAddRegion: () -> Unit,
     onDelete: (UUID) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (regions.isEmpty()) {
+    if (HomeCoverageLogic.showsEmptyCoveragePrompt(loading, regions.size)) {
         Column(modifier = modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Text(
                 text = "No coverage sets yet. Download map data for an area to get started.",
@@ -217,6 +220,10 @@ private fun HomeRegionList(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+        return
+    }
+    if (loading && regions.isEmpty()) {
+        NofARLoadingIndicator(modifier = modifier)
         return
     }
     LazyColumn(
